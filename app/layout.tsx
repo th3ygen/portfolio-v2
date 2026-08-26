@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { archivoBlack, jetbrainsMono } from './fonts';
+import { Analytics } from '@vercel/analytics/next';
 import { SmoothScrollProvider } from '@/components/motion/SmoothScrollProvider';
 import './globals.css';
 
@@ -14,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${archivoBlack.variable} ${jetbrainsMono.variable}`}>
       <body>
         <SmoothScrollProvider>{children}</SmoothScrollProvider>
+        <Analytics />
       </body>
     </html>
   );

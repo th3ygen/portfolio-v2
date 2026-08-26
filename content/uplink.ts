@@ -6,11 +6,15 @@ export const UPLINK = {
   body: "Full-time roles, freelance builds, or work for Ascenity — all fine. If you're deciding whether to reach out, reach out.",
   formTitle: 'TRANSMIT.SH',
   fields: {
-    name: '> YOUR NAME',
-    email: '> REPLY ADDRESS',
-    message: '> PAYLOAD',
+    name: { label: '> YOUR NAME', placeholder: 'jane doe' },
+    email: { label: '> REPLY ADDRESS', placeholder: 'jane@company.com' },
+    message: { label: '> PAYLOAD', placeholder: 'what are you building?' },
   },
   submit: 'TRANSMIT →',
+  sending: 'TRANSMITTING…',
+  success: 'TRANSMISSION RECEIVED — REPLY INBOUND',
+  failure: 'TRANSMISSION FAILED — TRY EMAIL BELOW',
+  invalid: 'CHECK THE HIGHLIGHTED FIELDS',
   responseWindow: 'RESPONSE WINDOW: ~24H · GMT+8',
 } as const;
 

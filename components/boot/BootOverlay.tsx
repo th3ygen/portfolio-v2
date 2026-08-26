@@ -18,7 +18,7 @@ import {
 } from './bootProgress';
 import styles from './BootOverlay.module.css';
 
-type Phase = 'idle' | 'running' | 'exiting' | 'wiping';
+type Phase = 'idle' | 'running' | 'exiting' | 'wiping' | 'done';
 
 /** sessionStorage throws in some privacy modes; a boot overlay is not worth a crash. */
 function alreadyPlayed(): boolean {
@@ -52,7 +52,7 @@ export function BootOverlay({ onComplete }: { onComplete: () => void }) {
   // and break hydration. So the server and the first client render both emit
   // nothing, and the effect takes it from there.
   const [phase, setPhase] = useState<Phase>('idle');
-  const active = phase !== 'idle';
+  const active = phase !== 'idle' && phase !== 'done';
   const [shown, setShown] = useState(0);
   const [state, setState] = useState<'POST' | 'LOAD' | 'HANDOFF'>('POST');
 
@@ -93,6 +93,10 @@ export function BootOverlay({ onComplete }: { onComplete: () => void }) {
 
     const teardown = () => {
       document.body.style.overflow = previousOverflow;
+      // Unmount rather than leaving a clipped-away overlay in the DOM. It is
+      // fixed at z-index 200 and carries role="status"; left mounted it stays
+      // a live region competing with the contact form's own status message.
+      setPhase('done');
       onCompleteRef.current();
     };
 

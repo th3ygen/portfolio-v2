@@ -7,8 +7,7 @@ import { OPERATOR } from '@/content/operator';
 
 /**
  * The hero is the page's h1 and carries no section title or ghost numeral.
- * Every other section has both, whether it is a bespoke component or still a
- * placeholder shell — so these assertions hold as sections get built out.
+ * Every other section has both.
  */
 const TITLED_SECTIONS = SECTIONS.filter((s) => s.id !== 's00');
 

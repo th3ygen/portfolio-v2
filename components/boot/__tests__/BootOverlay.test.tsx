@@ -104,6 +104,26 @@ describe('BootOverlay', () => {
     caf.mockRestore();
   });
 
+  it('leaves the DOM entirely once it has handed off', () => {
+    vi.useFakeTimers();
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const caf = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+
+    const { container, unmount } = render(<BootOverlay onComplete={vi.fn()} />);
+    expect(container).not.toBeEmptyDOMElement();
+
+    act(() => {
+      vi.advanceTimersByTime(4500 + 300 + 680 + 50);
+    });
+
+    // A clipped-away overlay is still a fixed, full-viewport live region.
+    expect(container).toBeEmptyDOMElement();
+
+    unmount();
+    raf.mockRestore();
+    caf.mockRestore();
+  });
+
   it('hides its decorative chrome from assistive tech', () => {
     const { container } = render(<BootOverlay onComplete={vi.fn()} />);
     for (const bracket of container.querySelectorAll('[data-boot-bracket]')) {
