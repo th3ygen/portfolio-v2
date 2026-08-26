@@ -17,7 +17,7 @@ export const UPLINK = {
 export const CHANNELS: readonly ContactChannel[] = [
   { label: 'EMAIL', value: 'aidil.syaz1.hamdan@gmail.com', href: 'mailto:aidil.syaz1.hamdan@gmail.com' },
   { label: 'PHONE', value: '+6011-3652-8296', href: 'tel:+601136528296' },
-  { label: 'BASE', value: 'Kuala Lumpur, Malaysia' },
+  { label: 'BASE', value: 'Kuala Lumpur, Malaysia', href: 'https://maps.app.goo.gl/ZbhD9hVvHUBW3d3E6' },
   { label: 'LINKEDIN', value: '/in/aidilsyaz', href: 'https://www.linkedin.com/in/aidilsyaz' },
 ] as const;
 

@@ -56,3 +56,18 @@ export const TICKER: readonly string[] = [
   'MQTT', 'WEBSOCKET', 'WEBRTC', 'CAN BUS', 'TENSORFLOW.JS', 'DOCKER', 'AWS',
   'NGINX', 'MAPBOX', 'BLE', 'RASPBERRY PI',
 ] as const;
+
+/**
+ * Social and CV destinations. The prototype renders these as bare labels with
+ * no hrefs; the real URLs come from the live site at aidilsyaz.vercel.app.
+ */
+export const SOCIALS: readonly { readonly label: string; readonly href: string }[] = [
+  { label: 'GITHUB', href: 'https://github.com/th3ygen' },
+  { label: 'LINKEDIN', href: 'https://www.linkedin.com/in/aidilsyaz/' },
+  { label: 'X', href: 'https://x.com/aideal_syaz' },
+  { label: 'STACKOVERFLOW', href: 'https://stackoverflow.com/users/10222642/aidil' },
+  { label: 'DEV.TO', href: 'https://dev.to/th3ygen' },
+  { label: 'INSTAGRAM', href: 'https://www.instagram.com/aidil.syaz_/' },
+] as const;
+
+export const CV_HREF = '/docs/cv.pdf';

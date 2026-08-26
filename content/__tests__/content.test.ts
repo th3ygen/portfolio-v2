@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CORE_LOADOUT } from '@/content/operator';
+import { CORE_LOADOUT, SOCIALS } from '@/content/operator';
 import { MANIFEST } from '@/content/manifest';
 import { SPOTLIGHTS } from '@/content/spotlights';
 import { INDEX_ROWS } from '@/content/index-rows';
@@ -106,5 +106,19 @@ describe('index rows', () => {
   it('names each system exactly once', () => {
     const names = INDEX_ROWS.map((r) => r.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe('socials', () => {
+  it('gives every social label a real absolute URL', () => {
+    for (const social of SOCIALS) {
+      expect(social.href).toMatch(/^https:\/\//);
+    }
+  });
+
+  it('covers the six labels the hero renders', () => {
+    expect(SOCIALS.map((s) => s.label)).toEqual([
+      'GITHUB', 'LINKEDIN', 'X', 'STACKOVERFLOW', 'DEV.TO', 'INSTAGRAM',
+    ]);
   });
 });
