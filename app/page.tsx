@@ -7,6 +7,7 @@ import { Ambient } from '@/components/chrome/Ambient';
 import { Reticle } from '@/components/chrome/Reticle';
 import { BootOverlay } from '@/components/boot/BootOverlay';
 import { S00Hero } from '@/components/sections/S00Hero';
+import { S01Operator } from '@/components/sections/S01Operator';
 import { SectionShell } from '@/components/sections/SectionShell';
 import { SECTIONS } from '@/content/sections';
 
@@ -15,6 +16,9 @@ import { SECTIONS } from '@/content/sections';
  * that timeline must not play until the boot overlay has handed off. The page
  * is animated end to end and gains nothing from staying a server component.
  */
+/** Sections with bespoke components; the rest still render placeholder shells. */
+const BUILT = new Set(['s00', 's01']);
+
 export default function Page() {
   const [bootDone, setBootDone] = useState(false);
 
@@ -27,7 +31,8 @@ export default function Page() {
       <RailNav />
       <main data-boot-done={bootDone ? 'true' : 'false'}>
         <S00Hero bootDone={bootDone} />
-        {SECTIONS.filter((section) => section.id !== 's00').map((section) => (
+        <S01Operator />
+        {SECTIONS.filter((section) => !BUILT.has(section.id)).map((section) => (
           <SectionShell
             key={section.id}
             id={section.id}

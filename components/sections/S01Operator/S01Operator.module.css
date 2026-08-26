@@ -1,0 +1,294 @@
+.section {
+  position: relative;
+  padding: 120px 0;
+  margin-left: 52px;
+  border-top: 1px solid var(--color-border);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1460px;
+  margin: 0 auto;
+  padding: 0 var(--pad-section-x-tight);
+}
+
+.head {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-16);
+  border-bottom: 1px solid var(--color-textGhost);
+  padding-bottom: 13px;
+  margin-bottom: 60px;
+}
+
+.headNumber { font-size: var(--fs-body-sm); font-weight: 800; color: var(--color-accent); }
+
+.headTitle {
+  margin: 0;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: 14px;
+  letter-spacing: var(--track-label);
+  color: var(--color-textPrimary);
+}
+
+.headNote {
+  flex: 1;
+  text-align: right;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: var(--color-textDim);
+}
+
+/* Travels top to bottom over the first 80% of the scrub, then fades. */
+.scan {
+  position: absolute;
+  left: var(--pad-section-x-tight);
+  right: var(--pad-section-x-tight);
+  top: 0;
+  height: 2px;
+  z-index: 4;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent) 12%,
+    var(--color-accent) 88%,
+    transparent
+  );
+  box-shadow: var(--glow-scan);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tag {
+  position: absolute;
+  right: var(--pad-section-x-tight);
+  top: -22px;
+  z-index: 4;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-tag);
+  color: var(--color-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: var(--gap-64);
+  align-items: start;
+}
+
+.card { position: relative; }
+
+.cardFrame {
+  position: relative;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface1);
+  padding: 8px;
+}
+
+.portrait {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  /* Clipped shut; the scan timeline wipes it open with steps(5). */
+  clip-path: inset(0 0 100% 0);
+}
+
+.portraitImage { width: 100%; height: 100%; object-fit: cover; }
+
+/* Explicit pending state — a visible gap, not a disguised one. */
+.portraitPending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gap-16);
+  text-align: center;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--color-borderDim1) 0px,
+      var(--color-borderDim1) 5px,
+      transparent 5px,
+      transparent 12px
+    ),
+    var(--color-bgAlt1);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-micro);
+  color: var(--color-textDim);
+  line-height: 1.8;
+}
+
+.cardMeta {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 2px 2px;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  color: var(--color-textDim);
+}
+
+.verified { color: var(--color-accent); }
+
+.cardCornerTL {
+  position: absolute;
+  top: -9px;
+  left: -9px;
+  width: 14px;
+  height: 14px;
+  border-top: 1px solid var(--color-accent);
+  border-left: 1px solid var(--color-accent);
+}
+
+.cardCornerBR {
+  position: absolute;
+  bottom: -9px;
+  right: -9px;
+  width: 14px;
+  height: 14px;
+  border-bottom: 1px solid var(--color-accent);
+  border-right: 1px solid var(--color-accent);
+}
+
+.idCard {
+  margin-top: 18px;
+  padding: var(--gap-12);
+  border: 1px solid var(--color-border);
+  font-size: var(--fs-label);
+  line-height: 1.9;
+  letter-spacing: var(--track-body);
+  color: var(--color-textMuted);
+}
+
+.idRow { display: flex; justify-content: space-between; }
+.idLabel { color: var(--color-textDim); }
+.idCallSign { color: var(--color-accent); }
+
+.lead {
+  margin: 0 0 var(--gap-22);
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(24px, 2.6vw, 38px);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  color: var(--color-textPrimary);
+  text-wrap: balance;
+}
+
+.leadAccent { color: var(--color-accent); }
+
+.body {
+  margin: 0 0 18px;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--color-textSecondary);
+  text-wrap: pretty;
+}
+
+.body:last-of-type { margin-bottom: var(--gap-40); }
+
+.loadoutHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-12);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 9px;
+  margin-bottom: 20px;
+}
+
+.loadoutTitle { font-size: var(--fs-micro); letter-spacing: var(--track-label); color: var(--color-textDim); }
+
+.loadoutNote {
+  flex: 1;
+  text-align: right;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  color: var(--color-textFaint);
+}
+
+/* 1px gap over a background is the hairline grid — no borders per cell. */
+.loadout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1px;
+  background: var(--color-borderDim1);
+  border: 1px solid var(--color-borderDim1);
+  list-style: none;
+}
+
+.loadoutItem { background: var(--color-bgAlt1); padding: 15px; }
+.loadoutItem:hover { background: var(--color-surface1); }
+
+.loadoutName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-textPrimary);
+  margin-bottom: 5px;
+}
+
+.loadoutName[data-accent='true'] { color: var(--color-accent); }
+
+.loadoutDetail { font-size: var(--fs-micro); letter-spacing: 0.1em; color: var(--color-textDim); }
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: minmax(0, 1fr); gap: var(--gap-40); }
+  .card { max-width: 340px; }
+}
+
+@media (max-width: 700px) {
+  .section { margin-left: 0; padding: 80px 0; }
+  .headNote { display: none; }
+}
+
+/* Parallax greebles. Present in the prototype and initially dropped. */
+.ghost {
+  position: absolute;
+  top: 60px;
+  right: -6px;
+  pointer-events: none;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(140px, 20vw, 300px);
+  line-height: 0.8;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--color-surface3);
+  user-select: none;
+  z-index: 0;
+}
+
+.ticks {
+  position: absolute;
+  top: 110px;
+  left: -14px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-34);
+  z-index: 0;
+}
+
+.tick { display: flex; align-items: center; gap: 5px; }
+.tickLine { height: 1px; background: var(--color-border); }
+.tickBox { width: 5px; height: 5px; border: 1px solid var(--color-border); }
+.tickBoxLive {
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--color-textGhost);
+  background: rgba(198, 242, 26, 0.14);
+}
+
+.dots {
+  position: absolute;
+  bottom: 90px;
+  right: 5%;
+  width: 150px;
+  height: 150px;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 11px 11px;
+  z-index: 0;
+}

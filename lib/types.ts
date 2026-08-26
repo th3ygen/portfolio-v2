@@ -2,6 +2,8 @@
 export type LoadoutItem = {
   readonly name: string;
   readonly detail: string;
+  /** Two entries are accent-coloured in the design; this is not decorative. */
+  readonly accent?: boolean;
 };
 
 /** One lettered category of the s02 full manifest. */

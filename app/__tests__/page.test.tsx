@@ -5,8 +5,12 @@ import Page from '@/app/page';
 import { SECTIONS } from '@/content/sections';
 import { OPERATOR } from '@/content/operator';
 
-/** Sections rendered by SectionShell. s00 is a bespoke hero and is excluded. */
-const SHELL_SECTIONS = SECTIONS.filter((s) => s.id !== 's00');
+/**
+ * The hero is the page's h1 and carries no section title or ghost numeral.
+ * Every other section has both, whether it is a bespoke component or still a
+ * placeholder shell — so these assertions hold as sections get built out.
+ */
+const TITLED_SECTIONS = SECTIONS.filter((s) => s.id !== 's00');
 
 describe('page', () => {
   it('renders all seven section anchors in scroll order', () => {
@@ -32,10 +36,10 @@ describe('page', () => {
     expect(h1s[0]).toHaveTextContent(`${OPERATOR.name[0]} ${OPERATOR.name[1]}`);
   });
 
-  it('renders one h2 per shell section, in order', () => {
+  it('renders one h2 per non-hero section, in scroll order', () => {
     const { container } = render(<Page />);
     const headings = Array.from(container.querySelectorAll('h2')).map((h) => h.textContent);
-    expect(headings).toEqual(SHELL_SECTIONS.map((s) => s.title));
+    expect(headings).toEqual(TITLED_SECTIONS.map((s) => s.title));
   });
 
   it('server-renders every section, so the page works without JavaScript', () => {
@@ -43,7 +47,7 @@ describe('page', () => {
     for (const section of SECTIONS) {
       expect(html).toContain(`id="${section.id}"`);
     }
-    for (const section of SHELL_SECTIONS) {
+    for (const section of TITLED_SECTIONS) {
       expect(html).toContain(section.title);
     }
     // The hero carries content rather than a section title.
@@ -53,7 +57,7 @@ describe('page', () => {
   it('hides every ghost numeral from assistive tech', () => {
     const { container } = render(<Page />);
     const ghosts = container.querySelectorAll('[data-ghost-numeral]');
-    expect(ghosts).toHaveLength(SHELL_SECTIONS.length);
+    expect(ghosts).toHaveLength(TITLED_SECTIONS.length);
     for (const ghost of ghosts) {
       expect(ghost).toHaveAttribute('aria-hidden', 'true');
     }

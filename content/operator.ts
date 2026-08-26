@@ -70,8 +70,8 @@ export const CORE_LOADOUT: readonly LoadoutItem[] = [
   { name: 'TypeScript', detail: 'ZOD · STRICT' },
   { name: 'Node.js', detail: 'EXPRESS · PM2' },
   { name: 'PostgreSQL', detail: 'PRISMA ORM' },
-  { name: 'MQTT / Socket.io', detail: 'REAL-TIME TRANSPORT' },
-  { name: 'WebRTC', detail: 'LIVE VIDEO · INTERCOM' },
+  { name: 'MQTT / Socket.io', detail: 'REAL-TIME TRANSPORT', accent: true },
+  { name: 'WebRTC', detail: 'LIVE VIDEO · INTERCOM', accent: true },
   { name: 'Flutter', detail: 'CURRENT ROLE' },
   { name: 'Tensorflow.js', detail: 'ON-DEVICE INFERENCE' },
 ] as const;
@@ -97,3 +97,27 @@ export const SOCIALS: readonly { readonly label: string; readonly href: string }
 ] as const;
 
 export const CV_HREF = '/docs/cv.pdf';
+
+export const LOADOUT_HEAD = {
+  title: 'CORE LOADOUT',
+  note: 'DAILY DRIVERS — FULL MANIFEST IN 02',
+} as const;
+
+/**
+ * The s01 portrait.
+ *
+ * `src: null` renders an explicit pending frame rather than a stand-in image —
+ * the layout is then correct and the gap is visible instead of disguised. The
+ * only candidate on the old site is a cartoon avatar, which the prototype
+ * itself rejects ("real photo beats the cartoon"). Set `src` when a real
+ * photograph exists; nothing else needs to change.
+ */
+export const PORTRAIT: {
+  readonly src: string | null;
+  readonly alt: string;
+  readonly filename: string;
+} = {
+  src: null,
+  alt: 'Muhd Aidil Syazwan Hamdan',
+  filename: 'OPERATOR.JPG',
+};
