@@ -297,7 +297,10 @@ git commit -m "feat: add design tokens, reset, and keyframes"
 ### Task 3: Self-hosted fonts
 
 **Files:**
-- Create: `public/fonts/ArchivoBlack-Regular.woff2`, `public/fonts/JetBrainsMono-{Light,Regular,Medium,Bold,ExtraBold}.woff2`
+- Create: `public/fonts/ArchivoBlack-Regular.woff2`, `public/fonts/JetBrainsMono-Variable.woff2`
+  (Google serves JetBrains Mono as a single variable file covering 300–800; requesting the five
+  weights separately returns five byte-identical copies. One face declaration at `weight: '300 800'`
+  covers the whole range.)
 - Create: `app/fonts.ts`
 - Modify: `app/layout.tsx`
 - Modify: `app/globals.css` (wire `--font-display` / `--font-mono`)
@@ -321,18 +324,14 @@ export const archivoBlack = localFont({
   src: [{ path: '../public/fonts/ArchivoBlack-Regular.woff2', weight: '400', style: 'normal' }],
   variable: '--font-display',
   display: 'block',
+  fallback: ['Impact', 'Haettenschweiler', 'sans-serif'],
 });
 
 export const jetbrainsMono = localFont({
-  src: [
-    { path: '../public/fonts/JetBrainsMono-Light.woff2', weight: '300', style: 'normal' },
-    { path: '../public/fonts/JetBrainsMono-Regular.woff2', weight: '400', style: 'normal' },
-    { path: '../public/fonts/JetBrainsMono-Medium.woff2', weight: '500', style: 'normal' },
-    { path: '../public/fonts/JetBrainsMono-Bold.woff2', weight: '700', style: 'normal' },
-    { path: '../public/fonts/JetBrainsMono-ExtraBold.woff2', weight: '800', style: 'normal' },
-  ],
+  src: [{ path: '../public/fonts/JetBrainsMono-Variable.woff2', weight: '300 800', style: 'normal' }],
   variable: '--font-mono',
   display: 'swap',
+  fallback: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
 });
 ```
 
