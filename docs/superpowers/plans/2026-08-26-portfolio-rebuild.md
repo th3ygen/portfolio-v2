@@ -407,7 +407,7 @@ design:
 
 - The **8-item core loadout lives in s01**, as `CORE_LOADOUT`, and each item carries a detail
   sub-label (`Next.js` / `APP ROUTER · SERVER ACTIONS`).
-- **s02 holds the full manifest** — nine lettered categories A–I, 72 items — as `MANIFEST`. The
+- **s02 holds the full manifest** — nine lettered categories A–I, 73 items — as `MANIFEST`. The
   toggle shows and hides the entire grid and **defaults to open**. Labels are
   `[ − ] COLLAPSE MANIFEST` and `[ + ] EXPAND FULL MANIFEST`.
 - `TrajectoryPost` carries a `tag` (`INTERNSHIP` / `RESEARCH` / `→ PRESENT`) and a `status`
@@ -1303,7 +1303,7 @@ git commit -m "feat: add s01 operator with scrubbed scan reveal"
 
 These two ship together because each is small and neither depends on the other; splitting them would mean two review gates for one afternoon of work.
 
-**s02** is the full manifest: nine lettered categories, 72 items, behind a toggle that shows and
+**s02** is the full manifest: nine lettered categories, 73 items, behind a toggle that shows and
 hides the whole grid and defaults to open. The 8-item core loadout it contrasts against lives in
 s01 (Task 11), not here. See the correction note in Task 4.
 
