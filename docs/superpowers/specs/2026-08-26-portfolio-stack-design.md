@@ -236,9 +236,24 @@ by eye against the prototype.
 
 ## Open questions
 
-1. **Real image assets.** The portrait and the four spotlight images do not
-   exist in this bundle. The build proceeds with placeholders and the layout is
-   correct without them, but the site cannot ship until they are supplied.
+1. **Real image assets.** ~~Do not exist in this bundle.~~ Resolved: the four
+   spotlight images were recovered from the live site at aidilsyaz.vercel.app
+   and committed to `public/img/`, cropped to landscape and rendered through
+   `components/media/FramedImage.tsx`, which applies a duotone treatment so the
+   bright source material sits inside the dark palette.
+
+   Two caveats remain, both the owner's call:
+   - Only CAM Kenderaan and Piping Calc Tools are product screenshots. CAM Muka
+     and GajahSafe are candid photographs, and CAM Muka had no landscape source
+     at all — it is a centre-band crop of a portrait photo.
+   - The CAM Kenderaan screenshot was cropped to drop a table row carrying a
+     vehicle plate. The remaining frame still shows record IDs and SHA256
+     comparisons from a Cyber Security Malaysia system, against epoch-dated
+     rows that look like test fixtures.
+
+   **The s01 operator portrait is still missing.** The only candidate on the
+   live site is a cartoon avatar (`me-toon-2.png`), which does not fit the
+   direction. This still blocks ship.
 2. **GSAP licensing.** Confirm ScrollTrigger's license at install time and
    record the resolved version.
 3. **Git.** This directory is not yet a repository. It needs `git init` and a

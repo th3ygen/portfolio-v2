@@ -1,0 +1,61 @@
+/*
+ * Duotone treatment for photographic content.
+ *
+ * Every source image is a bright, light-mode screenshot or a daylight candid
+ * photo. Dropped into a #070809 page with a single acid-green accent they read
+ * as a rendering fault. This knocks luminance down, strips the source's own
+ * colour, and re-tints toward the accent so the imagery sits inside the
+ * palette rather than fighting it.
+ */
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface1);
+  border: 1px solid var(--color-border);
+}
+
+.frame::before {
+  /* Accent re-tint. `color` blend keeps source luminance, replaces its hue. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--color-accent);
+  mix-blend-mode: color;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.frame::after {
+  /* Scanline overlay, tying framed media to the page chrome. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.03) 0px,
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(1) brightness(0.52) contrast(1.28);
+}
+
+/* The 2.5D drift in s03 moves the image inside a fixed frame, so the image is
+   deliberately larger than its frame and has room to travel. */
+.drifts .image {
+  width: 112%;
+  height: 112%;
+  max-width: none;
+  margin: -6% 0 0 -6%;
+}
