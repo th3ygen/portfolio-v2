@@ -384,15 +384,39 @@ git commit -m "feat: self-host Archivo Black and JetBrains Mono"
 - Produces: the types and data every section component imports.
 
 ```ts
-type ManifestItem = { label: string; category: string; core: boolean };
-type Spotlight = { id: string; name: string; year: string; blurb: string; stack: readonly string[]; image: string };
-type IndexRow = { n: string; name: string; year: string; role: string; stack: string };
-type TrajectoryPost = { post: string; year: string; org: string; role: string; body: string };
+type LoadoutItem = { name: string; detail: string };
+type ManifestCategory = { letter: string; category: string; items: readonly string[] };
+type SpotlightMeta = { label: string; value: string };
+type Spotlight = { id: string; code: string; name: string; tagline: string; years: string;
+                   tags: readonly string[]; blurb: string; meta: readonly SpotlightMeta[];
+                   stack: string; image: string };
+type IndexRow = { n: string; name: string; sector: string; keyTech: string; access: 'PRIVATE' | 'PUBLIC' };
+type TrajectoryPost = { post: string; year: string; tag: string; status: 'ACTIVE' | 'ARCHIVED';
+                        role: string; org: string; body: string };
 ```
 
-Exports: `OPERATOR`, `MANIFEST`, `SPOTLIGHTS`, `INDEX_ROWS`, `TRAJECTORY`.
+Exports: `OPERATOR`, `OPERATOR_CARD`, `HERO_STATS`, `CORE_LOADOUT`, `TICKER`, `MANIFEST`,
+`MANIFEST_LABEL`, `SPOTLIGHTS`, `INDEX_ROWS`, `TRAJECTORY`, `UPLINK`, `CHANNELS`, `FOOTER`.
 
-**Counts are load-bearing.** README calls out "keep the count discipline" — the redesign exists partly to replace a 90-skill dump. Exactly 8 core manifest items, exactly 4 spotlights, exactly 16 index rows, exactly 5 trajectory posts. The tests enforce this.
+**Correction against the prototype.** The plan originally modelled one `MANIFEST` array with a
+`core: boolean` flag. The prototype does something different, and the prototype is the approved
+design:
+
+- The **8-item core loadout lives in s01**, as `CORE_LOADOUT`, and each item carries a detail
+  sub-label (`Next.js` / `APP ROUTER · SERVER ACTIONS`).
+- **s02 holds the full manifest** — nine lettered categories A–I, 72 items — as `MANIFEST`. The
+  toggle shows and hides the entire grid and **defaults to open**. Labels are
+  `[ − ] COLLAPSE MANIFEST` and `[ + ] EXPAND FULL MANIFEST`.
+- `TrajectoryPost` carries a `tag` (`INTERNSHIP` / `RESEARCH` / `→ PRESENT`) and a `status`
+  (`ACTIVE` / `ARCHIVED`) that the original type omitted.
+- `IndexRow` columns are ID / SYSTEM / SECTOR / KEY TECH / ACCESS, not year and role.
+
+**Counts are load-bearing.** README calls out "keep the count discipline" — the redesign exists
+partly to replace a 90-skill dump. Exactly 8 core loadout items, exactly 4 spotlights, exactly 16
+index rows, exactly 5 trajectory posts, exactly 9 manifest categories. The tests enforce this.
+
+**Copy comes from the prototype verbatim.** Every string in these modules is lifted from
+`Portfolio Redesign.dc.html`, which holds the final approved copy. Do not rewrite it.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1163,7 +1187,7 @@ git commit -m "feat: add s00 hero with datamosh canvas and intro timeline"
 - Consumes: `OPERATOR` (Task 4), `SectionShell`, `gsap`/`useGSAP`, `useReducedMotion`, `next/image`.
 - Produces: `<S01Operator />`.
 
-**Layout per README:** grid `340px minmax(0,1fr)`, `gap: 64px`, `align-items: start`. Left is the portrait card; right is a lead statement in Archivo Black at `clamp(24px, 2.6vw, 38px)` followed by body copy blocks.
+**Layout per README:** grid `340px minmax(0,1fr)`, `gap: 64px`, `align-items: start`. Left is the portrait card, with the `OPERATOR_CARD` identity facts beneath it; right is a lead statement in Archivo Black at `clamp(24px, 2.6vw, 38px)`, then the body copy blocks, then the 8-item `CORE_LOADOUT` grid under a `CORE LOADOUT / DAILY DRIVERS — FULL MANIFEST IN 02` header.
 
 **The scan animation** is scrubbed at `scrub: .45`, from `top 78%` to `top -30%` — a deliberately long window so it completes on screen rather than below the fold.
 
@@ -1255,7 +1279,9 @@ git commit -m "feat: add s01 operator with scrubbed scan reveal"
 
 These two ship together because each is small and neither depends on the other; splitting them would mean two review gates for one afternoon of work.
 
-**s02** shows the 8 core loadout items by default, with the full manifest behind a toggle. This section replaced the old 90-skill grid across 9 categories — the count discipline is the point of the section, and the Task 4 test already enforces it.
+**s02** is the full manifest: nine lettered categories, 72 items, behind a toggle that shows and
+hides the whole grid and defaults to open. The 8-item core loadout it contrasts against lives in
+s01 (Task 11), not here. See the correction note in Task 4.
 
 **s03** shows four projects, each with framed imagery that drifts in 2.5D inside its frame on scroll.
 
@@ -1276,26 +1302,36 @@ beforeEach(() => {
   }));
 });
 
+const TOTAL_ITEMS = MANIFEST.reduce((sum, c) => sum + c.items.length, 0);
+
 describe('S02Manifest', () => {
-  it('shows only the 8 core items collapsed', () => {
+  it('renders the whole manifest expanded by default', () => {
     render(<S02Manifest />);
-    expect(screen.getAllByRole('listitem')).toHaveLength(8);
+    expect(screen.getAllByRole('listitem')).toHaveLength(TOTAL_ITEMS);
   });
 
-  it('expands to the full manifest on toggle', async () => {
+  it('collapses the grid on toggle', async () => {
     const user = userEvent.setup();
     render(<S02Manifest />);
     await user.click(screen.getByRole('button'));
-    expect(screen.getAllByRole('listitem')).toHaveLength(MANIFEST.length);
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
   });
 
   it('reflects expanded state to assistive tech', async () => {
     const user = userEvent.setup();
     render(<S02Manifest />);
     const toggle = screen.getByRole('button');
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('swaps the toggle label with the state', async () => {
+    const user = userEvent.setup();
+    render(<S02Manifest />);
+    expect(screen.getByRole('button')).toHaveTextContent('COLLAPSE MANIFEST');
+    await user.click(screen.getByRole('button'));
+    expect(screen.getByRole('button')).toHaveTextContent('EXPAND FULL MANIFEST');
   });
 });
 ```
@@ -1340,7 +1376,9 @@ Expected: FAIL — neither module resolves.
 
 - [ ] **Step 3: Implement s02**
 
-State is one boolean. Render a `<ul>` of `MANIFEST.filter(m => m.core)` when collapsed, all of `MANIFEST` when expanded. The toggle is a real `<button>` carrying `aria-expanded`.
+State is one boolean, initialised to `true`. Render the nine category columns as a grid of `<ul>`s
+when open and nothing when closed. The toggle is a real `<button>` carrying `aria-expanded` and
+`MANIFEST_LABEL.open` / `MANIFEST_LABEL.closed` as its text.
 
 - [ ] **Step 4: Implement s03**
 

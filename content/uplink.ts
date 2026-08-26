@@ -1,0 +1,28 @@
+import type { ContactChannel } from '@/lib/types';
+
+export const UPLINK = {
+  label: 'ACCEPTING TRANSMISSIONS',
+  lead: ['Got something', 'that has to', 'not break', '?'] as const,
+  body: "Full-time roles, freelance builds, or work for Ascenity — all fine. If you're deciding whether to reach out, reach out.",
+  formTitle: 'TRANSMIT.SH',
+  fields: {
+    name: '> YOUR NAME',
+    email: '> REPLY ADDRESS',
+    message: '> PAYLOAD',
+  },
+  submit: 'TRANSMIT →',
+  responseWindow: 'RESPONSE WINDOW: ~24H · GMT+8',
+} as const;
+
+export const CHANNELS: readonly ContactChannel[] = [
+  { label: 'EMAIL', value: 'aidil.syaz1.hamdan@gmail.com', href: 'mailto:aidil.syaz1.hamdan@gmail.com' },
+  { label: 'PHONE', value: '+6011-3652-8296', href: 'tel:+601136528296' },
+  { label: 'BASE', value: 'Kuala Lumpur, Malaysia' },
+  { label: 'LINKEDIN', value: '/in/aidilsyaz', href: 'https://www.linkedin.com/in/aidilsyaz' },
+] as const;
+
+export const FOOTER = {
+  sys: 'DIL.SYS',
+  credit: 'DESIGNED & BUILT BY MUHD AIDIL SYAZWAN BIN HAMDAN',
+  rights: 'ALL RIGHTS RESERVED © 2026',
+} as const;
