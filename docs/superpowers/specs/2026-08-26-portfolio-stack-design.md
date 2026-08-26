@@ -31,9 +31,11 @@ Constraints taken from the handoff and from the stack conversation:
 
 ## Decisions
 
-### Framework — Next.js 15, App Router
+### Framework — Next.js 16, App Router
 
 Chosen over Astro and a Vite SPA.
+
+Resolved at install time as 16.3.3 with React 19.2. The spec was written against 15; `create-next-app@latest` now ships 16, and nothing this design relies on — App Router, route handlers, `next/font/local`, `next/image` — changed across that major. Taking the current stable rather than deliberately pinning back a major.
 
 Next.js covers all three forward-looking needs with no additional services: a
 route handler for the contact form, a one-import analytics integration, and

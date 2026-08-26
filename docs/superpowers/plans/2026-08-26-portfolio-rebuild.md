@@ -4,9 +4,9 @@
 
 **Goal:** Rebuild the `Portfolio Redesign.dc.html` prototype as a production Next.js site — seven full-height scroll-driven sections, a boot overlay, a pinned zoom transition, and a working contact form.
 
-**Architecture:** Next.js 15 App Router, statically generated except one route handler for the contact form. One component per section under `components/sections/`, each with a colocated CSS Module consuming custom-property design tokens declared once in `app/globals.css`. All motion is GSAP driven through `@gsap/react`'s `useGSAP`, with Lenis smooth scroll owned by a single provider in the root layout. Content is typed TypeScript modules, so the types are the content schema.
+**Architecture:** Next.js 16 App Router, statically generated except one route handler for the contact form. One component per section under `components/sections/`, each with a colocated CSS Module consuming custom-property design tokens declared once in `app/globals.css`. All motion is GSAP driven through `@gsap/react`'s `useGSAP`, with Lenis smooth scroll owned by a single provider in the root layout. Content is typed TypeScript modules, so the types are the content schema.
 
-**Tech Stack:** Next.js 15 (App Router), React 19, TypeScript strict, CSS Modules, GSAP 3.12+ with ScrollTrigger, `@gsap/react`, Lenis, Zod, Resend, `@vercel/analytics`, Vitest + Testing Library, Playwright.
+**Tech Stack:** Next.js 16 (App Router), React 19, TypeScript strict, CSS Modules, GSAP 3.12+ with ScrollTrigger, `@gsap/react`, Lenis, Zod, Resend, `@vercel/analytics`, Vitest + Testing Library, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-08-26-portfolio-stack-design.md`
 
@@ -14,7 +14,8 @@
 
 ## Global Constraints
 
-- Node 24.x, npm 11.x. React 19, Next.js 15, App Router only — no `pages/`.
+- Node 24.x, npm 11.x. React 19, Next.js 16, App Router only — no `pages/`.
+  (Resolved 16.3.3 / React 19.2.8 at scaffold time. The plan was drafted against 15; nothing here depends on the difference.)
 - TypeScript `strict: true` and `noUncheckedIndexedAccess: true`. No `any`. No non-null assertions (`!`) in application code.
 - `border-radius: 0` everywhere. The only exception is the 6px pulsing status dot, which is `border-radius: 50%`. This is load-bearing to the brutalist direction.
 - One accent colour only: `#c6f21a`. The two aberration colours (`rgba(255,138,61,.5)`, `rgba(26,120,242,.35)`) appear in the hero `text-shadow` and nowhere else.
