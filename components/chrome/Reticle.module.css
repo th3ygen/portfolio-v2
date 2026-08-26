@@ -1,0 +1,70 @@
+.reticle {
+  position: fixed;
+  inset: 0;
+  z-index: 91;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.reticle[data-visible='true'] {
+  opacity: 1;
+}
+
+.crossY {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(198, 242, 26, 0.16) 18%,
+    rgba(198, 242, 26, 0.16) 82%,
+    transparent
+  );
+  will-change: transform;
+}
+
+.crossX {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(198, 242, 26, 0.16) 18%,
+    rgba(198, 242, 26, 0.16) 82%,
+    transparent
+  );
+  will-change: transform;
+}
+
+.dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 15px;
+  height: 15px;
+  margin: -8px 0 0 -8px;
+  border: 1px solid rgba(198, 242, 26, 0.45);
+  /* Second and last exception to border-radius: 0. */
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 14px 0 0 14px;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  color: rgba(198, 242, 26, 0.5);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  will-change: transform;
+}

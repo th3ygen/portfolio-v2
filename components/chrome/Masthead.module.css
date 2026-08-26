@@ -1,0 +1,62 @@
+.masthead {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-22);
+  height: 38px;
+  padding: 0 20px;
+  background: rgba(7, 8, 9, 0.86);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--color-textMuted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sys {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-textPrimary);
+  font-weight: 700;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  background: var(--color-accent);
+  /* The one intentional exception to border-radius: 0. */
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
+.slash {
+  color: var(--color-textFaint);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.clock {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.coffee {
+  color: var(--aberration-warm-solid);
+}
+
+/* Below the rail's breakpoint the masthead sheds its secondary readouts
+   rather than wrapping — it is chrome, not content. */
+@media (max-width: 900px) {
+  .optional {
+    display: none;
+  }
+}

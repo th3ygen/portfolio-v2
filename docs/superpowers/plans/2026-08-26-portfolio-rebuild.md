@@ -18,7 +18,10 @@
   (Resolved 16.3.3 / React 19.2.8 at scaffold time. The plan was drafted against 15; nothing here depends on the difference.)
 - TypeScript `strict: true` and `noUncheckedIndexedAccess: true`. No `any`. No non-null assertions (`!`) in application code.
 - `border-radius: 0` everywhere. The only exception is the 6px pulsing status dot, which is `border-radius: 50%`. This is load-bearing to the brutalist direction.
-- One accent colour only: `#c6f21a`. The two aberration colours (`rgba(255,138,61,.5)`, `rgba(26,120,242,.35)`) appear in the hero `text-shadow` and nowhere else.
+- One accent colour only: `#c6f21a`. The warm secondary `#ff8a3d` appears in exactly three
+  places — the hero name's chromatic aberration, the masthead `COFFEE: CRITICAL` readout, and the
+  tail of the rail progress gradient (`linear-gradient(180deg, #c6f21a, #ff8a3d)`). The cool
+  aberration `rgba(26,120,242,.35)` appears only in the hero `text-shadow`.
 - No box shadows for elevation. Glows only, at the exact values in README's "Other values" section.
 - Minimum font size is 9px, used only for chrome micro-labels.
 - Every colour, size, and spacing value in a CSS Module must reference a custom property from `app/globals.css`. No raw hex in a module file.
@@ -747,11 +750,32 @@ git commit -m "feat: add Lenis smooth scroll wired to ScrollTrigger"
 ### Task 7: Page chrome
 
 **Files:**
+- Create: `content/sections.ts` — the seven-section registry, shared with Task 8
+- Create: `components/chrome/Masthead.tsx` + `.module.css`
 - Create: `components/chrome/RailNav.tsx` + `.module.css`
-- Create: `components/chrome/ProgressTrack.tsx` + `.module.css`
-- Create: `components/chrome/Ticker.tsx` + `.module.css`
 - Create: `components/chrome/Ambient.tsx` + `.module.css`
-- Test: `components/chrome/__tests__/RailNav.test.tsx`
+- Create: `components/chrome/Reticle.tsx` + `.module.css`
+- Test: `components/chrome/__tests__/chrome.test.tsx`
+
+**Correction against the prototype.** The plan listed four components and got two of them
+wrong:
+
+- **`Masthead` was missing entirely.** The prototype has a fixed 38px top bar carrying
+  `DIL.SYS` with a glowing dot, the operator name, `BUILD 2026.08`, a live MYT clock, KL
+  coordinates, and `COFFEE: CRITICAL`. The clock must server-render a `--:--:-- MYT`
+  placeholder — a real time in SSR output can never match what the client computes.
+- **`Reticle` was missing entirely.** A pointer-tracking crosshair with a live coordinate
+  readout, gated on `(pointer: fine)` and skipped under reduced motion. Positions are written
+  straight to `style` inside a rAF; it fires on every mousemove and must not re-render React.
+- **`ProgressTrack` is not a separate component.** The handoff's "right-side progress track"
+  means the right edge *of the 52px rail*, not of the viewport. It lives inside `RailNav` as a
+  2px track with a `#c6f21a → #ff8a3d` gradient.
+- **`Ticker` does not belong here.** It sits inside s00 in the prototype, so it moves to
+  Task 10.
+- `Ambient` is two layers, not one: the scanline at `rgba(255,255,255,.022)` (the README says
+  `.03`; the prototype wins) with `om-flick 7s infinite`, plus a vignette at
+  `inset 0 0 220px 60px rgba(0,0,0,.9)`.
+- `om-drift` is defined in the prototype but never used. It stays declared, unused.
 
 **Interfaces:**
 - Consumes: tokens (Task 2), `gsap` module (Task 6), `useReducedMotion` (Task 5).
@@ -794,7 +818,7 @@ describe('RailNav', () => {
 Run: `npm test -- RailNav`
 Expected: FAIL — cannot resolve `../RailNav`.
 
-- [ ] **Step 3: Implement the four chrome components**
+- [ ] **Step 3: Implement the chrome components**
 
 `RailNav` is a fixed left rail of anchor links, one per section, in 9–10px mono at `.2em` tracking. The active section's label switches to `--color-accent`; track it with a `ScrollTrigger` per section rather than a scroll listener.
 

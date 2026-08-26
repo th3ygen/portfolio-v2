@@ -1,0 +1,103 @@
+.rail {
+  position: fixed;
+  top: 38px;
+  bottom: 0;
+  left: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 0;
+  background: rgba(7, 8, 9, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+/* The progress track sits on the rail's own right edge, not the viewport's. */
+.track {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-borderDim1);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.progress {
+  width: 100%;
+  height: 100%;
+  transform: scaleY(0);
+  transform-origin: 0 0;
+  background: linear-gradient(180deg, var(--color-accent), var(--aberration-warm-solid));
+}
+
+.indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  width: 2px;
+  height: 0;
+  background: var(--color-accent);
+  box-shadow: 0 0 10px rgba(198, 242, 26, 0.7);
+  opacity: 0;
+  transition:
+    top 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.3s;
+  pointer-events: none;
+}
+
+.link {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 52px;
+  padding: 7px 0;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.1em;
+  color: var(--color-textDim);
+  transition:
+    color 0.3s,
+    background 0.3s,
+    transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.link:hover,
+.link:focus-visible {
+  color: var(--color-accent);
+  background: var(--color-surface1);
+  transform: translateX(3px);
+}
+
+.link[aria-current='true'] {
+  color: var(--color-accent);
+}
+
+.number {
+  font-weight: 800;
+}
+
+.label {
+  writing-mode: vertical-rl;
+  font-size: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link,
+  .indicator {
+    transition: none;
+  }
+}
+
+/* The rail costs 52px of a narrow viewport for navigation that duplicates
+   scrolling. Below this width the sections run full-bleed instead. */
+@media (max-width: 700px) {
+  .rail {
+    display: none;
+  }
+}
