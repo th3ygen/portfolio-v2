@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // Design reference bundle. `support.js` and `image-slot.js` are prototype
+    // tooling shipped with the handoff — they are explicitly not ported and
+    // are not part of the build, so their lint output is noise.
+    "support.js",
+    "image-slot.js",
+    "*.dc.html",
   ]),
 ]);
 

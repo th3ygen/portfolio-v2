@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { archivoBlack, jetbrainsMono } from './fonts';
+import { SmoothScrollProvider } from '@/components/motion/SmoothScrollProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${archivoBlack.variable} ${jetbrainsMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <SmoothScrollProvider>{children}</SmoothScrollProvider>
+      </body>
     </html>
   );
 }
