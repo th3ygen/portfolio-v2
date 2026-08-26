@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MANIFEST, MANIFEST_LABEL } from '@/content/manifest';
+import { useSectionReveal } from '@/components/motion/useSectionReveal';
 import styles from './S02Manifest.module.css';
 
 /**
@@ -13,9 +14,11 @@ import styles from './S02Manifest.module.css';
  */
 export function S02Manifest() {
   const [open, setOpen] = useState(true);
+  const rootRef = useRef<HTMLElement>(null);
+  useSectionReveal(rootRef, '[data-reveal]');
 
   return (
-    <section id="s02" className={styles.section}>
+    <section id="s02" ref={rootRef} className={styles.section}>
       <div className={styles.ghost} data-py="-46" data-ghost-numeral aria-hidden="true">02</div>
       <div className={styles.hatch} data-py="-18" aria-hidden="true" />
       <div className={styles.sideLabel} data-py="30" aria-hidden="true">
@@ -42,7 +45,7 @@ export function S02Manifest() {
         {open ? (
           <div className={styles.grid} id="manifest-grid">
             {MANIFEST.map((category) => (
-              <div key={category.letter} className={styles.category}>
+              <div key={category.letter} className={styles.category} data-reveal>
                 <div className={styles.categoryHead}>
                   <span className={styles.letter} aria-hidden="true">{category.letter}</span>
                   <h3 className={styles.categoryTitle}>{category.category}</h3>

@@ -5,6 +5,7 @@ import { SPOTLIGHTS, SPOTLIGHT_INTRO } from '@/content/spotlights';
 import { FramedImage } from '@/components/media/FramedImage';
 import { gsap, useGSAP } from '@/components/motion/gsap';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
+import { useSectionReveal } from '@/components/motion/useSectionReveal';
 import styles from './S03Spotlight.module.css';
 
 /**
@@ -17,6 +18,7 @@ import styles from './S03Spotlight.module.css';
  */
 export function S03Spotlight() {
   const rootRef = useRef<HTMLElement>(null);
+  useSectionReveal(rootRef, '[data-reveal]');
 
   useGSAP(
     () => {
@@ -62,6 +64,7 @@ export function S03Spotlight() {
               className={styles.card}
               data-reversed={index % 2 === 1 ? 'true' : 'false'}
               data-spotlight={project.id}
+              data-reveal
             >
               <div className={styles.media}>
                 <FramedImage

@@ -55,11 +55,22 @@ describe('page', () => {
   });
 
   it('hides every ghost numeral from assistive tech', () => {
+    // Count is not fixed per section: s05 carries one ghost year per post
+    // rather than one section numeral. What must hold is that none of them
+    // are ever exposed, since each repeats text stated elsewhere.
     const { container } = render(<Page />);
     const ghosts = container.querySelectorAll('[data-ghost-numeral]');
-    expect(ghosts).toHaveLength(TITLED_SECTIONS.length);
+    expect(ghosts.length).toBeGreaterThanOrEqual(TITLED_SECTIONS.length);
     for (const ghost of ghosts) {
       expect(ghost).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+
+  it('gives every non-hero section at least one ghost numeral', () => {
+    const { container } = render(<Page />);
+    for (const section of TITLED_SECTIONS) {
+      const el = container.querySelector(`section#${section.id}`);
+      expect(el?.querySelectorAll('[data-ghost-numeral]').length ?? 0).toBeGreaterThan(0);
     }
   });
 

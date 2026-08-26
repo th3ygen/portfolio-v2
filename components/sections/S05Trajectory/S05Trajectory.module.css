@@ -1,0 +1,198 @@
+/*
+ * The signature section, inverted: accent background, dark text.
+ *
+ * Every dark value here is alpha over green, never the opaque text tokens —
+ * those were mixed against #070809 and read wrong on this ground.
+ */
+
+.section {
+  position: relative;
+  margin-left: 52px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-accent);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1460px;
+  margin: 0 auto;
+  padding: 110px var(--pad-section-x-tight) var(--pad-section-x-tight);
+}
+
+.post {
+  position: relative;
+  min-height: 60vh;
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) 24px minmax(0, 1fr);
+  align-items: center;
+}
+
+.ghost {
+  position: absolute;
+  top: 50%;
+  right: 1%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 0;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(150px, 21vw, 300px);
+  line-height: 0.78;
+  letter-spacing: -0.05em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(7, 8, 9, 0.13);
+  user-select: none;
+}
+
+.hatch {
+  position: absolute;
+  top: 8%;
+  right: 18%;
+  width: 58px;
+  height: 120px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--on-accent-hatch) 0px,
+    var(--on-accent-hatch) 4px,
+    transparent 4px,
+    transparent 11px
+  );
+}
+
+.dots {
+  position: absolute;
+  bottom: 12%;
+  right: 8%;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  background-image: radial-gradient(rgba(7, 8, 9, 0.6) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.bars {
+  position: absolute;
+  bottom: 16%;
+  left: 26%;
+  pointer-events: none;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 86px;
+}
+
+.bar { height: 3px; background: rgba(7, 8, 9, 0.18); }
+.barStrong { height: 3px; background: rgba(7, 8, 9, 0.4); }
+
+.yearCol {
+  position: relative;
+  z-index: 1;
+  padding-right: 28px;
+  text-align: right;
+}
+
+.year {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(46px, 5.6vw, 88px);
+  line-height: 0.84;
+  letter-spacing: -0.035em;
+  color: var(--on-accent-year);
+}
+
+.tag {
+  margin-top: var(--gap-10);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: rgba(7, 8, 9, 0.55);
+}
+
+.rail {
+  position: relative;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.railLine { width: 1px; height: 100%; background: rgba(7, 8, 9, 0.16); }
+
+.railProgress {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(180deg, var(--color-bg), rgba(7, 8, 9, 0));
+  transform-origin: 0 0;
+}
+
+.railDot {
+  position: absolute;
+  top: 50%;
+  margin-top: -5px;
+  width: 11px;
+  height: 11px;
+  /* Exception to border-radius: 0 — a timeline node, like the status dots. */
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--on-accent-year);
+}
+
+.body { position: relative; z-index: 1; padding-left: 36px; }
+
+.postHead {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-10);
+  margin-bottom: var(--gap-16);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
+  color: rgba(7, 8, 9, 0.5);
+}
+
+.postNumber { color: var(--color-bg); font-weight: 700; }
+.postRule { width: 34px; height: 1px; background: rgba(7, 8, 9, 0.25); }
+
+.role {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(21px, 2.5vw, 36px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  color: var(--color-bg);
+  margin-bottom: 11px;
+  text-wrap: balance;
+}
+
+.org {
+  font-size: var(--fs-body-sm);
+  letter-spacing: var(--track-org);
+  color: var(--on-accent-label);
+  margin-bottom: 20px;
+}
+
+.copy {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 14px;
+  line-height: 1.8;
+  color: rgba(7, 8, 9, 0.78);
+  text-wrap: pretty;
+}
+
+@media (max-width: 900px) {
+  .post { grid-template-columns: minmax(110px, 150px) 20px minmax(0, 1fr); }
+  .body { padding-left: 22px; }
+  .yearCol { padding-right: 18px; }
+}
+
+@media (max-width: 700px) {
+  .section { margin-left: 0; }
+  .inner { padding: 70px var(--gap-22) var(--gap-22); }
+  .post { min-height: auto; padding: var(--gap-40) 0; }
+  .hatch, .dots, .bars { display: none; }
+}
