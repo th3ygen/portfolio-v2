@@ -24,3 +24,15 @@ if (!window.matchMedia) {
     }),
   });
 }
+
+/**
+ * jsdom does not implement scrollTo. The boot overlay resets scroll position
+ * while it holds the viewport, which is correct behaviour, not a test concern.
+ */
+// jsdom defines scrollTo but throws "Not implemented" when called, so this is
+// assigned unconditionally rather than guarded on existence.
+Object.defineProperty(window, 'scrollTo', {
+  writable: true,
+  configurable: true,
+  value: vi.fn(),
+});
