@@ -1,0 +1,150 @@
+.section {
+  position: relative;
+  padding: 120px 0;
+  margin-left: 52px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bgAlt3);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1460px;
+  margin: 0 auto;
+  padding: 0 var(--pad-section-x-tight);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-16);
+  border-bottom: 1px solid var(--color-textGhost);
+  padding-bottom: 13px;
+  margin-bottom: var(--gap-22);
+}
+
+.headNumber { font-size: var(--fs-body-sm); font-weight: 800; color: var(--color-accent); }
+
+.headTitle {
+  margin: 0;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: 14px;
+  letter-spacing: var(--track-label);
+  color: var(--color-textPrimary);
+}
+
+.headNote {
+  flex: 1;
+  text-align: right;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: var(--color-textDim);
+}
+
+.intro {
+  margin: 0 0 var(--gap-34);
+  max-width: 60ch;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--color-textMuted);
+  text-wrap: pretty;
+}
+
+.tableWrap {
+  border: 1px solid var(--color-borderDim1);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body-sm);
+  color: var(--color-textMuted);
+  text-align: left;
+}
+
+.table thead {
+  background: var(--color-surface1);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: var(--color-textDim);
+}
+
+.table th {
+  padding: 11px var(--gap-12);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.table tbody tr { border-top: 1px solid var(--color-surface2); }
+.table tbody tr:hover { background: var(--color-surface1); }
+
+.table td { padding: 13px var(--gap-12); }
+
+.colId { width: 46px; color: var(--color-textFaint); }
+.colName { min-width: 160px; color: var(--color-textPrimary); font-weight: 700; }
+/* The four projects that also appear in s03. */
+.colName[data-spotlit='true'] { color: var(--color-accent); }
+.colSector { width: 140px; }
+.colTech { min-width: 200px; }
+.colAccess { width: 92px; color: var(--color-textDim); }
+
+.note {
+  margin: var(--gap-22) 0 0;
+  max-width: 72ch;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-body);
+  line-height: 1.9;
+  color: var(--color-textDim);
+}
+
+.ghost {
+  position: absolute;
+  top: 60px;
+  right: -6px;
+  pointer-events: none;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(140px, 20vw, 300px);
+  line-height: 0.8;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--color-surface3);
+  user-select: none;
+  z-index: 0;
+}
+
+.dots {
+  position: absolute;
+  bottom: 90px;
+  right: 5%;
+  width: 150px;
+  height: 150px;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 11px 11px;
+  z-index: 0;
+}
+
+.hatch {
+  position: absolute;
+  top: 180px;
+  left: 2%;
+  width: 74px;
+  height: 190px;
+  pointer-events: none;
+  opacity: 0.42;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-borderDim1) 0px,
+    var(--color-borderDim1) 5px,
+    transparent 5px,
+    transparent 12px
+  );
+  z-index: 0;
+}
+
+@media (max-width: 700px) {
+  .section { margin-left: 0; padding: 80px 0; }
+  .headNote, .hatch, .dots { display: none; }
+}

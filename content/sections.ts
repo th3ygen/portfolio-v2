@@ -28,3 +28,15 @@ export const HEADER = {
   /** Rendered on the server and until the client clock ticks. */
   clockPlaceholder: '--:--:-- MYT',
 } as const;
+
+/**
+ * The year the zoom counter rewinds *from*.
+ *
+ * Deliberately a constant rather than `new Date().getFullYear()`. The page is
+ * statically prerendered, so the server value is baked at build time while the
+ * client computes at visit time — those genuinely differ across a New Year
+ * boundary, which would be a hydration mismatch. The design already bakes 2026
+ * in elsewhere (KRNL 2026.08, BUILD 2026.08, the footer copyright), so this
+ * stays consistent with them and is updated in one place.
+ */
+export const CURRENT_YEAR = 2026;
