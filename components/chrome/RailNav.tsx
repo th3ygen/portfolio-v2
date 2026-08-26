@@ -47,7 +47,7 @@ export function RailNav() {
   );
 
   return (
-    <nav ref={rootRef} className={styles.rail} aria-label="Section navigation">
+    <nav ref={rootRef} className={styles.rail} data-rail-nav aria-label="Section navigation">
       <div className={styles.track} aria-hidden="true">
         <div ref={progressRef} className={styles.progress} />
       </div>

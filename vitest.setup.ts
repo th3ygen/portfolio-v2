@@ -36,3 +36,12 @@ Object.defineProperty(window, 'scrollTo', {
   configurable: true,
   value: vi.fn(),
 });
+
+/**
+ * jsdom cannot provide a rendering context without the native `canvas`
+ * package. Returning null is the real "no WebGL available" path, which the
+ * datamosh canvas is built to handle silently — so this exercises the fallback
+ * rather than papering over anything.
+ */
+HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as unknown as
+  HTMLCanvasElement['getContext'];

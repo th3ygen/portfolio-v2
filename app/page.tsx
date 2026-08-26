@@ -6,6 +6,7 @@ import { RailNav } from '@/components/chrome/RailNav';
 import { Ambient } from '@/components/chrome/Ambient';
 import { Reticle } from '@/components/chrome/Reticle';
 import { BootOverlay } from '@/components/boot/BootOverlay';
+import { S00Hero } from '@/components/sections/S00Hero';
 import { SectionShell } from '@/components/sections/SectionShell';
 import { SECTIONS } from '@/content/sections';
 
@@ -25,7 +26,8 @@ export default function Page() {
       <Masthead />
       <RailNav />
       <main data-boot-done={bootDone ? 'true' : 'false'}>
-        {SECTIONS.map((section) => (
+        <S00Hero bootDone={bootDone} />
+        {SECTIONS.filter((section) => section.id !== 's00').map((section) => (
           <SectionShell
             key={section.id}
             id={section.id}

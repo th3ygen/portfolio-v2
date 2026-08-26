@@ -24,14 +24,40 @@ export const OPERATOR_CARD: readonly Stat[] = [
   { label: 'REMOTE', value: 'YES' },
 ] as const;
 
-/** The s00 hero stat strip. */
-export const HERO_STATS: readonly Stat[] = [
-  { label: 'YRS ACTIVE', value: '06' },
-  { label: 'SYSTEMS', value: '16' },
-  { label: 'FULL-TIME', value: 'ARKI FINANCE, SG' },
-  { label: 'OWN STUDIO', value: 'ASCENITY SOLUTIONS' },
-  { label: 'DOMAINS', value: 'SECURITY · INDUSTRIAL · IOT · FINTECH · AGRI · GOV' },
-  { label: 'AVAILABILITY', value: 'OPEN' },
+/**
+ * The s00 SYS.READOUT panel. Rows are typed by shape because the panel mixes
+ * three treatments: a large display numeral, plain text, and a chip list.
+ */
+export type ReadoutRow =
+  | { readonly kind: 'numeral'; readonly label: string; readonly value: string }
+  | { readonly kind: 'text'; readonly label: string; readonly value: string }
+  | { readonly kind: 'chips'; readonly label: string; readonly items: readonly string[] }
+  | { readonly kind: 'status'; readonly label: string; readonly value: string };
+
+export const READOUT: readonly ReadoutRow[] = [
+  { kind: 'numeral', label: 'YRS ACTIVE', value: '06' },
+  { kind: 'numeral', label: 'SYSTEMS', value: '16' },
+  { kind: 'text', label: 'FULL-TIME', value: 'ARKI FINANCE, SG' },
+  { kind: 'text', label: 'OWN STUDIO', value: 'ASCENITY SOLUTIONS' },
+  {
+    kind: 'chips',
+    label: 'DOMAINS',
+    items: ['SECURITY', 'INDUSTRIAL', 'IOT', 'FINTECH', 'AGRI', 'GOV'],
+  },
+  { kind: 'status', label: 'AVAILABILITY', value: 'OPEN' },
+] as const;
+
+export const READOUT_HEAD = { title: 'SYS.READOUT', state: 'LIVE' } as const;
+
+/** The three hero calls to action, in order. */
+export const HERO_CTAS: readonly {
+  readonly label: string;
+  readonly href: string;
+  readonly variant: 'solid' | 'outline' | 'ghost';
+}[] = [
+  { label: 'OPEN UPLINK →', href: '#s06', variant: 'solid' },
+  { label: 'DOWNLOAD CV', href: '/docs/cv.pdf', variant: 'outline' },
+  { label: '16 SYSTEMS', href: '#s03', variant: 'ghost' },
 ] as const;
 
 /**

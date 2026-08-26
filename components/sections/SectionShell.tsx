@@ -20,7 +20,7 @@ type Props = {
 export function SectionShell({ id, number, title, note, children, className }: Props) {
   return (
     <section id={id} className={[styles.section, className].filter(Boolean).join(' ')}>
-      <div className={styles.ghost} aria-hidden="true">{number}</div>
+      <div className={styles.ghost} data-ghost-numeral aria-hidden="true">{number}</div>
       <div className={styles.inner}>
         <header className={styles.head} data-title-reveal>
           <span className={styles.number} aria-hidden="true">{number}</span>
