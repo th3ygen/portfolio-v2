@@ -19,6 +19,19 @@ export const TEARDOWN_DELAY_MS = 680;
 
 export const SESSION_KEY = 'dil-sys-boot-played';
 
+/**
+ * Debug flag: outside production the boot replays on every load.
+ *
+ * The once-per-session gate is a visitor courtesy — nobody wants the cold boot
+ * again on their third page view. In development it just hides the thing you
+ * are trying to look at, and the only way back is clearing sessionStorage by
+ * hand. Read as a function rather than a module constant so tests can stub
+ * NODE_ENV and exercise both sides.
+ */
+export function bootDebugReplay(): boolean {
+  return process.env.NODE_ENV !== 'production';
+}
+
 export const LOG_THRESHOLDS = [18, 31, 47, 58, 72, 88, 99] as const;
 
 export type BootLine = {

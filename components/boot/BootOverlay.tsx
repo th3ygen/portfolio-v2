@@ -11,6 +11,7 @@ import {
   SESSION_KEY,
   TEARDOWN_DELAY_MS,
   WIPE_DELAY_MS,
+  bootDebugReplay,
   bootTarget,
   lerp,
   logIndexFor,
@@ -22,6 +23,7 @@ type Phase = 'idle' | 'running' | 'exiting' | 'wiping' | 'done';
 
 /** sessionStorage throws in some privacy modes; a boot overlay is not worth a crash. */
 function alreadyPlayed(): boolean {
+  if (bootDebugReplay()) return false;
   try {
     return sessionStorage.getItem(SESSION_KEY) === '1';
   } catch {
@@ -38,7 +40,8 @@ function markPlayed(): void {
 }
 
 /**
- * The cold-boot overlay. Plays once per session, before anything else.
+ * The cold-boot overlay. Plays before anything else — once per session in
+ * production, and on every load elsewhere (see `bootDebugReplay`).
  *
  * Exit is the three-stage sequence from the handoff: panels stagger up and
  * fade, the overlay wipes upward via clip-path, and a glowing bar rides the

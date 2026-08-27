@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
+  bootDebugReplay,
   bootTarget,
   logIndexFor,
   stateLabelFor,
@@ -117,5 +118,21 @@ describe('boot log content', () => {
   it('reports the counts the rest of the page renders', () => {
     expect(BOOT_LINES[2]?.value).toBe('8 MODULES');
     expect(BOOT_LINES[3]?.value).toBe('16 RECORDS');
+  });
+});
+
+describe('bootDebugReplay', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('keeps the once-per-session gate in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(bootDebugReplay()).toBe(false);
+  });
+
+  it('replays every load everywhere else', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    expect(bootDebugReplay()).toBe(true);
   });
 });

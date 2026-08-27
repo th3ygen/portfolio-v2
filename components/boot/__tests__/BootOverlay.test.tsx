@@ -22,6 +22,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 describe('BootOverlay', () => {
@@ -54,6 +55,7 @@ describe('BootOverlay', () => {
   });
 
   it('skips entirely if it already played this session', () => {
+    vi.stubEnv('NODE_ENV', 'production');
     sessionStorage.setItem(SESSION_KEY, '1');
     const onComplete = vi.fn();
     const { container } = render(<BootOverlay onComplete={onComplete} />);
@@ -62,9 +64,18 @@ describe('BootOverlay', () => {
   });
 
   it('leaves scroll unlocked when it skips', () => {
+    vi.stubEnv('NODE_ENV', 'production');
     sessionStorage.setItem(SESSION_KEY, '1');
     render(<BootOverlay onComplete={vi.fn()} />);
     expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
+  it('replays despite the session flag outside production, for debugging', () => {
+    // The gate is a visitor courtesy, not correctness. In dev it only hides
+    // the thing you are trying to look at.
+    sessionStorage.setItem(SESSION_KEY, '1');
+    const { container } = render(<BootOverlay onComplete={vi.fn()} />);
+    expect(container.querySelector('[data-boot]')).toBeInTheDocument();
   });
 
   it('skips under reduced motion', () => {
