@@ -231,3 +231,27 @@ a:hover {
 main:focus {
   outline: none;
 }
+
+/*
+ * Box reveal for body copy. The block is a pseudo-element because GSAP cannot
+ * animate one directly — useBoxReveal writes --box-reveal-x on the paragraph
+ * and this rule reads it.
+ *
+ * The default is off to the RIGHT, not the left: if JavaScript never runs, the
+ * paragraph must read as finished rather than sitting under a solid block.
+ * overflow:hidden is what keeps the parked block out of sight.
+ */
+[data-box-reveal] {
+  position: relative;
+  overflow: hidden;
+}
+
+[data-box-reveal]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--color-accent);
+  transform: translateX(var(--box-reveal-x, 101%));
+  pointer-events: none;
+}

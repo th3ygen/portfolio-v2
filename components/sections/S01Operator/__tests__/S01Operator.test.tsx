@@ -10,7 +10,9 @@ beforeEach(() => {
 describe('S01Operator', () => {
   it('renders the lead statement as one sentence across its three parts', () => {
     const { container } = render(<S01Operator />);
-    const lead = container.querySelector('[data-op-line]');
+    // Queried as the section's first paragraph, not by a motion attribute —
+    // this is a content assertion and should not move when the reveal does.
+    const lead = container.querySelector('p');
     expect(lead?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
       `${OPERATOR.lead[0]} ${OPERATOR.lead[1]} ${OPERATOR.lead[2]}`,
     );

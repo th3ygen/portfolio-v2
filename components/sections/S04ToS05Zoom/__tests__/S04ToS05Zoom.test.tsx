@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { YearOdometer } from '../YearOdometer';
 import { BrutalistClock } from '../BrutalistClock';
 import { S04ToS05Zoom } from '../index';
+import { CLONE_OFFSETS } from '../ZoomWords';
 import { TRAJECTORY_LABEL } from '@/content/trajectory';
 
 const svg = (children: React.ReactNode) => <svg>{children}</svg>;
@@ -76,10 +77,33 @@ describe('S04ToS05Zoom', () => {
     expect(container.querySelector('[data-zw="1"]')).toBeInTheDocument();
   });
 
-  it('gives each word a two-step trail', () => {
+  it('stacks UPTIME into a hollow clone column and trails SINCE', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
-    expect(container.querySelectorAll('[data-trail="0"]')).toHaveLength(2);
+    // UPTIME detonates into hollow copies; SINCE keeps the two-step trail.
+    expect(container.querySelectorAll('[data-clone]')).toHaveLength(CLONE_OFFSETS.length);
     expect(container.querySelectorAll('[data-trail="1"]')).toHaveLength(2);
+  });
+
+  it('makes the clones hollow rather than faded copies', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    const clone = container.querySelector<SVGTextElement>('[data-clone]');
+    expect(clone).not.toBeNull();
+    // Background fill plus an accent outline: cut-outs, not ghosts. Opacity is
+    // what a ghost would use, and would make them read as the old trail.
+    expect(clone?.style.fill).toBe('var(--color-bg)');
+    expect(clone?.style.stroke).toBe('var(--color-accent)');
+    // The camera reaches 190x. A scaling stroke would be hundreds of pixels
+    // thick by the end of the pin.
+    expect(clone?.getAttribute('vector-effect')).toBe('non-scaling-stroke');
+  });
+
+  it('spaces the clone column symmetrically about the solid word', () => {
+    const offsets = [...CLONE_OFFSETS];
+    expect(offsets).toHaveLength(8);
+    // No clone sits at 0 — that is where the solid word lives.
+    expect(offsets).not.toContain(0);
+    // Sums to zero only if every offset above the word is matched below it.
+    expect(offsets.reduce((total, value) => total + value, 0)).toBe(0);
   });
 
   it('renders the section meta label', () => {

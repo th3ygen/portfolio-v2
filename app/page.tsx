@@ -15,6 +15,7 @@ import { S04ToS05Zoom } from '@/components/sections/S04ToS05Zoom';
 import { S05Trajectory } from '@/components/sections/S05Trajectory';
 import { S06Uplink } from '@/components/sections/S06Uplink';
 import { useParallax } from '@/components/motion/useParallax';
+import { useBoxReveal } from '@/components/motion/useBoxReveal';
 import { CURRENT_YEAR } from '@/content/sections';
 
 /**
@@ -26,6 +27,7 @@ export default function Page() {
   const [bootDone, setBootDone] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   useParallax(mainRef);
+  useBoxReveal(mainRef);
 
   return (
     <>

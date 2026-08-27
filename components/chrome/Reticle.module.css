@@ -20,8 +20,8 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(198, 242, 26, 0.16) 18%,
-    rgba(198, 242, 26, 0.16) 82%,
+    rgba(198, 242, 26, 0.08) 18%,
+    rgba(198, 242, 26, 0.08) 82%,
     transparent
   );
   will-change: transform;
@@ -36,8 +36,8 @@
   background: linear-gradient(
     180deg,
     transparent,
-    rgba(198, 242, 26, 0.16) 18%,
-    rgba(198, 242, 26, 0.16) 82%,
+    rgba(198, 242, 26, 0.08) 18%,
+    rgba(198, 242, 26, 0.08) 82%,
     transparent
   );
   will-change: transform;
@@ -50,7 +50,7 @@
   width: 15px;
   height: 15px;
   margin: -8px 0 0 -8px;
-  border: 1px solid rgba(198, 242, 26, 0.45);
+  border: 1px solid rgba(198, 242, 26, 0.2);
   /* Second and last exception to border-radius: 0. */
   border-radius: 50%;
   will-change: transform;
@@ -63,7 +63,7 @@
   margin: 14px 0 0 14px;
   font-size: var(--fs-micro);
   letter-spacing: 0.14em;
-  color: rgba(198, 242, 26, 0.5);
+  color: rgba(198, 242, 26, 0.26);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   will-change: transform;

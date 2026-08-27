@@ -108,7 +108,7 @@ export function S03Spotlight() {
           <span className={styles.headNote}>04 OF 16 SELECTED</span>
         </header>
 
-        <p className={styles.intro}>{SPOTLIGHT_INTRO}</p>
+        <p className={styles.intro} data-box-reveal>{SPOTLIGHT_INTRO}</p>
 
         <ul className={styles.list}>
           {SPOTLIGHTS.map((project, index) => (
@@ -148,7 +148,7 @@ export function S03Spotlight() {
 
                 <h3 className={styles.name}>{project.name}</h3>
                 <div className={styles.tagline}>{project.tagline}</div>
-                <p className={styles.blurb}>{project.blurb}</p>
+                <p className={styles.blurb} data-box-reveal>{project.blurb}</p>
 
                 <dl className={styles.meta}>
                   {project.meta.map((cell) => (

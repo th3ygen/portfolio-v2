@@ -146,14 +146,14 @@ export function S01Operator() {
           </div>
 
           <div>
-            <p className={styles.lead} data-op-line>
+            <p className={styles.lead} data-box-reveal>
               {OPERATOR.lead[0]}{' '}
               <span className={styles.leadAccent}>{OPERATOR.lead[1]}</span>{' '}
               {OPERATOR.lead[2]}
             </p>
 
             {OPERATOR.body.map((block) => (
-              <p key={block} className={styles.body} data-op-line>{block}</p>
+              <p key={block} className={styles.body} data-box-reveal>{block}</p>
             ))}
 
             <div className={styles.loadoutHead} data-op-line>

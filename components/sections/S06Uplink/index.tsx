@@ -72,14 +72,14 @@ export function S06Uplink() {
 
         <div className={styles.grid}>
           <div>
-            <p className={styles.lead} data-reveal>
+            <p className={styles.lead} data-box-reveal>
               {UPLINK.lead[0]} {UPLINK.lead[1]}{' '}
               <span className={styles.leadAccent}>
                 {UPLINK.lead[2]}
                 {UPLINK.lead[3]}
               </span>
             </p>
-            <p className={styles.body} data-reveal>{UPLINK.body}</p>
+            <p className={styles.body} data-box-reveal>{UPLINK.body}</p>
 
             <dl className={styles.channels} data-reveal>
               {CHANNELS.map((channel) => (

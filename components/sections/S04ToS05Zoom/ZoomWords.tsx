@@ -23,6 +23,32 @@ export const TRAIL_OFFSETS = [150, 76] as const;
 /** Resting opacity per ghost, by index. Thins out with distance. */
 export const TRAIL_OPACITY = [0.16, 0.36] as const;
 
+/** Line height of the exploded column, matching the word's own size. */
+const CLONE_PITCH = 104;
+/**
+ * Where each hollow clone lands, ordered outward from the centre so a
+ * from:'center' stagger reads as one blast rather than a sweep.
+ */
+export const CLONE_OFFSETS = [-4, -3, -2, -1, 1, 2, 3, 4].map(
+  (step) => step * CLONE_PITCH,
+);
+
+/**
+ * Hollow: filled with the page background and outlined in the accent, so the
+ * clones read as cut-outs stacked behind the solid word rather than as ghosts
+ * of it. The stroke does not scale with the camera — at 190x a scaled outline
+ * would be hundreds of pixels thick.
+ */
+const CLONE_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--font-display), Impact, sans-serif',
+  fontSize: 104,
+  letterSpacing: -3,
+  fill: 'var(--color-bg)',
+  stroke: 'var(--color-accent)',
+  strokeWidth: 1.4,
+  paintOrder: 'fill',
+};
+
 /**
  * The UPTIME → SINCE <year> handoff.
  *
@@ -44,16 +70,18 @@ export function ZoomWords({ year }: { year: number }) {
   return (
     <>
       <g data-zw="0">
-        {TRAIL_OFFSETS.map((offset) => (
+        {CLONE_OFFSETS.map((offset) => (
           <text
             key={offset}
-            data-trail="0"
+            data-clone
+            data-clone-y={offset}
             x={0}
-            y={offset}
+            y={0}
             textAnchor="middle"
             dominantBaseline="middle"
             opacity={0}
-            style={WORD_STYLE}
+            vectorEffect="non-scaling-stroke"
+            style={CLONE_STYLE}
             aria-hidden="true"
           >
             UPTIME

@@ -14,6 +14,12 @@ import styles from './S04ToS05Zoom.module.css';
 const END_YEAR = 2020;
 
 /**
+ * Where SINCE <year> takes over. UPTIME's column has fully faded by 0.16, so
+ * this leaves a beat of empty frame between the two rather than crossing them.
+ */
+const HANDOFF = 0.17;
+
+/**
  * The pinned s04 → s05 transition.
  *
  * One ScrollTrigger, one timeline. A single linear tween drives `p`; scale
@@ -53,13 +59,19 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
       };
       setCamera(0);
 
-      const trail0 = gsap.utils.toArray<SVGElement>('[data-trail="0"]');
+      const clones = gsap.utils.toArray<SVGElement>('[data-clone]');
       const trail1 = gsap.utils.toArray<SVGElement>('[data-trail="1"]');
       const trailIn = (index: number) => TRAIL_OPACITY[index] ?? 0;
       const trailOut = (index: number) => -(TRAIL_OFFSETS[index] ?? 0);
+      /** Each clone's landing place, read off the element that owns it. */
+      const cloneY = (_i: number, el: Element) =>
+        Number.parseFloat(el.getAttribute('data-clone-y') ?? '0');
 
       gsap.set('[data-zw="1"]', { opacity: 0, y: TRAIL_OFFSETS[0] });
-      gsap.set([...trail0, ...trail1], { opacity: 0, y: (i: number) => trailOut(i) });
+      // Clones start stacked exactly on the solid word, so the explosion has
+      // somewhere to come from.
+      gsap.set(clones, { opacity: 0, y: 0 });
+      gsap.set(trail1, { opacity: 0, y: (i: number) => trailOut(i) });
       gsap.set('[data-clock]', { opacity: 0 });
 
       const camera = { p: 0 };
@@ -85,16 +97,29 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
         0,
       );
 
-      // UPTIME is shoved off the top, dragging a two-step trail that forms,
-      // follows, then thins out. SINCE <year> steps up from below the same way.
+      // UPTIME detonates into a vertical column of hollow copies of itself,
+      // then the whole column is shoved off the top. SINCE <year> steps up from
+      // below to replace it.
+      //
+      // from:'center' so the pair nearest the word leaves first and the outer
+      // ones chase — a blast outward, not a sweep down the column.
       timeline
-        .to(trail0, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: 'power2.out' }, 0)
-        .to('[data-word="uptime"]', { y: -320, duration: 0.085, ease: 'power2.in' }, 0.05)
-        .to(trail0, { opacity: 0, duration: 0.05, stagger: 0.014, ease: 'power1.in' }, 0.095)
-        .set('[data-zw="0"]', { opacity: 0 }, 0.135)
-        .to('[data-zw="1"]', { opacity: 1, duration: 0.035, ease: 'power1.out' }, 0.13)
-        .to(trail1, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: 'power2.out' }, 0.13)
-        .to('[data-zw="1"]', { y: 0, duration: 0.09, ease: 'power3.out' }, 0.13);
+        .to(clones, {
+          opacity: 1,
+          y: cloneY,
+          duration: 0.075,
+          ease: 'power3.out',
+          stagger: { each: 0.011, from: 'center' },
+        }, 0)
+        .to('[data-zw="0"]', { y: -520, duration: 0.09, ease: 'power2.in' }, 0.06)
+        .to(clones, { opacity: 0, duration: 0.05, stagger: { each: 0.01, from: 'center' }, ease: 'power1.in' }, 0.085)
+        // The whole group fades rather than snapping, and finishes before
+        // SINCE starts — the two never share a frame.
+        .to('[data-zw="0"]', { opacity: 0, duration: 0.055, ease: 'power2.in' }, 0.105)
+        .set('[data-zw="0"]', { opacity: 0 }, 0.16)
+        .to('[data-zw="1"]', { opacity: 1, duration: 0.035, ease: 'power1.out' }, HANDOFF)
+        .to(trail1, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: 'power2.out' }, HANDOFF)
+        .to('[data-zw="1"]', { y: 0, duration: 0.09, ease: 'power3.out' }, HANDOFF);
 
       // Year rolls backwards. The numeric counter is the source of truth; the
       // odometer reacts to it.
@@ -108,7 +133,9 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
           onUpdate: () => setYear(Math.round(counter.value)),
           onComplete: () => setYear(END_YEAR),
         },
-        0.1,
+        // Starts with the handoff, not before it: the rewind has to be seen
+        // from the current year, and the odometer is invisible until then.
+        HANDOFF,
       );
 
       // Clock. Keeps spinning through the whole zoom and never fades out.

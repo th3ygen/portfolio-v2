@@ -31,7 +31,7 @@ export function S04Index() {
           <span className={styles.headNote}>16 RECORDS</span>
         </header>
 
-        <p className={styles.intro} data-reveal>{INDEX_INTRO}</p>
+        <p className={styles.intro} data-box-reveal>{INDEX_INTRO}</p>
 
         <div className={styles.tableWrap} data-reveal>
           <table className={styles.table}>
@@ -65,7 +65,7 @@ export function S04Index() {
           </table>
         </div>
 
-        <p className={styles.note}>{INDEX_NOTE}</p>
+        <p className={styles.note} data-box-reveal>{INDEX_NOTE}</p>
       </div>
     </section>
   );

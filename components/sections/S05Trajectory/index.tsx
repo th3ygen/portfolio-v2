@@ -57,7 +57,7 @@ export function S05Trajectory() {
                 </div>
                 <h3 className={styles.role} data-traj-el>{post.role}</h3>
                 <div className={styles.org} data-traj-el>{post.org}</div>
-                <p className={styles.copy} data-traj-el>{post.body}</p>
+                <p className={styles.copy} data-box-reveal>{post.body}</p>
               </div>
             </li>
           ))}
