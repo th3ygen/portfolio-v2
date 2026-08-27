@@ -167,54 +167,19 @@ a:hover {
 }
 
 /* ============================================================
-   Keyframes — bodies taken verbatim from the prototype
+   Keyframes live in the module that uses them, never here.
+
+   A CSS Module hashes animation names the same way it hashes class names, so
+   `animation: om-tick ...` inside a module compiles to a reference to
+   `Module__hash__om-tick`. A @keyframes declared in this file keeps its bare
+   name, so the reference resolves to nothing and the animation never runs —
+   silently, with no warning at build or runtime. Seven animations were dead
+   this way: the hero ticker, three blinking cursors, the datamosh fade-in,
+   the boot pulse and the ambient flicker.
+
+   om-drift, om-sweep and om-glitch were declared here and referenced by
+   nothing at all; they went with the rest.
    ============================================================ */
-
-@keyframes om-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-@keyframes om-tick {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-@keyframes om-flick {
-  0%, 100% { opacity: 0.5; }
-  92% { opacity: 0.5; }
-  94% { opacity: 0.15; }
-  96% { opacity: 0.6; }
-}
-
-@keyframes om-drift {
-  from { background-position: 0 0; }
-  to { background-position: 0 -400px; }
-}
-
-@keyframes om-sweep {
-  0% { transform: scaleX(0); opacity: 1; }
-  62% { transform: scaleX(1); opacity: 1; }
-  100% { transform: scaleX(1); opacity: 0; }
-}
-
-@keyframes om-glitch {
-  0%, 100% { opacity: 1; transform: translateX(0); }
-  12% { opacity: 0.2; transform: translateX(-2px); }
-  24% { opacity: 1; transform: translateX(1px); }
-  38% { opacity: 0.35; transform: translateX(2px); }
-  52% { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes om-pulse {
-  0%, 100% { opacity: 0.25; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.35); }
-}
-
-@keyframes om-fadein {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   *,

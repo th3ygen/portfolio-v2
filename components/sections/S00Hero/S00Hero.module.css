@@ -230,3 +230,24 @@
 @media (max-width: 700px) {
   .hero { padding: 38px 0 0 0; }
 }
+
+/* Local to this module. A CSS Module hashes animation *names* as well as class
+   names, so a reference here to a @keyframes declared in globals.css compiles
+   to a hashed name that nothing defines and the animation silently never runs.
+   Keyframes have to live in the module that uses them. */
+@keyframes om-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Local to this module: CSS Modules hash animation names, so a reference to a
+   @keyframes in globals.css resolves to a name nothing defines. */
+@keyframes om-tick {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes om-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

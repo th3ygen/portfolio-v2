@@ -26,3 +26,22 @@ test('the hero clears the masthead at every viewport height', async ({ page }) =
     expect(gap, `${size.width}x${size.height}`).toBeGreaterThanOrEqual(24);
   }
 });
+
+test('the hero ticker loops horizontally', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('[data-boot]').waitFor({ state: 'detached', timeout: 15_000 });
+
+  const rail = page.locator('[data-ticker]');
+  // Deliberately no scrollIntoViewIfNeeded: it waits for the element to stop
+  // moving, and this one never does. The rail sits in the hero, already in
+  // view on load.
+  //
+  // The animation is the only thing that moves this element, so a changing
+  // transform is proof the keyframes actually resolved.
+  const first = await rail.evaluate((el) => getComputedStyle(el).transform);
+  await expect
+    .poll(async () => rail.evaluate((el) => getComputedStyle(el).transform))
+    .not.toBe(first);
+
+  await expect(rail).toHaveCSS('animation-iteration-count', 'infinite');
+});
