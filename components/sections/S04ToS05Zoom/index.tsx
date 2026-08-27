@@ -7,7 +7,7 @@ import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import { zoomScale } from '@/lib/zoom/camera';
 import { handAngles, rewindLabel } from '@/lib/zoom/clock';
 import { BrutalistClock } from './BrutalistClock';
-import { ZoomWords, TRAIL } from './ZoomWords';
+import { ZoomWords, TRAIL_OFFSETS, TRAIL_OPACITY } from './ZoomWords';
 import styles from './S04ToS05Zoom.module.css';
 
 /** The year the trajectory rewinds to — POST.01. */
@@ -42,18 +42,35 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
         return;
       }
 
-      gsap.set('[data-zw="1"]', { autoAlpha: 0 });
+      // Camera writes the transform attribute directly. GSAP resolves
+      // transformOrigin against the element's *bounding box*, and this group's
+      // bbox moves every frame as UPTIME leaves and SINCE arrives — so a GSAP
+      // scale would drift the zoom target frame by frame. The content is
+      // authored around the dot at 0,0 and the parent group centres it, so a
+      // bare SVG scale() flies into the dot exactly.
+      const setCamera = (p: number) => {
+        scaler.setAttribute('transform', `scale(${zoomScale(p).toFixed(4)})`);
+      };
+      setCamera(0);
+
+      const trail0 = gsap.utils.toArray<SVGElement>('[data-trail="0"]');
+      const trail1 = gsap.utils.toArray<SVGElement>('[data-trail="1"]');
+      const trailIn = (index: number) => TRAIL_OPACITY[index] ?? 0;
+      const trailOut = (index: number) => -(TRAIL_OFFSETS[index] ?? 0);
+
+      gsap.set('[data-zw="1"]', { opacity: 0, y: TRAIL_OFFSETS[0] });
+      gsap.set([...trail0, ...trail1], { opacity: 0, y: (i: number) => trailOut(i) });
       gsap.set('[data-clock]', { opacity: 0 });
 
       const camera = { p: 0 };
       const timeline = gsap.timeline({
+        defaults: { ease: 'none' },
         scrollTrigger: {
           trigger: root,
           start: 'top top',
-          end: '+=300%',
+          end: '+=340%',
           pin: true,
-          scrub: true,
-          anticipatePin: 1,
+          scrub: 0.5,
         },
       });
 
@@ -62,44 +79,22 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
         camera,
         {
           p: 1,
-          ease: 'none',
           duration: 1,
-          onUpdate: () => {
-            gsap.set(scaler, { scale: zoomScale(camera.p), transformOrigin: '50% 50%' });
-          },
+          onUpdate: () => setCamera(camera.p),
         },
         0,
       );
 
-      // UPTIME's trail: ghosts start collapsed onto the word, then stagger out.
-      TRAIL.forEach((ghost, index) => {
-        timeline.fromTo(
-          `[data-trail="0"]:nth-of-type(${index + 1})`,
-          { y: -ghost.y, opacity: 0 },
-          { y: 0, opacity: ghost.opacity, duration: 0.05, ease: 'power2.out' },
-          0 + index * 0.016,
-        );
-      });
-
+      // UPTIME is shoved off the top, dragging a two-step trail that forms,
+      // follows, then thins out. SINCE <year> steps up from below the same way.
       timeline
-        .to('[data-word="uptime"]', { y: -320, duration: 0.085, ease: 'power2.in' }, 0)
-        .set('[data-zw="0"]', { autoAlpha: 0 }, 0.135)
-        .to('[data-zw="1"]', { autoAlpha: 1, duration: 0.02 }, 0.13)
-        .fromTo(
-          '[data-since-block]',
-          { y: 150 },
-          { y: 0, duration: 0.09, ease: 'power3.out' },
-          0.13,
-        );
-
-      TRAIL.forEach((ghost, index) => {
-        timeline.fromTo(
-          `[data-trail="1"]:nth-of-type(${index + 1})`,
-          { opacity: 0 },
-          { opacity: ghost.opacity, duration: 0.05, ease: 'power2.out' },
-          0.13 + index * 0.016,
-        );
-      });
+        .to(trail0, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: 'power2.out' }, 0)
+        .to('[data-word="uptime"]', { y: -320, duration: 0.085, ease: 'power2.in' }, 0.05)
+        .to(trail0, { opacity: 0, duration: 0.05, stagger: 0.014, ease: 'power1.in' }, 0.095)
+        .set('[data-zw="0"]', { opacity: 0 }, 0.135)
+        .to('[data-zw="1"]', { opacity: 1, duration: 0.035, ease: 'power1.out' }, 0.13)
+        .to(trail1, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: 'power2.out' }, 0.13)
+        .to('[data-zw="1"]', { y: 0, duration: 0.09, ease: 'power3.out' }, 0.13);
 
       // Year rolls backwards. The numeric counter is the source of truth; the
       // odometer reacts to it.
@@ -111,6 +106,7 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
           duration: 0.3,
           ease: 'power1.inOut',
           onUpdate: () => setYear(Math.round(counter.value)),
+          onComplete: () => setYear(END_YEAR),
         },
         0.1,
       );
@@ -118,12 +114,11 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
       // Clock. Keeps spinning through the whole zoom and never fades out.
       const clock = { p: 0 };
       timeline
-        .to('[data-clock]', { opacity: 1, duration: 0.06 }, 0.1)
+        .fromTo('[data-clock]', { opacity: 0 }, { opacity: 1, duration: 0.08 }, 0.08)
         .to(
           clock,
           {
             p: 1,
-            ease: 'none',
             duration: 0.88,
             onUpdate: () => {
               const angles = handAngles(clock.p);
@@ -137,9 +132,11 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
           0.1,
         );
 
-      // Flood: full green as the dot fills the viewport.
-      timeline.to(`.${styles.flood}`, { opacity: 1, ease: 'power2.in', duration: 0.16 }, 0.84);
-      timeline.to(`.${styles.meta}`, { opacity: 0, duration: 0.1 }, 0.2);
+      // Chrome clears out early; the flood snaps green as the dot fills the frame.
+      timeline
+        .to(`.${styles.meta}`, { opacity: 0, duration: 0.1 }, 0)
+        .to(`.${styles.grid}`, { opacity: 0, duration: 0.3 }, 0)
+        .fromTo(`.${styles.flood}`, { opacity: 0 }, { opacity: 1, duration: 0.05 }, 0.96);
     },
     { scope: rootRef, revertOnUpdate: true },
   );

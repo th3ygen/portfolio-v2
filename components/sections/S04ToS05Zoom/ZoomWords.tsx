@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { YearOdometer } from './YearOdometer';
 
 const WORD_STYLE: React.CSSProperties = {
@@ -17,32 +18,38 @@ const SINCE_STYLE: React.CSSProperties = {
   fill: 'var(--color-textMuted)',
 };
 
-/** Trailing ghost offsets and their resting opacities. */
-export const TRAIL = [
-  { y: 150, opacity: 0.16 },
-  { y: 76, opacity: 0.36 },
-] as const;
+/** Trailing ghost offsets, far ghost first — markup order the stagger relies on. */
+export const TRAIL_OFFSETS = [150, 76] as const;
+/** Resting opacity per ghost, by index. Thins out with distance. */
+export const TRAIL_OPACITY = [0.16, 0.36] as const;
 
 /**
  * The UPTIME → SINCE <year> handoff.
  *
  * Each word carries a two-step motion trail. The ghosts start collapsed onto
- * the word and stagger down into their offsets; they persist rather than
- * fading, which is what reads as speed during the cruise.
+ * the word and stagger out into their offsets, then fade as the word leaves —
+ * the trail is a smear, not a persistent stack.
+ *
+ * The SINCE ghosts are `<use>` instances rather than copies: they mirror the
+ * live odometer for free, and `y` stays a real attribute so GSAP's `y`
+ * transform composes with the offset instead of overwriting it.
  *
  * A stepped *look* was wanted here, not stepped *motion* — literal steps()
  * easing on the words was tried and rejected.
  */
 export function ZoomWords({ year }: { year: number }) {
+  const uid = useId().replace(/:/g, '');
+  const sinceId = `${uid}-since`;
+
   return (
     <>
       <g data-zw="0">
-        {TRAIL.map((ghost) => (
+        {TRAIL_OFFSETS.map((offset) => (
           <text
-            key={ghost.y}
+            key={offset}
             data-trail="0"
             x={0}
-            y={ghost.y}
+            y={offset}
             textAnchor="middle"
             dominantBaseline="middle"
             opacity={0}
@@ -65,18 +72,11 @@ export function ZoomWords({ year }: { year: number }) {
       </g>
 
       <g data-zw="1">
-        {TRAIL.map((ghost) => (
-          <g key={ghost.y} data-trail="1" transform={`translate(0 ${ghost.y})`} opacity={0} aria-hidden="true">
-            <text x={0} y={-58} textAnchor="middle" dominantBaseline="middle" style={SINCE_STYLE}>
-              SINCE
-            </text>
-            <text x={-8} y={0} textAnchor="end" dominantBaseline="middle" style={{ ...SINCE_STYLE, fontWeight: 800, fontSize: 64, letterSpacing: 2, fill: 'var(--color-accent)' }}>
-              20
-            </text>
-          </g>
+        {TRAIL_OFFSETS.map((offset) => (
+          <use key={offset} data-trail="1" href={`#${sinceId}`} y={offset} opacity={0} aria-hidden="true" />
         ))}
 
-        <g data-since-block>
+        <g id={sinceId} data-since-block>
           <text
             data-zoom-since
             x={0}

@@ -9,7 +9,7 @@
  */
 
 export const START_SCALE = 0.55;
-/** 62x left the background visible around the expanding dot. */
+/** Far enough that the dot alone fills the viewport at the end of the pin. */
 export const END_SCALE = 190;
 
 /** Where the fast opening leg hands over to the cruise. */
