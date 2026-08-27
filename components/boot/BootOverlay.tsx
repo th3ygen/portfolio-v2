@@ -19,7 +19,7 @@ import {
 } from './bootProgress';
 import styles from './BootOverlay.module.css';
 
-type Phase = 'idle' | 'running' | 'exiting' | 'wiping' | 'done';
+type Phase = 'running' | 'exiting' | 'wiping' | 'done';
 
 /** sessionStorage throws in some privacy modes; a boot overlay is not worth a crash. */
 function alreadyPlayed(): boolean {
@@ -49,13 +49,15 @@ function markPlayed(): void {
  * rejected — the wipe is the intended treatment. Do not add it back.
  */
 export function BootOverlay({ onComplete }: { onComplete: () => void }) {
-  // 'idle' until an effect decides. The decision depends on sessionStorage and
-  // a media query, neither of which exists on the server — computing it during
-  // render would make the client's first pass disagree with the server's HTML
-  // and break hydration. So the server and the first client render both emit
-  // nothing, and the effect takes it from there.
-  const [phase, setPhase] = useState<Phase>('idle');
-  const active = phase !== 'idle' && phase !== 'done';
+  // Rendered from the very first frame, server and client alike. The decision
+  // to skip depends on sessionStorage and a media query, neither of which
+  // exists on the server, so it cannot be made during render without breaking
+  // hydration — the effect below makes it instead, and the pre-paint script in
+  // the root layout hides the overlay in the meantime so a skipped boot never
+  // flashes. Emitting nothing until an effect ran was the earlier approach; it
+  // let the page paint first and dropped the overlay in a frame later.
+  const [phase, setPhase] = useState<Phase>('running');
+  const active = phase !== 'done';
   const [shown, setShown] = useState(0);
   const [state, setState] = useState<'POST' | 'LOAD' | 'HANDOFF'>('POST');
 
@@ -74,6 +76,11 @@ export function BootOverlay({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     if (alreadyPlayed() || prefersReducedMotion()) {
       markPlayed();
+      // The overlay is in the server HTML, so skipping means unmounting it.
+      // The pre-paint script in the root layout has already hidden it, so this
+      // never produces a visible frame.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPhase('done');
       onCompleteRef.current();
       return;
     }
@@ -82,12 +89,6 @@ export function BootOverlay({ onComplete }: { onComplete: () => void }) {
     // StrictMode; marking on entry means the second invocation sees the flag
     // already set and skips the boot entirely, so it never runs in dev. The
     // flag is set at teardown instead, where "played" actually means played.
-    // Deliberate: mount-gated UI cannot avoid a state change after mount. The
-    // alternative is deciding during render, which is the hydration mismatch
-    // this structure exists to prevent. One extra render is the intended cost.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPhase('running');
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     window.scrollTo(0, 0);

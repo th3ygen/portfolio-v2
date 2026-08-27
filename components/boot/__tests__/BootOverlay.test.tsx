@@ -26,12 +26,20 @@ afterEach(() => {
 });
 
 describe('BootOverlay', () => {
-  it('emits nothing on the first render pass, so hydration cannot mismatch', () => {
-    // Visibility depends on sessionStorage and a media query, neither of which
-    // exists on the server. If the component decided during render, the client's
-    // first pass would disagree with the server's HTML. Both must emit nothing
-    // and let the effect take over.
-    expect(renderToString(<BootOverlay onComplete={vi.fn()} />)).toBe('');
+  it('ships in the server HTML, so it covers the page from the first paint', () => {
+    // Emitting nothing until an effect ran let the page paint first and dropped
+    // the overlay in a frame later, which was visible. The server renders it
+    // unconditionally instead.
+    expect(renderToString(<BootOverlay onComplete={vi.fn()} />)).toContain('data-boot');
+  });
+
+  it('renders the same thing on the first client pass, so hydration cannot mismatch', () => {
+    // Whether to skip depends on sessionStorage and a media query, neither of
+    // which exists on the server — so the decision cannot happen during render.
+    // Both passes emit the overlay; the effect decides afterwards.
+    sessionStorage.setItem(SESSION_KEY, '1');
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(renderToString(<BootOverlay onComplete={vi.fn()} />)).toContain('data-boot');
   });
 
   it('renders on a fresh session', () => {

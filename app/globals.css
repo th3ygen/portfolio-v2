@@ -224,3 +224,16 @@ a:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Hides the boot overlay before the first paint when it should not play.
+ *
+ * The overlay ships in the server HTML so it covers the page immediately; the
+ * pre-paint script in the root layout marks the document for a returning
+ * visitor or a reduced-motion visitor, and this rule keeps them from seeing a
+ * frame of it. `!important` because the overlay's own display is a grid layout
+ * from a CSS Module, which loads later in the cascade.
+ */
+[data-boot-skip='1'] [data-boot] {
+  display: none !important;
+}

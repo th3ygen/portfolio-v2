@@ -9,6 +9,14 @@ const SECTIONS = ['s00', 's01', 's02', 's03', 's04', 's05', 's06'] as const;
  */
 const EXPECTED_OFFLINE_404 = '/_vercel/insights';
 
+/**
+ * The overlay ships in the server HTML and covers the page until it hands off,
+ * so anything that interacts with the page has to wait it out first.
+ */
+async function bootHandsOff(page: import('@playwright/test').Page) {
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
+}
+
 test('scrolls through all seven sections with no console errors', async ({ page }) => {
   const errors: string[] = [];
   const ignored: string[] = [];
@@ -64,6 +72,7 @@ test('the contact form reports a server failure rather than claiming success', a
   );
 
   await page.goto('/');
+  await bootHandsOff(page);
   await page.locator('#s06').scrollIntoViewIfNeeded();
 
   await page.getByLabel('> YOUR NAME').fill('Ada');
@@ -71,8 +80,12 @@ test('the contact form reports a server failure rather than claiming success', a
   await page.getByLabel('> PAYLOAD').fill('A genuine enquiry, at length.');
   await page.getByRole('button', { name: /TRANSMIT/ }).click();
 
-  await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page.getByRole('status')).toHaveCount(0);
+  // Scoped to the section: Next injects its own role="alert" route announcer,
+  // and the boot overlay is a role="status" live region. Both are page-level
+  // and neither has anything to do with the form.
+  const uplink = page.locator('#s06');
+  await expect(uplink.getByRole('alert')).toBeVisible();
+  await expect(uplink.getByRole('status')).toHaveCount(0);
 });
 
 test.describe('reduced motion', () => {

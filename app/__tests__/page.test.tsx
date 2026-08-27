@@ -73,7 +73,10 @@ describe('page', () => {
     }
   });
 
-  it('does not render the boot overlay on the server', () => {
-    expect(renderToString(<Page />)).not.toContain('COLD BOOT');
+  it('renders the boot overlay on the server, so it covers the first paint', () => {
+    // Withholding it until an effect ran meant the page painted first and the
+    // overlay arrived a frame later. A returning visitor is spared the flash by
+    // the pre-paint script in the root layout, not by withholding the markup.
+    expect(renderToString(<Page />)).toContain('COLD BOOT');
   });
 });
