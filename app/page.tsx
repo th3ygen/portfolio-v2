@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Masthead } from '@/components/chrome/Masthead';
 import { RailNav } from '@/components/chrome/RailNav';
 import { Ambient } from '@/components/chrome/Ambient';
@@ -14,6 +14,7 @@ import { S04Index } from '@/components/sections/S04Index';
 import { S04ToS05Zoom } from '@/components/sections/S04ToS05Zoom';
 import { S05Trajectory } from '@/components/sections/S05Trajectory';
 import { S06Uplink } from '@/components/sections/S06Uplink';
+import { useParallax } from '@/components/motion/useParallax';
 import { CURRENT_YEAR } from '@/content/sections';
 
 /**
@@ -23,6 +24,8 @@ import { CURRENT_YEAR } from '@/content/sections';
  */
 export default function Page() {
   const [bootDone, setBootDone] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  useParallax(mainRef);
 
   return (
     <>
@@ -31,7 +34,7 @@ export default function Page() {
       <Reticle />
       <Masthead />
       <RailNav />
-      <main data-boot-done={bootDone ? 'true' : 'false'}>
+      <main ref={mainRef} data-boot-done={bootDone ? 'true' : 'false'}>
         <S00Hero bootDone={bootDone} />
         <S01Operator />
         <S02Manifest />

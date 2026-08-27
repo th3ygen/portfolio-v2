@@ -75,7 +75,10 @@ export function BootOverlay({ onComplete }: { onComplete: () => void }) {
       return;
     }
 
-    markPlayed();
+    // NOT marked as played here. React double-invokes effects in development
+    // StrictMode; marking on entry means the second invocation sees the flag
+    // already set and skips the boot entirely, so it never runs in dev. The
+    // flag is set at teardown instead, where "played" actually means played.
     // Deliberate: mount-gated UI cannot avoid a state change after mount. The
     // alternative is deciding during render, which is the hydration mismatch
     // this structure exists to prevent. One extra render is the intended cost.
@@ -92,6 +95,7 @@ export function BootOverlay({ onComplete }: { onComplete: () => void }) {
     const timers: number[] = [];
 
     const teardown = () => {
+      markPlayed();
       document.body.style.overflow = previousOverflow;
       // Unmount rather than leaving a clipped-away overlay in the DOM. It is
       // fixed at z-index 200 and carries role="status"; left mounted it stays

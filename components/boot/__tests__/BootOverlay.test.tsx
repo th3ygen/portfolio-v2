@@ -75,9 +75,33 @@ describe('BootOverlay', () => {
     expect(onComplete).toHaveBeenCalled();
   });
 
-  it('marks the session as played so a reload does not replay it', () => {
-    render(<BootOverlay onComplete={vi.fn()} />);
+  it('marks the session played only once it has finished, not on mount', () => {
+    vi.useFakeTimers();
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const caf = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+
+    const { unmount } = render(<BootOverlay onComplete={vi.fn()} />);
+    // Marking on mount breaks development StrictMode: the second effect
+    // invocation would see the flag and skip the boot entirely.
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(4500 + 300 + 680 + 50);
+    });
     expect(sessionStorage.getItem(SESSION_KEY)).toBe('1');
+
+    unmount();
+    raf.mockRestore();
+    caf.mockRestore();
+  });
+
+  it('still plays when an effect is invoked twice, as StrictMode does', () => {
+    // Simulates the double-invoke by mounting, unmounting, and mounting again
+    // within one session — the boot must still appear the second time.
+    const first = render(<BootOverlay onComplete={vi.fn()} />);
+    first.unmount();
+    render(<BootOverlay onComplete={vi.fn()} />);
+    expect(screen.getByText('COLD BOOT')).toBeInTheDocument();
   });
 
   it('completes and restores scroll even if the frame loop never runs', () => {
