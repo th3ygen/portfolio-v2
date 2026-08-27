@@ -29,7 +29,16 @@ export function DatamoshCanvas() {
       antialias: false,
       premultipliedAlpha: false,
     });
-    if (!gl) return;
+    if (!gl || gl.isContextLost()) return;
+
+    // A lost context composites as opaque white, which on a full-bleed hero
+    // background is the entire section going white. Nothing can be drawn to it
+    // either way, so take the canvas out of the paint entirely.
+    const onLost = (event: Event) => {
+      event.preventDefault();
+      canvas.style.display = 'none';
+    };
+    canvas.addEventListener('webglcontextlost', onLost);
 
     const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
     const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -108,12 +117,18 @@ export function DatamoshCanvas() {
       if (frame) window.cancelAnimationFrame(frame);
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', onMove);
+      canvas.removeEventListener('webglcontextlost', onLost);
       observer?.disconnect();
       gl.deleteProgram(program);
       gl.deleteShader(vertex);
       gl.deleteShader(fragment);
       gl.deleteBuffer(buffer);
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      // Deliberately NOT loseContext(). React double-invokes effects in
+      // development StrictMode, and the second mount reuses this same canvas
+      // element — so getContext() hands back the context this line just
+      // killed, every draw call silently no-ops, and the canvas composites
+      // white over the whole hero. The GPU context is released with the
+      // canvas; this component mounts once per page.
     };
   }, []);
 

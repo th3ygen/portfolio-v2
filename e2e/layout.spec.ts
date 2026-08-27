@@ -45,3 +45,21 @@ test('the hero ticker loops horizontally', async ({ page }) => {
 
   await expect(rail).toHaveCSS('animation-iteration-count', 'infinite');
 });
+
+test('the datamosh canvas never composites white over the hero', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('[data-boot]').waitFor({ state: 'detached', timeout: 15_000 });
+
+  // A lost WebGL context composites as opaque white, and this canvas is
+  // full-bleed behind the hero — so losing it turns the whole section white.
+  const state = await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-mosh]');
+    if (!canvas) throw new Error('datamosh canvas missing');
+    const gl = canvas.getContext('webgl');
+    return { lost: gl ? gl.isContextLost() : null, display: getComputedStyle(canvas).display };
+  });
+
+  if (state.lost === null) return; // no WebGL in this runner; the canvas draws nothing
+  expect(state.lost).toBe(false);
+  expect(state.display).not.toBe('none');
+});
