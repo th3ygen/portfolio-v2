@@ -18,22 +18,42 @@ const VARIANT_CLASS = {
 /**
  * The hero. `bootDone` gates the intro timeline — it must not play until the
  * boot overlay has handed off, or the animation runs behind the overlay and is
- * over before anyone sees it.
+ * over before anyone sees it. Hiding and playing are separate effects; see the
+ * comment on the first one for why they cannot be the same.
  */
 export function S00Hero({ bootDone }: { bootDone: boolean }) {
   const rootRef = useRef<HTMLElement>(null);
+
+  // Hide the intro content at mount, not at handoff.
+  //
+  // The overlay's wipe reveals the page 680ms before `bootDone` flips, so a
+  // bare gsap.from() at handoff showed the hero at full opacity through the
+  // whole wipe and then snapped it to zero to animate in — a visible flash.
+  // Hiding here, in a layout effect, means it is never painted visible.
+  // Deliberately not CSS keyed on [data-boot-done]: that ships in the server
+  // HTML, so a JS failure would hide the hero permanently.
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return;
+      gsap.set('[data-intro]', { opacity: 0, y: 26 });
+    },
+    { scope: rootRef },
+  );
 
   useGSAP(
     () => {
       if (!bootDone) return;
       if (prefersReducedMotion()) return;
 
-      gsap.from('[data-intro]', {
-        opacity: 0,
-        y: 26,
+      gsap.to('[data-intro]', {
+        opacity: 1,
+        y: 0,
         duration: 0.8,
         ease: 'power3.out',
         stagger: 0.08,
+        // Hand the elements back to CSS once landed, so nothing inline is left
+        // fighting the parallax transforms on their wrappers.
+        clearProps: 'opacity,transform',
       });
 
       // Parallax layers drift and fade as the hero scrolls away.
