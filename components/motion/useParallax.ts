@@ -7,6 +7,11 @@ import { prefersReducedMotion } from './useReducedMotion';
 /** How fast the pointer-driven layers chase the cursor. */
 const LERP = 0.07;
 
+/** Promote layers to their own compositor buffer only while they are moving. */
+function hint(layers: readonly HTMLElement[], on: boolean): void {
+  for (const layer of layers) layer.style.willChange = on ? 'transform' : '';
+}
+
 /**
  * Drives the two parallax systems the design uses. They are different
  * mechanics and were easy to conflate:
@@ -50,18 +55,26 @@ export function useParallax(scope: React.RefObject<HTMLElement | null>): void {
       const moving =
         Math.abs(targetX - currentX) > 0.001 || Math.abs(targetY - currentY) > 0.001;
       frame = moving ? window.requestAnimationFrame(tick) : 0;
+      // Released the moment the chase settles. A permanent will-change on
+      // every layer holds a compositor buffer for each one for the whole
+      // session, which costs more than the promotion saves.
+      if (!moving) hint(layers, false);
     };
 
     const onMove = (event: MouseEvent) => {
       targetX = (event.clientX / window.innerWidth - 0.5) * 2;
       targetY = (event.clientY / window.innerHeight - 0.5) * 2;
-      if (!frame) frame = window.requestAnimationFrame(tick);
+      if (!frame) {
+        hint(layers, true);
+        frame = window.requestAnimationFrame(tick);
+      }
     };
 
     window.addEventListener('mousemove', onMove, { passive: true });
     return () => {
       window.removeEventListener('mousemove', onMove);
       if (frame) window.cancelAnimationFrame(frame);
+      hint(layers, false);
       for (const layer of layers) layer.style.transform = '';
     };
   }, []);
@@ -85,6 +98,8 @@ export function useParallax(scope: React.RefObject<HTMLElement | null>): void {
               start: 'top bottom',
               end: 'bottom top',
               scrub: 0.8,
+              // Only the layers currently crossing the viewport hold a buffer.
+              onToggle: ({ isActive }) => hint([el], isActive),
             },
           },
         );

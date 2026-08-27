@@ -42,7 +42,9 @@
   --color-textPrimary: #e8ecea;
   --color-textSecondary: #a8b0ae;
   --color-textMuted: #7c8583;
-  --color-textDim: #4a5250;
+  /* #4a5250 in the prototype: 2.49:1 on --color-bg, below the 4.5:1 floor.
+     This is the label tone, used across twelve stylesheets for real text. */
+  --color-textDim: #727a78;
   --color-textFaint: #38403f;
   --color-textGhost: #23292b;
 
@@ -236,4 +238,31 @@ a:hover {
  */
 [data-boot-skip='1'] [data-boot] {
   display: none !important;
+}
+
+/*
+ * Skip link. Off-screen until focused rather than display:none, which would
+ * take it out of the tab order and defeat the point.
+ */
+.skipLink {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 300;
+  padding: 12px 18px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-wide);
+  color: var(--color-bg);
+  background: var(--color-accent);
+  transform: translateY(-120%);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.skipLink:focus-visible {
+  transform: translateY(0);
+}
+
+main:focus {
+  outline: none;
 }

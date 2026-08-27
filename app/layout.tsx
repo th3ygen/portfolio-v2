@@ -31,6 +31,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${archivoBlack.variable} ${jetbrainsMono.variable}`}>
       <body>
         <script dangerouslySetInnerHTML={{ __html: SKIP_BOOT_SCRIPT }} />
+        {/* First focusable thing on the page. Seven full-height sections with
+            a pinned zoom between them is a long way to tab through. */}
+        <a href="#main" className="skipLink">
+          SKIP TO CONTENT
+        </a>
         <SmoothScrollProvider>{children}</SmoothScrollProvider>
         <Analytics />
       </body>

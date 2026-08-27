@@ -34,7 +34,9 @@ export default function Page() {
       <Reticle />
       <Masthead />
       <RailNav />
-      <main ref={mainRef} data-boot-done={bootDone ? 'true' : 'false'}>
+      {/* tabIndex -1 so the skip link can actually move focus here; without it
+          the browser scrolls but leaves focus stranded in the rail nav. */}
+      <main id="main" tabIndex={-1} ref={mainRef} data-boot-done={bootDone ? 'true' : 'false'}>
         <S00Hero bootDone={bootDone} />
         <S01Operator />
         <S02Manifest />

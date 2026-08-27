@@ -9,6 +9,12 @@ import { useSectionReveal } from '@/components/motion/useSectionReveal';
 import styles from './S03Spotlight.module.css';
 
 /**
+ * Hover push. Small on purpose: the image is already drifting on scroll, and a
+ * larger jump reads as two unrelated motions rather than one surface.
+ */
+const HOVER_SCALE = 1.05;
+
+/**
  * Four detailed projects. Cards alternate image side so the eye zig-zags down
  * the column.
  *
@@ -37,6 +43,53 @@ export function S03Spotlight() {
           },
         );
       }
+    },
+    { scope: rootRef, revertOnUpdate: true },
+  );
+
+  // Hover: the image pushes toward the viewer inside its fixed frame.
+  //
+  // Pointer-fine only — a hover tween on touch latches on first tap and never
+  // reverses. quickTo rather than a fresh gsap.to per event: the interpolator
+  // is created once per card and re-aimed, so flicking across the list does
+  // not allocate a tween per crossing. The reverse is the same interpolator
+  // aimed back at 1, so a fast pointer-out can never strand a card scaled up.
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return;
+      if (!window.matchMedia('(pointer: fine)').matches) return;
+
+      const teardowns: (() => void)[] = [];
+
+      for (const card of gsap.utils.toArray<HTMLElement>(`.${styles.card}`)) {
+        const image = card.querySelector<HTMLElement>('img');
+        if (!image) continue;
+
+        const scaleTo = gsap.quickTo(image, 'scale', { duration: 0.55, ease: 'power3.out' });
+        const enter = () => {
+          image.style.willChange = 'transform';
+          scaleTo(HOVER_SCALE);
+        };
+        const leave = () => {
+          // quickTo takes only a value, so the release hangs off the tween it
+          // hands back rather than a vars object.
+          scaleTo(1).eventCallback('onComplete', () => {
+            image.style.willChange = '';
+          });
+        };
+
+        card.addEventListener('pointerenter', enter);
+        card.addEventListener('pointerleave', leave);
+        teardowns.push(() => {
+          card.removeEventListener('pointerenter', enter);
+          card.removeEventListener('pointerleave', leave);
+          image.style.willChange = '';
+        });
+      }
+
+      return () => {
+        for (const teardown of teardowns) teardown();
+      };
     },
     { scope: rootRef, revertOnUpdate: true },
   );
