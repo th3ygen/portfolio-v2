@@ -1,7 +1,12 @@
 .hero {
   position: relative;
   min-height: 100vh;
-  padding: 38px 0 0 52px;
+  /* 38px clears the fixed masthead; the rest is breathing room. The ticker's
+     margin-top:auto consumes all the slack in this flex column, so the grid
+     sits hard against whatever the top padding leaves it — justify-content
+     centre never gets a say. The prototype used a bare 38px and the first row
+     landed 2px under the masthead. */
+  padding: calc(38px + var(--gap-40)) 0 0 52px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
