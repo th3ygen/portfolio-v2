@@ -84,10 +84,11 @@
 .card { position: relative; }
 
 .cardFrame {
+  --card-pad: 8px;
   position: relative;
   border: 1px solid var(--color-border);
   background: var(--color-surface1);
-  padding: 8px;
+  padding: var(--card-pad);
 }
 
 .portrait {
@@ -95,11 +96,72 @@
   width: 100%;
   aspect-ratio: 4 / 5;
   overflow: hidden;
-  /* Clipped shut; the scan timeline wipes it open with steps(5). */
-  clip-path: inset(0 0 100% 0);
 }
 
+/*
+ * No clip-path at rest, deliberately. The old stepped wipe left the frame
+ * clipped shut in CSS, so a JS failure hid the portrait permanently. The
+ * overflow: hidden above only crops the photo to the frame — it hides nothing
+ * the reader needs, and the photograph is visible with no JS at all.
+ */
 .portraitImage { width: 100%; height: 100%; object-fit: cover; }
+
+/*
+ * Depth pass over the flat photograph.
+ *
+ * operator-alpha.png is the same frame with the background cut away, moved
+ * independently of operator.jpg: `data-py` on the outer element for scroll,
+ * `data-px` on the inner for pointer. They cannot share one element —
+ * useParallax's pointer loop assigns style.transform directly and would stomp
+ * the GSAP scroll tween — hence the nesting.
+ *
+ * PAINT ORDER is what makes the effect read. The cutout must sit above the flat
+ * photo but below the meta bar, so the figure's feet pass behind OPERATOR.JPG
+ * instead of ending in a hard cut in mid-air. Within a stacking context a
+ * positioned element paints above non-positioned in-flow content whatever the
+ * DOM order, so .cardMeta is given position: relative and an opaque background
+ * and placed after this in the markup — that, not a z-index, is what puts it in
+ * front. It sits inside .cardFrame (which does not clip) rather than inside
+ * .portrait, which crops the photo to the frame and would crop the cutout with
+ * it.
+ *
+ * transform-origin is load-bearing twice over. Scaling moves a point away from
+ * the origin in proportion to its DISTANCE from it, so anything near the origin
+ * gains almost no clearance and the flat original ghosts through beside it — a
+ * centred origin left the ear ~24px out, earning ~4px against 14px of travel,
+ * a visible second ear. Sitting it low keeps every visible silhouette edge far
+ * away. But at exactly 50% 100% the bottom edge is a fixed point and the feet
+ * cannot extend past the frame to be occluded at all, so it rides slightly
+ * above the bottom: the figure grows up out of the top of the frame and down
+ * behind the meta bar at the same time. At 84% the feet clear the frame by
+ * ~19px, which the ~23px meta bar covers.
+ *
+ * Budget: nearest visible silhouette edge (the ear) is ~133px from the origin,
+ * so 1.28 clears ~37px against 11px of travel — deliberately generous, because
+ * the travel was tuned down by eye rather than to the limit. Raising data-py or
+ * data-px without raising the scale reintroduces the ghost; there is a test.
+ */
+.portraitAlpha {
+  position: absolute;
+  top: var(--card-pad);
+  left: var(--card-pad);
+  right: var(--card-pad);
+  aspect-ratio: 4 / 5;
+  pointer-events: none;
+}
+
+.portraitAlphaInner {
+  position: absolute;
+  inset: 0;
+}
+
+.portraitAlphaImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.28);
+  transform-origin: 50% 84%;
+}
 
 /* Explicit pending state — a visible gap, not a disguised one. */
 .portraitPending {
@@ -123,7 +185,11 @@
   line-height: 1.8;
 }
 
+/* position + background are load-bearing: they are what the cutout's feet pass
+   behind. See the paint-order note above. */
 .cardMeta {
+  position: relative;
+  background: var(--color-surface1);
   display: flex;
   justify-content: space-between;
   padding: 9px 2px 2px;

@@ -47,7 +47,7 @@ export function S04Index() {
             </thead>
             <tbody>
               {INDEX_ROWS.map((row) => (
-                <tr key={row.n}>
+                <tr key={row.n} data-lock={row.name}>
                   <td className={styles.colId}>{row.n}</td>
                   <th
                     scope="row"

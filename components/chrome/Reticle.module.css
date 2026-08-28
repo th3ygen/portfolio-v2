@@ -68,3 +68,42 @@
   font-variant-numeric: tabular-nums;
   will-change: transform;
 }
+
+/*
+ * Lock-on brackets. Four corners that converge on whatever [data-lock] element
+ * the pointer is over, so the crosshair reads as acquiring a target rather than
+ * drifting past it — the same language as s01's ACQUIRING OPERATOR tag.
+ *
+ * Positioned by transform from the viewport origin, which is why the reticle
+ * root is position: fixed with inset 0: the numbers written here are
+ * getBoundingClientRect values, used raw.
+ */
+.bracket {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 13px;
+  height: 13px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.bracketTL {
+  border-top: 1px solid var(--color-accent);
+  border-left: 1px solid var(--color-accent);
+}
+
+.bracketTR {
+  border-top: 1px solid var(--color-accent);
+  border-right: 1px solid var(--color-accent);
+}
+
+.bracketBL {
+  border-bottom: 1px solid var(--color-accent);
+  border-left: 1px solid var(--color-accent);
+}
+
+.bracketBR {
+  border-bottom: 1px solid var(--color-accent);
+  border-right: 1px solid var(--color-accent);
+}

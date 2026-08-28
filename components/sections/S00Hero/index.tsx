@@ -115,6 +115,7 @@ export function S00Hero({ bootDone }: { bootDone: boolean }) {
                 key={cta.label}
                 href={cta.href === '/docs/cv.pdf' ? CV_HREF : cta.href}
                 className={`${styles.cta} ${VARIANT_CLASS[cta.variant]}`}
+                data-lock={cta.label}
                 {...(cta.href.startsWith('/docs/') ? { download: true } : {})}
               >
                 {cta.label}

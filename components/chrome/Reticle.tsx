@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { gsap } from '@/components/motion/gsap';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import styles from './Reticle.module.css';
 
@@ -15,6 +16,17 @@ const pad = (value: number) => String(Math.round(value)).padStart(4, '0');
 const LERP = 0.16;
 /** Below this the chase is over; stop the frame loop rather than idling. */
 const SETTLED = 0.05;
+
+/** Bracket arm length; must match .bracket in the stylesheet. */
+const ARM = 13;
+/** How far outside the target's edges the brackets settle. */
+const INSET = -5;
+/** How far outside that they start, before converging inward. */
+const APPROACH = 26;
+/** Acquisition is stepped, not eased — it snaps shut like a lock, not a glide. */
+const LOCK_EASE = 'steps(3)';
+const LOCK_S = 0.2;
+const RELEASE_S = 0.12;
 
 /**
  * Crosshair that tracks the pointer, with a live coordinate readout.
@@ -43,6 +55,86 @@ export function Reticle() {
     let y = 0;
     let started = false;
 
+    // Read out of the DOM rather than held in four refs: an array built during
+    // render is a new value every pass and would have to be an effect dependency
+    // even though the nodes never change. Document order is TL, TR, BL, BR,
+    // which is the order cornersFor returns.
+    const brackets = Array.from(
+      rootRef.current?.querySelectorAll<HTMLElement>('[data-lock-bracket]') ?? [],
+    );
+    let locked: HTMLElement | null = null;
+    let lockLabel = '';
+
+    /** Corner positions for a rect, in the order the bracket refs are declared. */
+    const cornersFor = (rect: DOMRect, spread: number) => [
+      { x: rect.left - spread, y: rect.top - spread },
+      { x: rect.right + spread - ARM, y: rect.top - spread },
+      { x: rect.left - spread, y: rect.bottom + spread - ARM },
+      { x: rect.right + spread - ARM, y: rect.bottom + spread - ARM },
+    ];
+
+    const place = (target: HTMLElement, animate: boolean) => {
+      const rect = target.getBoundingClientRect();
+      const settled = cornersFor(rect, INSET);
+      const approach = cornersFor(rect, APPROACH);
+
+      brackets.forEach((bracket, index) => {
+        const to = settled[index];
+        const from = approach[index];
+        if (!to || !from) return;
+        if (!animate) {
+          gsap.set(bracket, { x: to.x, y: to.y });
+          return;
+        }
+        gsap.fromTo(
+          bracket,
+          { x: from.x, y: from.y, opacity: 0 },
+          { x: to.x, y: to.y, opacity: 1, duration: LOCK_S, ease: LOCK_EASE, overwrite: true },
+        );
+      });
+    };
+
+    const acquire = (target: HTMLElement) => {
+      locked = target;
+      lockLabel = target.dataset.lock || '';
+      place(target, true);
+    };
+
+    const release = () => {
+      locked = null;
+      lockLabel = '';
+      gsap.to(brackets, {
+        opacity: 0,
+        duration: RELEASE_S,
+        ease: 'steps(2)',
+        overwrite: true,
+      });
+    };
+
+    // Delegated rather than one listener pair per element: the lockable set is
+    // spread across sections and a table of sixteen rows, and delegation also
+    // survives anything re-rendering underneath.
+    const onOver = (event: PointerEvent) => {
+      const target = (event.target as Element | null)?.closest<HTMLElement>('[data-lock]');
+      if (!target || target === locked) return;
+      acquire(target);
+    };
+
+    const onOut = (event: PointerEvent) => {
+      if (!locked) return;
+      const next = event.relatedTarget as Node | null;
+      // Moving between children of the same target is not a release.
+      if (next && locked.contains(next)) return;
+      release();
+    };
+
+    // The rect moves under the pointer while the page scrolls, so a held lock
+    // has to be repositioned. Written with set, not tweened: this is correcting
+    // for the page moving, not a new acquisition.
+    const reposition = () => {
+      if (locked) place(locked, false);
+    };
+
     const paint = () => {
       x += (targetX - x) * LERP;
       y += (targetY - y) * LERP;
@@ -55,8 +147,12 @@ export function Reticle() {
       if (labelRef.current) {
         labelRef.current.style.transform = `translate3d(${fx}px,${fy}px,0)`;
         // The readout tracks the pointer itself, not the eased position — the
-        // crosshair is allowed to lag, the coordinates are not.
-        labelRef.current.textContent = `${pad(targetX)} · ${pad(targetY)}`;
+        // crosshair is allowed to lag, the coordinates are not. While locked it
+        // names the target instead: the crosshair has stopped reporting where it
+        // is and started reporting what it has.
+        labelRef.current.textContent = lockLabel
+          ? `▸ ${lockLabel}`
+          : `${pad(targetX)} · ${pad(targetY)}`;
       }
 
       const moving =
@@ -81,11 +177,20 @@ export function Reticle() {
 
     window.addEventListener('mousemove', onMove, { passive: true });
     document.addEventListener('mouseleave', onLeave);
+    document.addEventListener('pointerover', onOver);
+    document.addEventListener('pointerout', onOut);
+    window.addEventListener('scroll', reposition, { passive: true });
+    window.addEventListener('resize', reposition, { passive: true });
 
     return () => {
       window.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseleave', onLeave);
+      document.removeEventListener('pointerover', onOver);
+      document.removeEventListener('pointerout', onOut);
+      window.removeEventListener('scroll', reposition);
+      window.removeEventListener('resize', reposition);
       if (frame) window.cancelAnimationFrame(frame);
+      gsap.killTweensOf(brackets);
     };
   }, []);
 
@@ -101,6 +206,10 @@ export function Reticle() {
       <div ref={xRef} className={styles.crossX} />
       <div ref={dotRef} className={styles.dot} />
       <div ref={labelRef} className={styles.label}>0000 · 0000</div>
+      <div className={`${styles.bracket} ${styles.bracketTL}`} data-lock-bracket />
+      <div className={`${styles.bracket} ${styles.bracketTR}`} data-lock-bracket />
+      <div className={`${styles.bracket} ${styles.bracketBL}`} data-lock-bracket />
+      <div className={`${styles.bracket} ${styles.bracketBR}`} data-lock-bracket />
     </div>
   );
 }

@@ -17,20 +17,36 @@ import styles from './S01Operator.module.css';
  * The operator section.
  *
  * The scan is scrubbed over a deliberately long window (top 78% → top -30%)
- * so it finishes on screen rather than below the fold. The portrait's wipe
- * uses steps(5) — the hard stepping is intentional and must not be smoothed.
+ * so it finishes on screen rather than below the fold.
+ *
+ * The portrait has no reveal of its own. It carried the page-wide box reveal
+ * for a while, but the accent block sweeping across it fought the cutout
+ * drifting over the top — two competing motions on one card. The cutout is the
+ * treatment now.
+ *
+ * It is NOT wiped open by a moving edge. The earlier steps(5) clip-path wipe
+ * was dropped once a real photograph went in: a hard horizontal cut across a
+ * face is the visual signature of a half-loaded progressive JPEG, and `scrub`
+ * parks it there whenever scrolling stops. It also never lined up with the
+ * scan line — that line is positioned against the section while the clip was a
+ * percentage of the portrait box, so the two edges were in different
+ * coordinate spaces and on different durations. Do not reintroduce an
+ * edge-based reveal here.
  */
 export function S01Operator() {
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
     () => {
-      const portrait = rootRef.current?.querySelector(`.${styles.portrait}`);
-
       if (prefersReducedMotion()) {
-        // Final state, no scrub: portrait open, copy in place.
-        if (portrait) gsap.set(portrait, { clipPath: 'inset(0 0 0% 0)' });
-        gsap.set('[data-op-line]', { opacity: 1, y: 0, clipPath: 'inset(0 0% 0 0)' });
+        // Final state, no scrub: copy in place. Neither the portrait nor the
+        // cutout needs anything here — useBoxReveal has its own reduced-motion
+        // branch, and the cutout is never hidden in the first place.
+        gsap.set('[data-op-line]', {
+          opacity: 1,
+          y: 0,
+          clipPath: 'inset(0 0% 0 0)',
+        });
         return;
       }
 
@@ -54,15 +70,6 @@ export function S01Operator() {
         .fromTo(`.${styles.tag}`, { opacity: 0 }, { opacity: 1, duration: 0.05 }, 0)
         .to(`.${styles.tag}`, { opacity: 0, duration: 0.1 }, 0.55);
 
-      if (portrait) {
-        timeline.fromTo(
-          portrait,
-          { clipPath: 'inset(0 0 100% 0)' },
-          { clipPath: 'inset(0 0 0% 0)', ease: 'steps(5)', duration: 0.5 },
-          0.1,
-        );
-      }
-
       timeline.fromTo(
         '[data-op-line]',
         { opacity: 0, y: 14, clipPath: 'inset(0 100% 0 0)' },
@@ -82,7 +89,9 @@ export function S01Operator() {
 
   return (
     <section id="s01" ref={rootRef} className={styles.section}>
-      <div className={styles.ghost} data-py="-46" data-ghost-numeral aria-hidden="true">01</div>
+      <div className={styles.ghost} data-py="-46" data-ghost-numeral aria-hidden="true">
+        01
+      </div>
       <div className={styles.ticks} data-py="26" aria-hidden="true">
         {[22, 38, 16, 46].map((width, index) => (
           <div key={width} className={styles.tick}>
@@ -95,7 +104,9 @@ export function S01Operator() {
 
       <div className={styles.inner}>
         <header className={styles.head}>
-          <span className={styles.headNumber} aria-hidden="true">01</span>
+          <span className={styles.headNumber} aria-hidden="true">
+            01
+          </span>
           <h2 className={styles.headTitle}>OPERATOR</h2>
           <span className={styles.headNote}>WHO IS RUNNING THIS</span>
         </header>
@@ -114,8 +125,8 @@ export function S01Operator() {
                     className={styles.portraitImage}
                     src={PORTRAIT.src}
                     alt={PORTRAIT.alt}
-                    width={680}
-                    height={850}
+                    width={971}
+                    height={1413}
                   />
                 ) : (
                   <div className={styles.portraitPending} data-portrait-pending>
@@ -125,6 +136,31 @@ export function S01Operator() {
                   </div>
                 )}
               </div>
+              {/* Decorative duplicate: same subject, background removed,
+                    drifting over the flat original to give the frame depth.
+                    Announcing it again would just repeat the alt text. Sits
+                    between the photo and .cardMeta on purpose — that paint
+                    order is what sends the feet behind the meta bar. Never
+                    faded or hidden: it is simply always there. */}
+              {PORTRAIT.src ? (
+                <div
+                  className={styles.portraitAlpha}
+                  data-portrait-alpha
+                  data-py="5"
+                  aria-hidden="true"
+                >
+                  <div className={styles.portraitAlphaInner} data-px="6">
+                    <Image
+                      className={styles.portraitAlphaImage}
+                      src={PORTRAIT.alphaSrc}
+                      alt=""
+                      width={971}
+                      height={1413}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
               <div className={styles.cardMeta}>
                 <span>{PORTRAIT.filename}</span>
                 <span className={styles.verified}>VERIFIED</span>
@@ -147,13 +183,14 @@ export function S01Operator() {
 
           <div>
             <p className={styles.lead} data-box-reveal>
-              {OPERATOR.lead[0]}{' '}
-              <span className={styles.leadAccent}>{OPERATOR.lead[1]}</span>{' '}
+              {OPERATOR.lead[0]} <span className={styles.leadAccent}>{OPERATOR.lead[1]}</span>{' '}
               {OPERATOR.lead[2]}
             </p>
 
             {OPERATOR.body.map((block) => (
-              <p key={block} className={styles.body} data-box-reveal>{block}</p>
+              <p key={block} className={styles.body} data-box-reveal>
+                {block}
+              </p>
             ))}
 
             <div className={styles.loadoutHead} data-op-line>
@@ -164,10 +201,7 @@ export function S01Operator() {
             <ul className={styles.loadout}>
               {CORE_LOADOUT.map((item) => (
                 <li key={item.name} className={styles.loadoutItem}>
-                  <div
-                    className={styles.loadoutName}
-                    data-accent={item.accent ? 'true' : 'false'}
-                  >
+                  <div className={styles.loadoutName} data-accent={item.accent ? 'true' : 'false'}>
                     {item.name}
                   </div>
                   <div className={styles.loadoutDetail}>{item.detail}</div>

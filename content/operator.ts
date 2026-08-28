@@ -21,7 +21,15 @@ export const OPERATOR_CARD: readonly Stat[] = [
   { label: 'CALL SIGN', value: 'DIL' },
   { label: 'BASE', value: 'KUALA LUMPUR' },
   { label: 'TIMEZONE', value: 'GMT+8' },
-  { label: 'REMOTE', value: 'YES' },
+  // One row rather than separate REMOTE / WFH / WIO lines: those say the same
+  // thing three times, and WIO is not an abbreviation a reader can be expected
+  // to decode. FIELD WORK stays its own row because it is not a work-mode
+  // preference — it is going out to the installation.
+  { label: 'WORK MODE', value: 'REMOTE · HYBRID · ON-SITE' },
+  { label: 'FIELD WORK', value: 'YES' },
+  { label: 'NOTICE', value: '30 DAYS' },
+  { label: 'LANGUAGES', value: 'MALAY · ENGLISH' },
+  { label: 'DEGREE', value: 'BSc (HONS) CS · SOFTWARE ENG' },
 ] as const;
 
 /**
@@ -106,18 +114,27 @@ export const LOADOUT_HEAD = {
 /**
  * The s01 portrait.
  *
- * `src: null` renders an explicit pending frame rather than a stand-in image —
- * the layout is then correct and the gap is visible instead of disguised. The
- * only candidate on the old site is a cartoon avatar, which the prototype
- * itself rejects ("real photo beats the cartoon"). Set `src` when a real
- * photograph exists; nothing else needs to change.
+ * A real photograph, which is what the prototype asked for ("real photo beats
+ * the cartoon"). `src` stays nullable: the component still renders an explicit
+ * pending frame when it is null, so the gap would be stated rather than
+ * disguised if the file were ever pulled.
+ *
+ * Intrinsic size is 971x1413. The frame is 4/5 and the image is `object-fit:
+ * cover`, so it crops top and bottom rather than distorting.
+ *
+ * `alphaSrc` is the same frame with the background cut away. It is layered over
+ * `src` and parallaxed independently to give the flat photograph depth, so the
+ * two files must stay pixel-aligned: same crop, same intrinsic size. Re-export
+ * both together or the cutout will drift off its own subject.
  */
 export const PORTRAIT: {
   readonly src: string | null;
+  readonly alphaSrc: string;
   readonly alt: string;
   readonly filename: string;
 } = {
-  src: null,
+  src: '/img/operator.jpg',
+  alphaSrc: '/img/operator-alpha.png',
   alt: 'Muhd Aidil Syazwan Hamdan',
   filename: 'OPERATOR.JPG',
 };

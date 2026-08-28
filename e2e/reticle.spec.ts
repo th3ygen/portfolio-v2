@@ -67,3 +67,53 @@ test('the crosshair stays faint enough to sit under the content', async ({ page 
   expect(alpha.dot).toBeLessThanOrEqual(0.25);
   expect(alpha.label).toBeLessThanOrEqual(0.3);
 });
+
+test('the crosshair acquires a lockable target and names it', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
+
+  const brackets = page.locator('[data-lock-bracket]');
+  await expect(brackets).toHaveCount(4);
+
+  await page.mouse.move(400, 400);
+  await page.waitForTimeout(400);
+  // At rest the brackets are not on screen at all.
+  expect(await brackets.first().evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
+
+  const row = page.locator('#s04 tbody tr[data-lock]').first();
+  await row.scrollIntoViewIfNeeded();
+  const name = await row.getAttribute('data-lock');
+  await row.hover();
+  await page.waitForTimeout(500);
+
+  // Acquired: brackets visible, and sitting on the row's own corners.
+  expect(Number(await brackets.first().evaluate((el) => getComputedStyle(el).opacity))).toBe(1);
+  const box = await row.boundingBox();
+  const corner = await brackets.first().evaluate((el) => {
+    const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    return { x: m.m41, y: m.m42 };
+  });
+  expect(Math.abs(corner.x - (box?.x ?? 0))).toBeLessThan(14);
+
+  // The readout stops reporting where it is and reports what it has.
+  const label = await page.locator('[data-reticle] > div:nth-child(4)').textContent();
+  expect(label).toBe(`▸ ${name}`);
+});
+
+test('the crosshair releases the target when the pointer leaves it', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
+
+  const row = page.locator('#s04 tbody tr[data-lock]').first();
+  await row.scrollIntoViewIfNeeded();
+  await row.hover();
+  await page.waitForTimeout(400);
+
+  await page.locator('#s04 h2').hover();
+  await page.waitForTimeout(400);
+
+  const brackets = page.locator('[data-lock-bracket]');
+  expect(Number(await brackets.first().evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
+  const label = await page.locator('[data-reticle] > div:nth-child(4)').textContent();
+  expect(label).not.toContain('▸');
+});
