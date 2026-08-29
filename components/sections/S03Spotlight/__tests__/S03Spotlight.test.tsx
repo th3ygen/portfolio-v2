@@ -9,8 +9,11 @@ beforeEach(() => {
 
 describe('S03Spotlight', () => {
   it('renders all four projects as list items', () => {
-    render(<S03Spotlight />);
-    expect(screen.getAllByRole('listitem')).toHaveLength(SPOTLIGHTS.length);
+    const { container } = render(<S03Spotlight />);
+    // Scoped to the project list: the section also closes with the client grid,
+    // which is another twelve list items.
+    const cards = container.querySelectorAll('[data-spotlight]');
+    expect(cards).toHaveLength(SPOTLIGHTS.length);
     expect(SPOTLIGHTS).toHaveLength(4);
   });
 
@@ -31,7 +34,10 @@ describe('S03Spotlight', () => {
 
   it('gives every image a descriptive alt naming its project', () => {
     render(<S03Spotlight />);
-    const images = screen.getAllByRole('img');
+    // Project images only — the client logos are covered by ClientGrid's tests.
+    const images = screen
+      .getAllByRole('img')
+      .filter((image) => !(image.getAttribute('src') ?? '').includes('clients-mono'));
     expect(images).toHaveLength(SPOTLIGHTS.length);
     for (const [index, image] of images.entries()) {
       const alt = image.getAttribute('alt') ?? '';

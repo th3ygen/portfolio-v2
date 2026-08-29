@@ -1,9 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import Page from '@/app/page';
 import { SECTIONS } from '@/content/sections';
 import { OPERATOR } from '@/content/operator';
+
+/**
+ * Every test here renders the whole page — seven sections, a pinned zoom and
+ * around forty images — so each one costs the better part of a second. That sat
+ * just under the 5s default until the s03 client grid was added, then tipped
+ * over whenever the suite ran in parallel and the workers contended. Raised
+ * rather than narrowed: rendering the real page is the point of this file.
+ */
+vi.setConfig({ testTimeout: 20_000 });
 
 /**
  * The hero is the page's h1 and carries no section title or ghost numeral.

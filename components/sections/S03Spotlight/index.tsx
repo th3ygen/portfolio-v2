@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { SPOTLIGHTS, SPOTLIGHT_INTRO } from '@/content/spotlights';
 import { FramedImage } from '@/components/media/FramedImage';
+import { ClientGrid } from './ClientGrid';
 import { gsap, useGSAP } from '@/components/motion/gsap';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import { useSectionReveal } from '@/components/motion/useSectionReveal';
@@ -166,6 +167,8 @@ export function S03Spotlight() {
             </li>
           ))}
         </ul>
+
+        <ClientGrid />
       </div>
     </section>
   );

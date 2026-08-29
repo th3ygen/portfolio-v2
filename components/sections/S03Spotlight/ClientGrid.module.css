@@ -1,0 +1,127 @@
+.wrap {
+  margin-top: var(--gap-64);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-12);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 9px;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
+  color: var(--color-textDim);
+}
+
+.note {
+  flex: 1;
+  text-align: right;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  color: var(--color-textFaint);
+}
+
+/* 1px gap over a background is the hairline grid — no borders per cell. The
+   same construction as s01's core loadout, deliberately: this is the second
+   instance of that idiom, not a new one. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1px;
+  background: var(--color-borderDim1);
+  border: 1px solid var(--color-borderDim1);
+  list-style: none;
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 138px;
+  padding: 18px 12px;
+  overflow: hidden;
+  background: var(--color-bgAlt1);
+}
+
+.logo {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 54px;
+  object-fit: contain;
+  /* Held back so the grid reads as a quiet block of evidence rather than
+     twelve competing marks; the hovered cell comes up to full. */
+  opacity: 0.6;
+  transition:
+    opacity 0.3s ease,
+    transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cell:hover .logo {
+  opacity: 1;
+  /* Steps aside for the name rather than the cell reserving a permanent gap.
+     Reserved space is what made the marks sit high: centring a logo stacked on
+     top of an always-present caption block centres the pair, not the logo. */
+  transform: translateY(-13px);
+}
+
+/*
+ * The name is present for every cell but only shown on hover. Several of these
+ * marks are crests that nobody outside Malaysia will recognise, so the grid
+ * would otherwise be twelve unreadable shapes. aria-hidden because the logo's
+ * alt text already carries the name — this is the same information, drawn.
+ */
+.caption {
+  /* Out of flow so the mark centres on the cell itself. It was in flow to stop
+     a two-line name landing on the logo; the hover slide does that job instead,
+     and the cell is tall enough that the two never meet at rest. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 13px;
+  padding: 0 10px;
+  transform: translateY(5px);
+  text-align: center;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  color: var(--color-textDim);
+  opacity: 0;
+  transition:
+    opacity 0.3s ease,
+    transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.cell:hover .caption {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .caption {
+    transition: opacity 0.3s ease;
+  }
+
+  .cell:hover .logo {
+    transform: none;
+  }
+
+  .caption {
+    transform: none;
+  }
+}
+
+@media (hover: none) {
+  /* No hover to reveal it, so the mark stays legible and the name stays put —
+     and the logo takes the raised position permanently to clear it. */
+  .logo { opacity: 0.8; transform: translateY(-13px); }
+  .caption { opacity: 1; transform: none; }
+}

@@ -162,7 +162,13 @@ export function Reticle() {
       if (yRef.current) yRef.current.style.transform = `translate3d(0,${fy}px,0)`;
       if (dotRef.current) dotRef.current.style.transform = `translate3d(${fx}px,${fy}px,0)`;
       if (labelRef.current) {
-        labelRef.current.style.transform = `translate3d(${fx}px,${fy}px,0)`;
+        // Rides the raw pointer while locked, rather than the pinned crosshair.
+        // Pinned, it parked the target's name on top of the target's own
+        // content; parking it outside the rect just moved the collision into
+        // whatever sits below. Following the cursor never rests on anything.
+        const lx = lockCentre ? targetX.toFixed(2) : fx;
+        const ly = lockCentre ? targetY.toFixed(2) : fy;
+        labelRef.current.style.transform = `translate3d(${lx}px,${ly}px,0)`;
         // The readout tracks the pointer itself, not the eased position — the
         // crosshair is allowed to lag, the coordinates are not. While locked it
         // names the target instead: the crosshair has stopped reporting where it

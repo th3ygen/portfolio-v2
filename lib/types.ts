@@ -63,3 +63,16 @@ export type ContactChannel = {
   readonly value: string;
   readonly href?: string;
 };
+
+/** An organisation shown in the s03 client grid. */
+export type Client = {
+  /** Matches the filename in public/img/clients-mono. */
+  readonly slug: string;
+  readonly name: string;
+  /**
+   * Terse form for the reticle's lock readout. The full name trails the cursor
+   * across neighbouring cells — "Kementerian Pertanian dan Keterjaminan
+   * Makanan" is 45 characters — and a HUD readout should be a callsign.
+   */
+  readonly short: string;
+};
