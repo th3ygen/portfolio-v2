@@ -16,6 +16,25 @@ export const OPERATOR = {
   ] as const,
 } as const;
 
+/**
+ * The roles the s01 title lockup cycles through, in order.
+ *
+ * Each is a PREFIX: the lockup renders them against a fixed `dev` suffix, so
+ * these read as "FRONTEND dev", "INFRA dev", and so on. That is why DevOps
+ * appears as INFRA — "DEVOPS dev" is not a phrase, and infrastructure is the
+ * accurate word for the Docker/Nginx/PM2/AWS end of the work.
+ *
+ * Order is deliberate: it walks outward from the surface a visitor sees first
+ * to the breadth underneath, and lands on the title actually being claimed.
+ */
+export const OPERATOR_ROLES: readonly string[] = [
+  'FRONTEND',
+  'BACKEND',
+  'INFRA',
+  'AIoT',
+  'FULL-STACK',
+] as const;
+
 /** Identity card facts shown beside the s01 portrait. */
 export const OPERATOR_CARD: readonly Stat[] = [
   { label: 'CALL SIGN', value: 'DIL' },

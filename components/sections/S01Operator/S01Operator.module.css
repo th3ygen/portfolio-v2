@@ -310,6 +310,14 @@
   .headNote { display: none; }
 }
 
+
+/* 300vh of nothing, so the sticky title stage has a runway to play its beats
+   across before the operator content scrolls up over it. */
+.titleRunway {
+  height: 300vh;
+  pointer-events: none;
+}
+
 /* Parallax greebles. Present in the prototype and initially dropped. */
 .ghost {
   position: absolute;

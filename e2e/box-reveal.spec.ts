@@ -26,6 +26,26 @@ async function park(page: Page, section: string, offset: number) {
   );
 }
 
+/**
+ * Scroll so the section's FIRST revealable paragraph sits `offset` px below the
+ * viewport top.
+ *
+ * Parking against the section top is not enough for s01: its title sequence
+ * opens with three viewports of scroll runway, so the section's top and its
+ * copy are thousands of pixels apart and parking at the top left every
+ * paragraph untouched below the fold.
+ */
+async function parkCopy(page: Page, section: string, offset: number) {
+  await page.evaluate(
+    ([sel, off]) => {
+      const el = document.querySelector(`${sel as string} [data-box-reveal]`);
+      if (!el) throw new Error(`${sel} has no [data-box-reveal]`);
+      window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - (off as number));
+    },
+    [section, offset] as const,
+  );
+}
+
 test('the block covers the paragraph at rest, before anything moves', async ({ page }) => {
   await page.goto('/');
   await bootHandsOff(page);
@@ -44,9 +64,9 @@ test('the block clears the paragraph on entry, staggered, and never returns', as
   await page.goto('/');
   await bootHandsOff(page);
 
-  await park(page, '#s01', 1400);
+  await parkCopy(page, '#s01', 1400);
   await page.waitForTimeout(400);
-  await park(page, '#s01', 180);
+  await parkCopy(page, '#s01', 180);
 
   // Mid-flight the first paragraph must be ahead of the last, or the stagger
   // is not doing anything.
@@ -57,7 +77,7 @@ test('the block clears the paragraph on entry, staggered, and never returns', as
   // Walk the rest of the section into view so every paragraph gets its turn —
   // parking at the top only triggers the ones above the fold.
   for (const offset of [-200, -600, -1000]) {
-    await park(page, '#s01', offset);
+    await parkCopy(page, '#s01', offset);
     await page.waitForTimeout(500);
   }
   await expect.poll(async () => (await positions(page, '#s01')).every((v) => v >= 100), {
@@ -65,9 +85,9 @@ test('the block clears the paragraph on entry, staggered, and never returns', as
   }).toBe(true);
 
   // Once only. Leaving and re-entering must not replay it.
-  await park(page, '#s01', 1400);
+  await parkCopy(page, '#s01', 1400);
   await page.waitForTimeout(600);
-  await park(page, '#s01', -600);
+  await parkCopy(page, '#s01', -600);
   await page.waitForTimeout(600);
   for (const value of await positions(page, '#s01')) expect(value).toBeGreaterThanOrEqual(100);
 });

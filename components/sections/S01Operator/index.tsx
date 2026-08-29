@@ -11,6 +11,7 @@ import {
 } from '@/content/operator';
 import { gsap, useGSAP } from '@/components/motion/gsap';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
+import { TitleStage } from './TitleStage';
 import styles from './S01Operator.module.css';
 
 /**
@@ -92,6 +93,12 @@ export function S01Operator() {
       <div className={styles.ghost} data-py="-46" data-ghost-numeral aria-hidden="true">
         01
       </div>
+      <TitleStage />
+      {/* Pure scroll runway for the title beats. The stage above is sticky, so
+          this is what gives it something to be scrolled through before the
+          section's real content arrives. */}
+      <div className={styles.titleRunway} aria-hidden="true" />
+
       <div className={styles.ticks} data-py="26" aria-hidden="true">
         {[22, 38, 16, 46].map((width, index) => (
           <div key={width} className={styles.tick}>

@@ -1,0 +1,112 @@
+/*
+ * Held in place by a ScrollTrigger pin, not position: sticky — sticky measured
+ * as inert inside this section and the stage simply scrolled away with it.
+ * z-index 0 so the section's real content passes over the lockup once it has
+ * receded to a backdrop.
+ */
+.stage {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  pointer-events: none;
+  /* The lockup is sized to fit the longest role, but a stray overflow here
+     would give the whole page a horizontal scrollbar. */
+  overflow: hidden;
+}
+
+.lockup {
+  display: flex;
+  /* Baseline, not centre. The column always translates the ACTIVE title to its
+     own first row, so aligning to the column's first baseline is what keeps
+     `dev` locked to the title that is currently solid — centring aligned it to
+     the column's midpoint instead, which drifts as titles switch. */
+  align-items: baseline;
+  gap: clamp(16px, 2.4vw, 40px);
+  white-space: nowrap;
+  font-family: var(--font-display), Impact, sans-serif;
+  letter-spacing: -0.02em;
+  will-change: transform, opacity;
+}
+
+/*
+ * The fixed half of the lockup. Lowercase against the uppercase titles on
+ * purpose — it is the constant the column is measured against, not another
+ * entry in it.
+ */
+.suffix {
+  font-size: clamp(52px, 9vw, 130px);
+  line-height: 0.86;
+  color: var(--color-accent);
+}
+
+/*
+ * Every title stacked, riding upward one row per step. The column's width is
+ * the widest title's and never changes, so `dev` beside it never jumps as the
+ * active title switches — which a single swapped word would have caused.
+ *
+ * Right-aligned: the titles run up against `dev`, so the gap between them is
+ * constant whether the active title is INFRA or FULL-STACK. Left-aligned, a
+ * short title would leave a hole in the middle of the lockup.
+ */
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  will-change: transform, opacity;
+}
+
+/*
+ * Hollow by default, solid accent when active. The outline is the same
+ * treatment as the section's ghost numeral, so the inactive titles read as the
+ * page's own furniture rather than as disabled text.
+ *
+ * Sized so the LONGEST role fits the viewport, not the shortest. At 20
+ * characters, FULL-STACK DEVELOPER is what sets this ceiling; anything larger
+ * ran off the right edge once the cycle reached it.
+ */
+.item {
+  font-size: clamp(26px, 5vw, 74px);
+  /* Fixed rather than unitless: the row height is what the column translates by,
+     and it is measured from this box. */
+  line-height: 1.24;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--color-surface3);
+}
+
+.item[data-role-active='true'] {
+  color: var(--color-accent);
+  -webkit-text-stroke-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lockup { will-change: auto; }
+}
+
+/*
+ * Stacked below this width. Even at the clamp's floor the longest role is wider
+ * than a phone, and shrinking the type far enough to fit in a row would leave
+ * the opening `01` too small to carry the beat.
+ */
+@media (max-width: 760px) {
+  .lockup {
+    /* DOM order already puts the column first, so stacking keeps the same
+       reading order as the row layout above this breakpoint: titles, then dev. */
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .column {
+    align-items: center;
+    text-align: center;
+  }
+
+  .item {
+    font-size: clamp(22px, 7vw, 40px);
+  }
+}
