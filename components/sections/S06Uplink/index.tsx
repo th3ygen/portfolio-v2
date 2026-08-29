@@ -145,7 +145,12 @@ export function S06Uplink() {
                 );
               })}
 
-              <button type="submit" className={styles.submit} disabled={status === 'sending'}>
+              <button
+                type="submit"
+                className={styles.submit}
+                data-lock="TRANSMIT"
+                disabled={status === 'sending'}
+              >
                 {status === 'sending' ? UPLINK.sending : UPLINK.submit}
               </button>
 

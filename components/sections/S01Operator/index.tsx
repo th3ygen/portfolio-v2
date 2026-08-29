@@ -119,7 +119,7 @@ export function S01Operator() {
         <div className={styles.grid}>
           <div className={styles.card} data-px="5">
             <div className={styles.cardFrame}>
-              <div className={styles.portrait}>
+              <div className={styles.portrait} data-lock={PORTRAIT.filename}>
                 {PORTRAIT.src ? (
                   <Image
                     className={styles.portraitImage}
@@ -200,7 +200,7 @@ export function S01Operator() {
 
             <ul className={styles.loadout}>
               {CORE_LOADOUT.map((item) => (
-                <li key={item.name} className={styles.loadoutItem}>
+                <li key={item.name} className={styles.loadoutItem} data-lock={item.name}>
                   <div className={styles.loadoutName} data-accent={item.accent ? 'true' : 'false'}>
                     {item.name}
                   </div>

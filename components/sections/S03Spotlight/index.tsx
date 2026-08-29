@@ -119,7 +119,7 @@ export function S03Spotlight() {
               data-spotlight={project.id}
               data-reveal
             >
-              <div className={styles.media}>
+              <div className={styles.media} data-lock={project.name}>
                 <FramedImage
                   className={styles.mediaFrame}
                   src={project.image}

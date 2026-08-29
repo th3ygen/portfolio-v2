@@ -64,6 +64,8 @@ export function Reticle() {
     );
     let locked: HTMLElement | null = null;
     let lockLabel = '';
+    // While set, the crosshair is pinned here instead of chasing the pointer.
+    let lockCentre: { x: number; y: number } | null = null;
 
     /** Corner positions for a rect, in the order the bracket refs are declared. */
     const cornersFor = (rect: DOMRect, spread: number) => [
@@ -75,6 +77,7 @@ export function Reticle() {
 
     const place = (target: HTMLElement, animate: boolean) => {
       const rect = target.getBoundingClientRect();
+      lockCentre = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       const settled = cornersFor(rect, INSET);
       const approach = cornersFor(rect, APPROACH);
 
@@ -98,11 +101,20 @@ export function Reticle() {
       locked = target;
       lockLabel = target.dataset.lock || '';
       place(target, true);
+      // Deliberately NOT snapped to the centre here: leaving x/y alone lets the
+      // paint loop's existing lerp carry the crosshair across, so it glides onto
+      // the target. The brackets are the part that snaps — stepped converge
+      // against a smooth travel is the contrast that sells the acquisition.
+      if (!frame) frame = window.requestAnimationFrame(paint);
     };
 
     const release = () => {
       locked = null;
       lockLabel = '';
+      // Cleared before the next frame, so the crosshair eases back out to
+      // wherever the pointer has got to rather than teleporting.
+      lockCentre = null;
+      if (!frame) frame = window.requestAnimationFrame(paint);
       gsap.to(brackets, {
         opacity: 0,
         duration: RELEASE_S,
@@ -132,12 +144,17 @@ export function Reticle() {
     // has to be repositioned. Written with set, not tweened: this is correcting
     // for the page moving, not a new acquisition.
     const reposition = () => {
-      if (locked) place(locked, false);
+      if (!locked) return;
+      place(locked, false);
+      if (!frame) frame = window.requestAnimationFrame(paint);
     };
 
     const paint = () => {
-      x += (targetX - x) * LERP;
-      y += (targetY - y) * LERP;
+      // Pinned to the target while locked, chasing the pointer otherwise.
+      const toX = lockCentre ? lockCentre.x : targetX;
+      const toY = lockCentre ? lockCentre.y : targetY;
+      x += (toX - x) * LERP;
+      y += (toY - y) * LERP;
 
       const fx = x.toFixed(2);
       const fy = y.toFixed(2);
@@ -155,8 +172,7 @@ export function Reticle() {
           : `${pad(targetX)} · ${pad(targetY)}`;
       }
 
-      const moving =
-        Math.abs(targetX - x) > SETTLED || Math.abs(targetY - y) > SETTLED;
+      const moving = Math.abs(toX - x) > SETTLED || Math.abs(toY - y) > SETTLED;
       frame = moving ? window.requestAnimationFrame(paint) : 0;
     };
 

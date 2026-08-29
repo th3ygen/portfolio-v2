@@ -117,3 +117,55 @@ test('the crosshair releases the target when the pointer leaves it', async ({ pa
   const label = await page.locator('[data-reticle] > div:nth-child(4)').textContent();
   expect(label).not.toContain('▸');
 });
+
+test('the crosshair glides onto a locked target rather than jumping to it', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
+
+  const item = page.locator('#s01 [data-lock]').last();
+  await item.scrollIntoViewIfNeeded();
+  const box = await item.boundingBox();
+  if (!box) throw new Error('lockable item has no box');
+
+  // Approach from well away, so a chase would still be visibly in flight.
+  await page.mouse.move(box.x + box.width - 4, box.y + box.height - 4);
+  await page.waitForTimeout(500);
+
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+  // Settles on the target's centre rather than sitting under the pointer.
+  await expect
+    .poll(async () => Math.abs((await translation(page)).x - centre.x), { timeout: 4_000 })
+    .toBeLessThan(6);
+  expect(Math.abs((await translation(page)).y - centre.y)).toBeLessThan(6);
+});
+
+test('the crosshair travels to a locked target instead of teleporting', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
+
+  const item = page.locator('#s01 [data-lock]').last();
+  await item.scrollIntoViewIfNeeded();
+  const box = await item.boundingBox();
+  if (!box) throw new Error('lockable item has no box');
+
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+  // Settle somewhere neutral FIRST. On the very first pointer sighting the move
+  // handler assigns the crosshair straight to the cursor, which lands after the
+  // acquire and masks whatever acquire did — an earlier version of this test
+  // entered cold and passed even with a hard teleport in place.
+  await page.mouse.move(6, 6);
+  await page.waitForTimeout(500);
+
+  // Enter at the far corner, the furthest the crosshair can be from the centre
+  // while still inside the target.
+  await page.mouse.move(box.x + box.width - 3, box.y + box.height - 3);
+  await page.waitForTimeout(50);
+
+  // Assigning the centre directly on acquire put it here in one frame, which
+  // read as a jump. Immediately after entering it must still be short.
+  const inFlight = await translation(page);
+  const travelled = Math.hypot(inFlight.x - centre.x, inFlight.y - centre.y);
+  expect(travelled).toBeGreaterThan(4);
+});
