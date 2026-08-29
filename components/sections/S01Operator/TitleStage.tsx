@@ -66,11 +66,13 @@ export function TitleStage() {
       };
 
       if (prefersReducedMotion()) {
-        // Final state only: the backdrop, parked on the last title.
+        // A static title card, not the backdrop. Nothing is pinned here, so the
+        // stage simply scrolls past like any other block — and at backdrop
+        // opacity it would read as a blank screen rather than as a title. The
+        // runway collapses to zero in CSS to match.
         const last = items.length - 1;
         activate(last);
         gsap.set(column, { y: -last * first.offsetHeight });
-        gsap.set(lockup, { opacity: GHOST });
         return;
       }
 
@@ -113,6 +115,10 @@ export function TitleStage() {
           start: 'top top',
           end: '+=300%',
           scrub: 0.4,
+          // The column's row height is read from the live line box, which the
+          // clamp on font-size makes viewport-dependent. Without this the
+          // function-based y values are captured once and never recomputed.
+          invalidateOnRefresh: true,
         },
       });
 

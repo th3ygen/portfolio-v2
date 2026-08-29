@@ -121,3 +121,36 @@ test('the lockup fits the viewport at its widest title', async ({ page }) => {
     expect(docWidth, `no h-scroll at ${width}`).toBe(width);
   }
 });
+
+test.describe('reduced motion', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
+  test('collapses the scroll runway when the beats do not play', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(900);
+
+    const reach = await page.evaluate(() => {
+      const section = document.querySelector('#s01');
+      const header = document.querySelector('#s01 header');
+      if (!section || !header) throw new Error('#s01 header missing');
+      return Math.round(
+        header.getBoundingClientRect().top - section.getBoundingClientRect().top,
+      );
+    });
+
+    // The runway exists only to give the pin something to scroll through. With
+    // the pin skipped it was 3001px of blank page — more than four viewports —
+    // between the section's top and its first content.
+    expect(reach).toBeLessThan(900);
+  });
+
+  test('shows the title as a readable card, not at backdrop opacity', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(900);
+    const opacity = await page.evaluate(() =>
+      Number(getComputedStyle(document.querySelector('[data-title-lockup]') as Element).opacity),
+    );
+    expect(opacity).toBeGreaterThan(0.9);
+    await expect(page.locator('[data-role-active="true"]')).toHaveText('FULL-STACK');
+  });
+});

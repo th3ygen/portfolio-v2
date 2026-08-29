@@ -311,11 +311,22 @@
 }
 
 
-/* 300vh of nothing, so the sticky title stage has a runway to play its beats
+/* 300vh of nothing, so the pinned title stage has a runway to play its beats
    across before the operator content scrolls up over it. */
 .titleRunway {
   height: 300vh;
   pointer-events: none;
+}
+
+/*
+ * Collapsed when the beats do not play. The runway exists only to give the pin
+ * something to scroll through; without it the reader had to cross 3001px —
+ * more than four viewports — of blank page to reach the section's content.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .titleRunway {
+    height: 0;
+  }
 }
 
 /* Parallax greebles. Present in the prototype and initially dropped. */
