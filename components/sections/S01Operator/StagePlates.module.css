@@ -17,19 +17,23 @@
   overflow: hidden;
 }
 
-.plate {
+/* Sized and placed; exists only to be the plate's parallax trigger. */
+.slot {
   position: absolute;
+}
+
+.plate {
+  position: relative;
   padding: 5px;
   border: 1px solid var(--color-borderDim1);
   background: var(--color-bgAlt1);
 }
 
-/* Tucked into the margins the content column does not use. */
-.plate[data-side='left'] {
+.slot[data-side='left'] {
   left: clamp(4px, 3vw, 64px);
 }
 
-.plate[data-side='right'] {
+.slot[data-side='right'] {
   right: clamp(4px, 3vw, 64px);
 }
 
@@ -87,4 +91,33 @@
   .plates {
     display: none;
   }
+}
+
+/* Spans the width so the mark can centre itself; the mark carries the drift. */
+.markSlot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.mark {
+  position: relative;
+}
+
+.markText {
+  display: block;
+  font-family: var(--font-display), Impact, sans-serif;
+  /* Sized so the longest title still fits the viewport. Wider than that and it
+     is clipped to a few letters, which reads as a stray shape, not a word. */
+  font-size: clamp(90px, 15vw, 260px);
+  line-height: 0.8;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  color: transparent;
+  /* --color-surface3 is #121617 against a #070809 background: fine on bare
+     backdrop, invisible once a plate sits behind it. --color-border carries
+     roughly two and a half times the contrast. */
+  -webkit-text-stroke: 1px var(--color-border);
 }

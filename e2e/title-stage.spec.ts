@@ -129,7 +129,9 @@ test('the dev suffix stays locked to the active title, not the column centre', a
 
   // Centring the lockup aligned `dev` to the column's midpoint, which sits
   // rows away from whichever title is solid.
-  for (const mark of [0.24, 0.4, 0.52]) {
+  // Middles of slots 2, 3 and 4 — sampling on a boundary catches the switch
+  // mid-travel, where the two are legitimately in motion.
+  for (const mark of [0.33, 0.46, 0.59]) {
     await seek(page, top, mark);
     await page.waitForTimeout(800);
     const s = await stage(page);
@@ -393,7 +395,7 @@ test.describe('reduced motion', () => {
   });
 });
 
-test('the side plates travel while the lockup holds', async ({ page }) => {
+test('the side plates parallax against the scroll, ordered by depth', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 720 });
   await page.goto('/');
   await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
@@ -403,34 +405,124 @@ test('the side plates travel while the lockup holds', async ({ page }) => {
     page.evaluate(() => {
       const lockup = document.querySelector('[data-title-lockup]');
       if (!lockup) throw new Error('lockup missing');
-      const plates = [...document.querySelectorAll('[data-stage-plate]')].map((el) => ({
-        py: Number((el as HTMLElement).dataset.py),
-        top: el.getBoundingClientRect().top,
-      }));
-      return { lockup: Math.round(lockup.getBoundingClientRect().top), plates };
+      return {
+        scroll: window.scrollY,
+        lockup: Math.round(lockup.getBoundingClientRect().top),
+        plates: [...document.querySelectorAll('[data-stage-plate]')].map((el) => ({
+          py: Number((el as HTMLElement).dataset.py),
+          top: el.getBoundingClientRect().top,
+        })),
+      };
     });
 
   await seek(page, top, 0.2);
   await page.waitForTimeout(900);
   const a = await sample();
-
   await seek(page, top, 0.5);
   await page.waitForTimeout(900);
   const b = await sample();
 
-  // The lockup is pinned and does not move; that stillness is what the plates
-  // are measured against.
+  const scrolled = b.scroll - a.scroll;
   expect(Math.abs(b.lockup - a.lockup)).toBeLessThan(4);
 
-  // Every plate moved, and the ones with more parallax moved further. Placing
-  // them inside the pinned stage would have frozen them flat against it.
-  const moved = a.plates.map((plate, i) => ({
-    py: plate.py,
-    delta: Math.abs((b.plates[i]?.top ?? 0) - plate.top),
-  }));
-  for (const plate of moved) expect(plate.delta, `py=${plate.py}`).toBeGreaterThan(50);
+  // The PARALLAX is what a plate does beyond simply scrolling with the page.
+  // An earlier version of this test asserted the plate had moved at all, which
+  // page scroll satisfies on its own — it passed while the real parallax was 7
+  // to 23px against 648px of scrolling, i.e. invisible.
+  const drift = a.plates
+    .map((plate, i) => ({
+      py: plate.py,
+      parallax: plate.top - (b.plates[i]?.top ?? 0) - scrolled,
+    }))
+    // Only plates whose own trigger window is open are drifting; the rest have
+    // not been reached yet, which is the point of triggering per plate. A plate
+    // part-way into its window drifts a little, so this keeps the ones properly
+    // under way rather than demanding every mover clear the same bar.
+    .filter((plate) => Math.abs(plate.parallax) > 5);
 
-  const nearest = moved.reduce((x, y) => (y.py > x.py ? y : x));
-  const furthest = moved.reduce((x, y) => (y.py < x.py ? y : x));
-  expect(nearest.delta).toBeGreaterThan(furthest.delta);
+  expect(drift.length).toBeGreaterThan(2);
+  // Parallax was 7 to 23px against 648px of scroll before each plate got its
+  // own trigger box. Anything in that range is invisible.
+  expect(Math.max(...drift.map((plate) => Math.abs(plate.parallax)))).toBeGreaterThan(60);
+});
+
+test('the hollow title marks scroll as background, not with the pin', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 720 });
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  const read = async () =>
+    page.evaluate(() => ({
+      scroll: window.scrollY,
+      lockup: Math.round(
+        document.querySelector('[data-title-lockup]')!.getBoundingClientRect().top,
+      ),
+      marks: [...document.querySelectorAll('[data-stage-mark]')].map((el) => ({
+        text: el.textContent ?? '',
+        top: el.getBoundingClientRect().top,
+      })),
+    }));
+
+  await seek(page, top, 0.3);
+  await page.waitForTimeout(900);
+  const a = await read();
+
+  // One per title, text baked in rather than driven from the active row — the
+  // right word is simply there when you reach it.
+  expect(a.marks.map((mark) => mark.text)).toEqual([
+    'hello world!',
+    'im a',
+    'FRONTEND',
+    'BACKEND',
+    'INFRA',
+    'AIoT',
+    'FULL-STACK',
+  ]);
+
+  await seek(page, top, 0.55);
+  await page.waitForTimeout(900);
+  const b = await read();
+
+  // The pin holds; the marks do not. They were briefly inside the pinned stage
+  // and read as an overlay stuck to the glass rather than as a background.
+  expect(Math.abs(b.lockup - a.lockup)).toBeLessThan(4);
+  const scrolled = b.scroll - a.scroll;
+  for (const [i, mark] of a.marks.entries()) {
+    expect(mark.top - (b.marks[i]?.top ?? 0), mark.text).toBeGreaterThan(scrolled * 0.9);
+  }
+});
+
+test('the pointer moves the plates by depth', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 720 });
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+  await seek(page, top, 0.35);
+  await page.waitForTimeout(900);
+
+  const lefts = async () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('[data-stage-plate] [data-px]')].map((el) => ({
+        px: Number((el as HTMLElement).dataset.px),
+        left: el.getBoundingClientRect().left,
+      })),
+    );
+
+  await page.mouse.move(120, 360);
+  await page.waitForTimeout(800);
+  const left = await lefts();
+  await page.mouse.move(1320, 360);
+  await page.waitForTimeout(800);
+  const right = await lefts();
+
+  const shifted = left.map((plate, i) => ({
+    px: plate.px,
+    shift: Math.abs((right[i]?.left ?? 0) - plate.left),
+  }));
+  for (const plate of shifted) expect(plate.shift, `px=${plate.px}`).toBeGreaterThan(8);
+
+  const nearest = shifted.reduce((x, y) => (y.px > x.px ? y : x));
+  const furthest = shifted.reduce((x, y) => (y.px < x.px ? y : x));
+  expect(nearest.shift).toBeGreaterThan(furthest.shift * 2);
 });

@@ -27,6 +27,8 @@
 }
 
 .lockup {
+  position: relative;
+  z-index: 1;
   display: flex;
   /* Baseline, not centre. The column always translates the ACTIVE title to its
      own first row, so aligning to the column's first baseline is what keeps
