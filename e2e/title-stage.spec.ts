@@ -122,6 +122,36 @@ test('the lockup fits the viewport at its widest title', async ({ page }) => {
   }
 });
 
+test('rebuilds the sequence when the viewport crosses the stacking breakpoint', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
+  const top = await sectionTop(page);
+  await page.evaluate((y) => window.scrollTo(0, y), top + 2.4 * 720);
+  await page.waitForTimeout(900);
+  expect((await stage(page)).right).toBeLessThanOrEqual(1280);
+
+  // The centring offset is measured from the column's width, and the stacked
+  // layout makes it zero. Measured once at build time it survived a resize as a
+  // number describing a layout that no longer existed; matchMedia tears the
+  // sequence down and rebuilds it per breakpoint.
+  await page.setViewportSize({ width: 375, height: 720 });
+  await page.waitForTimeout(1200);
+  const narrow = await stage(page);
+  expect(narrow.left, 'left after shrink').toBeGreaterThanOrEqual(0);
+  expect(narrow.right, 'right after shrink').toBeLessThanOrEqual(375);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForTimeout(1200);
+  const wide = await stage(page);
+  expect(wide.left, 'left after grow').toBeGreaterThanOrEqual(0);
+  expect(wide.right, 'right after grow').toBeLessThanOrEqual(1280);
+  await expect(page.locator('[data-role-active="true"]')).toHaveCount(1);
+});
+
 test.describe('reduced motion', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } });
 

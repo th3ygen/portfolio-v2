@@ -3,7 +3,6 @@
 import { useRef } from 'react';
 import { OPERATOR_ROLES } from '@/content/operator';
 import { gsap, ScrollTrigger, useGSAP } from '@/components/motion/gsap';
-import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import styles from './TitleStage.module.css';
 
 /** The fixed half of the lockup. Every title in the column reads against it. */
@@ -11,6 +10,16 @@ const SUFFIX = 'dev';
 
 /** Opacity the lockup settles at once it becomes the section's backdrop. */
 const GHOST = 0.055;
+
+/**
+ * The width below which the lockup stacks.
+ *
+ * Exported because it is a coupling, not a detail: the same breakpoint appears
+ * in TitleStage.module.css, and the stacked layout is what makes the centring
+ * offset zero. If the two drift apart, the sequence measures a row layout while
+ * the page renders a column. There is a test on them agreeing.
+ */
+export const STACK_BREAKPOINT = 760;
 
 /** Beat positions on a 0-1 timeline. Named because the order is the design. */
 const ROLE_IN = 0.05;
@@ -65,90 +74,139 @@ export function TitleStage() {
         });
       };
 
-      if (prefersReducedMotion()) {
-        // A static title card, not the backdrop. Nothing is pinned here, so the
-        // stage simply scrolls past like any other block — and at backdrop
-        // opacity it would read as a blank screen rather than as a title. The
-        // runway collapses to zero in CSS to match.
-        const last = items.length - 1;
-        activate(last);
-        gsap.set(column, { y: -last * first.offsetHeight });
-        return;
-      }
+      /** Row height, read live: the clamp on font-size makes it viewport-dependent. */
+      const rowHeight = () => first.offsetHeight;
 
-      // How far the pair must slide so `dev` reads as centred on its own first.
-      // The lockup is a centred flex row with the column on the left, so `dev`
-      // sits half the row's remainder to the RIGHT of centre; shifting the row
-      // left by that much puts it on centre, and animating back to 0 is the
-      // column arriving and pushing it right. The column's width is the widest
-      // title's and does not change as titles switch, so `dev` never jumps
-      // mid-cycle — and the titles are right-aligned inside it, so the gap
-      // before `dev` is constant however short the active title is.
-      const stacked = getComputedStyle(lockup).flexDirection === 'column';
-      const gap = Number.parseFloat(getComputedStyle(lockup).columnGap) || 0;
-      const offset = stacked ? 0 : -(column.getBoundingClientRect().width + gap) / 2;
+      /**
+       * How far the pair must slide so `dev` reads as centred on its own first.
+       *
+       * The lockup is a centred flex row with the column on the left, so `dev`
+       * sits half the row's remainder to the RIGHT of centre; shifting the row
+       * left by that much puts it on centre, and animating back to 0 is the
+       * column arriving and pushing it right. Zero when stacked — `dev` is
+       * already centred under the column and sliding it would only move it off.
+       */
+      const centreOffset = (stacked: boolean) => {
+        if (stacked) return 0;
+        const gap = Number.parseFloat(getComputedStyle(lockup).columnGap) || 0;
+        return -(column.getBoundingClientRect().width + gap) / 2;
+      };
 
-      // Applied immediately, NOT as .set() calls inside the timeline. A scrubbed
-      // timeline sitting at progress 0 has never rendered, and setting progress
-      // to the value it already holds is a no-op — so the opening state never
-      // reached the DOM and the lockup simply sat in its assembled HTML state.
-      activate(0);
-      gsap.set(lockup, { x: offset });
-      gsap.set(column, { y: 0, opacity: 0 });
-      gsap.set(column, { y: -80 });
+      // matchMedia rather than a one-shot check of the media queries. Everything
+      // created inside a condition is reverted automatically when that condition
+      // stops matching, so resizing across the breakpoint or toggling the motion
+      // preference rebuilds the sequence instead of leaving values measured for
+      // a layout that no longer exists.
+      const mm = gsap.matchMedia();
 
-      // Held for the section's whole length, not just the beats, so the lockup
-      // is still there to be a backdrop. pinSpacing: false because the runway
-      // below already provides the scroll distance — a spacer would add it twice.
-      ScrollTrigger.create({
-        trigger: section,
-        start: 'top top',
-        end: 'bottom bottom',
-        pin: stage,
-        pinSpacing: false,
-      });
-
-      const timeline = gsap.timeline({
-        defaults: { ease: 'none' },
-        scrollTrigger: {
-          trigger: section,
-          start: 'top top',
-          end: '+=300%',
-          scrub: 0.4,
-          // The column's row height is read from the live line box, which the
-          // clamp on font-size makes viewport-dependent. Without this the
-          // function-based y values are captured once and never recomputed.
-          invalidateOnRefresh: true,
+      mm.add(
+        {
+          // `row` is not decoration: matchMedia runs the callback only when at
+          // least one condition matches, so without the complement of `stacked`
+          // a wide viewport with no motion preference matched nothing and the
+          // whole sequence never built.
+          //
+          // Both widths MUST stay in step with the breakpoint in
+          // TitleStage.module.css; the stacked layout is what makes the centring
+          // offset zero. There is a test on the two agreeing.
+          row: `(min-width: ${STACK_BREAKPOINT + 1}px)`,
+          stacked: `(max-width: ${STACK_BREAKPOINT}px)`,
+          reduce: '(prefers-reduced-motion: reduce)',
         },
-      });
+        (context) => {
+          const { stacked, reduce } = context.conditions as {
+            row: boolean;
+            stacked: boolean;
+            reduce: boolean;
+          };
 
-      timeline
-        .to(column, { opacity: 1, y: 0, duration: 0.09, ease: 'power2.out' }, ROLE_IN)
-        .to(lockup, { x: 0, duration: 0.12, ease: 'power3.inOut' }, CENTRE);
+          if (reduce) {
+            // A static title card, not the backdrop. Nothing is pinned here, so
+            // the stage simply scrolls past like any other block — and at
+            // backdrop opacity it would read as a blank screen rather than as a
+            // title. The runway collapses to zero in CSS to match.
+            const last = items.length - 1;
+            activate(last);
+            gsap.set(column, { y: -last * rowHeight() });
+            return;
+          }
 
-      // The column rides up one row per step. Row height is measured rather than
-      // assumed: it is the display face's line box, which the clamp on font-size
-      // makes viewport-dependent.
-      const step = (CYCLE_END - CYCLE_START) / (items.length - 1);
-      for (let index = 1; index < items.length; index += 1) {
-        const at = CYCLE_START + (index - 1) * step;
-        timeline
-          .to(
-            column,
-            {
-              y: () => -index * first.offsetHeight,
-              duration: step * 0.62,
-              ease: 'power3.inOut',
+          activate(0);
+
+          // Held for the section's whole length, not just the beats, so the
+          // lockup is still there to be a backdrop. pinSpacing: false because
+          // the runway below already provides the scroll distance — a spacer
+          // would add it twice.
+          ScrollTrigger.create({
+            trigger: section,
+            start: 'top top',
+            end: 'bottom bottom',
+            pin: stage,
+            pinSpacing: false,
+          });
+
+          const timeline = gsap.timeline({
+            defaults: { ease: 'none' },
+            scrollTrigger: {
+              trigger: section,
+              start: 'top top',
+              end: '+=300%',
+              scrub: 0.4,
+              // Every measured value below is a function, and this is what makes
+              // them re-run. Without it they are captured once and survive a
+              // resize as numbers describing a layout that has changed.
+              invalidateOnRefresh: true,
             },
-            at,
-          )
-          // Hard switch rather than a cross-fade: the column's travel is the
-          // smooth part, and a title is either the current one or it is not.
-          .set(items, { onComplete: () => activate(index) }, at + step * 0.31)
-          .set(items, { onReverseComplete: () => activate(index - 1) }, at + step * 0.31);
-      }
+          });
 
-      timeline.to(lockup, { opacity: GHOST, duration: 0.13, ease: 'power2.in' }, RECEDE);
+          // fromTo, not a set() ahead of the timeline: fromTo renders its start
+          // state immediately at build time AND recomputes it on refresh. A
+          // .set() inside the timeline did neither — a scrubbed timeline parked
+          // at progress 0 has never rendered, and setting progress to the value
+          // it already holds is a no-op, so the opening state never reached the
+          // DOM at all.
+          timeline
+            .fromTo(
+              column,
+              { opacity: 0, y: -80 },
+              { opacity: 1, y: 0, duration: 0.09, ease: 'power2.out' },
+              ROLE_IN,
+            )
+            .fromTo(
+              lockup,
+              { x: () => centreOffset(stacked) },
+              { x: 0, duration: 0.12, ease: 'power3.inOut' },
+              CENTRE,
+            );
+
+          // The column rides up one row per step.
+          const step = (CYCLE_END - CYCLE_START) / (items.length - 1);
+          for (let index = 1; index < items.length; index += 1) {
+            const at = CYCLE_START + (index - 1) * step;
+            timeline
+              .to(
+                column,
+                {
+                  y: () => -index * rowHeight(),
+                  duration: step * 0.62,
+                  ease: 'power3.inOut',
+                },
+                at,
+              )
+              // Hard switch rather than a cross-fade: the column's travel is the
+              // smooth part, and a title is either the current one or it is not.
+              .set(items, { onComplete: () => activate(index) }, at + step * 0.31)
+              .set(items, { onReverseComplete: () => activate(index - 1) }, at + step * 0.31);
+          }
+
+          timeline.to(lockup, { opacity: GHOST, duration: 0.13, ease: 'power2.in' }, RECEDE);
+        },
+      );
+
+      // Kept even though useGSAP's context very likely reverts this too: revert
+      // is idempotent, and the cost of being wrong about who owns the cleanup is
+      // a leaked pin that keeps a section fixed forever.
+      return () => mm.revert();
     },
     { scope: stageRef, revertOnUpdate: true },
   );

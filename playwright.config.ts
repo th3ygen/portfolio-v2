@@ -23,6 +23,11 @@ export default defineConfig({
     // Never true: a reused server is a server nobody rebuilt, so a run can
     // silently test stale code. Rebuilding costs seconds and is always honest.
     reuseExistingServer: false,
-    timeout: 180_000,
+    // Covers `npm run build && npm run start` from cold. 180s was enough on an
+    // idle machine and timed out repeatedly on a busy one — this is a
+    // production build of a page with seven sections and a hundred images, and
+    // a failure here reads as "the whole suite is broken" rather than "the
+    // server was still compiling".
+    timeout: 420_000,
   },
 });

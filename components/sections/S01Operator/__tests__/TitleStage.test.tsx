@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import { TitleStage } from '../TitleStage';
+import { readFileSync } from 'node:fs';
+import { TitleStage, STACK_BREAKPOINT } from '../TitleStage';
 import { S01Operator } from '../index';
 import { OPERATOR_ROLES } from '@/content/operator';
 
@@ -38,6 +39,20 @@ describe('TitleStage', () => {
     const { container } = render(<S01Operator />);
     expect(container.querySelectorAll('h2')).toHaveLength(1);
     expect(container.querySelector('h2')?.textContent).toBe('OPERATOR');
+  });
+
+  it('stacks at the same width in script and in stylesheet', () => {
+    // matchMedia decides whether to measure a row or a column, and the
+    // stylesheet decides which one is rendered. If these disagree the sequence
+    // computes a centring offset for a layout that is not on screen.
+    const css = readFileSync(
+      'components/sections/S01Operator/TitleStage.module.css',
+      'utf8',
+    );
+    const breakpoints = [...css.matchAll(/@media \(max-width:\s*(\d+)px\)/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(breakpoints).toContain(STACK_BREAKPOINT);
   });
 
   it('ends the cycle on the title actually being claimed', () => {
