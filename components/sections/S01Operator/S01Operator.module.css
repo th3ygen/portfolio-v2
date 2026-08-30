@@ -11,7 +11,8 @@
 
 .inner {
   position: relative;
-  z-index: 1;
+  /* Above the title stage, which is above the side plates. */
+  z-index: 2;
   width: 100%;
   max-width: 1460px;
   margin: 0 auto;

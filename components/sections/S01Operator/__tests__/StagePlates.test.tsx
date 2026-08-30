@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { StagePlates } from '../StagePlates';
@@ -36,6 +37,24 @@ describe('StagePlates', () => {
       expect(near.alpha, `${near.src} vs ${far.src}`).toBeGreaterThanOrEqual(far.alpha);
       expect(near.px, `${near.src} vs ${far.src}`).toBeGreaterThanOrEqual(far.px);
     }
+  });
+
+  it('stacks plates behind the title and the title behind the content', () => {
+    // The plates are wide enough to run under the lockup now, so the order is
+    // declared rather than left to markup order — which was all that kept them
+    // apart while they still sat in the margins and never met.
+    const zIndex = (file: string, selector: string) => {
+      const css = readFileSync(`components/sections/S01Operator/${file}`, 'utf8');
+      const rule = new RegExp(`\\${selector}\\s*\\{[^}]*\\}`).exec(css)?.[0] ?? '';
+      return Number(/z-index:\s*(-?\d+)/.exec(rule)?.[1]);
+    };
+
+    const plates = zIndex('StagePlates.module.css', '.plates');
+    const stage = zIndex('TitleStage.module.css', '.stage');
+    const inner = zIndex('S01Operator.module.css', '.inner');
+
+    expect(plates).toBeLessThan(stage);
+    expect(stage).toBeLessThan(inner);
   });
 
   it('spreads the plates down both margins', () => {

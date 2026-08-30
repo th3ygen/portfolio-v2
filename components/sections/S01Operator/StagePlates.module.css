@@ -1,15 +1,19 @@
 /*
  * Spans the whole section, so plates can be placed anywhere down the title
- * runway. z-index 0 and declared before the stage in the markup, which is what
- * puts the lockup in front of them without either needing a raised z-index.
+ * runway.
+ *
+ * The plates are wide enough to run under the lockup, so the stacking order is
+ * declared explicitly rather than left to markup order: plates 0, stage 1,
+ * content 2. Relying on DOM order alone was fine while they sat in the margins
+ * and never met.
  */
 .plates {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* Plates sit in the margins; a wide one at a narrow viewport must not be able
-     to give the page a horizontal scrollbar. */
+  /* A wide plate at a narrow viewport must not be able to give the page a
+     horizontal scrollbar. */
   overflow: hidden;
 }
 

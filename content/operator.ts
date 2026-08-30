@@ -42,15 +42,21 @@ export type StagePlate = {
 };
 
 export const STAGE_PLATES: readonly StagePlate[] = [
-  // Ordered near to far. width, py and alpha move together on purpose: a plate
-  // that is larger, travels further and sits brighter reads as closer. Break
-  // that ordering and the depth inverts.
-  { src: '/img/projects/camkender/1-0.jpg', side: 'left', top: 7, width: 240, py: 66, px: 11, alpha: 0.26 },
-  { src: '/img/projects/gajahsafe/1-0.jpg', side: 'right', top: 33, width: 224, py: 52, px: 9, alpha: 0.22 },
-  { src: '/img/projects/cammuka/1-0.jpg', side: 'left', top: 62, width: 210, py: 46, px: 8, alpha: 0.21 },
-  { src: '/img/projects/csova/1-0.jpg', side: 'right', top: 70, width: 190, py: 36, px: 6, alpha: 0.17 },
-  { src: '/img/projects/sipfos/1-0.jpg', side: 'left', top: 42, width: 176, py: 30, px: 5, alpha: 0.16 },
-  { src: '/img/projects/topglove/1-0.jpg', side: 'right', top: 16, width: 168, py: 26, px: 4, alpha: 0.15 },
+  // Ordered near to far. width, py, px and alpha move together on purpose: a
+  // plate that is larger, travels further and sits brighter reads as closer.
+  // Break that ordering and the depth inverts. There is a test on it.
+  { src: '/img/projects/camkender/2-0.jpg', side: 'left', top: 6, width: 560, py: 84, px: 14, alpha: 0.3 },
+  { src: '/img/projects/gajahsafe/1-0.jpg', side: 'right', top: 14, width: 520, py: 76, px: 13, alpha: 0.28 },
+  { src: '/img/projects/csova/2-1.jpg', side: 'left', top: 24, width: 480, py: 68, px: 12, alpha: 0.26 },
+  { src: '/img/projects/pcasso/0-0.jpg', side: 'right', top: 33, width: 450, py: 62, px: 11, alpha: 0.24 },
+  { src: '/img/projects/camkender/2-1.jpg', side: 'left', top: 41, width: 420, py: 56, px: 10, alpha: 0.23 },
+  { src: '/img/projects/gajahsafe/1-4.jpg', side: 'right', top: 49, width: 400, py: 50, px: 9, alpha: 0.22 },
+  { src: '/img/projects/justgood/1-2.jpg', side: 'left', top: 57, width: 380, py: 45, px: 8, alpha: 0.21 },
+  { src: '/img/projects/gapura/0-0.jpg', side: 'right', top: 64, width: 365, py: 41, px: 7, alpha: 0.2 },
+  { src: '/img/projects/sipfos/1-0.jpg', side: 'left', top: 72, width: 350, py: 37, px: 6, alpha: 0.19 },
+  { src: '/img/projects/camkender/3-1.jpg', side: 'right', top: 79, width: 340, py: 33, px: 5, alpha: 0.18 },
+  { src: '/img/projects/gajahsafe/0-2.jpg', side: 'left', top: 86, width: 330, py: 29, px: 4, alpha: 0.17 },
+  { src: '/img/projects/gajahsafe/4-1.jpg', side: 'right', top: 92, width: 320, py: 25, px: 3, alpha: 0.16 },
 ] as const;
 
 /**

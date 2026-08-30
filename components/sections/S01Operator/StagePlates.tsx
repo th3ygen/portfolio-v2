@@ -41,7 +41,7 @@ export function StagePlates() {
               alt=""
               width={640}
               height={400}
-              sizes="260px"
+              sizes="(max-width: 900px) 0px, 560px"
             />
           </div>
         </div>
