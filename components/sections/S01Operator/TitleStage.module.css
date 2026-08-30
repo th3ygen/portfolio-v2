@@ -89,6 +89,17 @@
   right: calc(var(--role-size) * -0.14);
   height: var(--role-row);
   pointer-events: none;
+
+  /*
+   * Unitless on purpose. GSAP interpolates a numeric custom property cleanly;
+   * given `44px` it has a string to parse per frame instead. The px is applied
+   * here in calc, where it belongs.
+   *
+   * Defaults are the SETTLED state, so with no JS the brackets are simply
+   * present and correct rather than stuck mid-approach.
+   */
+  --slot-spread: 0;
+  --slot-alpha: 0.34;
 }
 
 .slot::before,
@@ -98,18 +109,18 @@
   top: 0;
   bottom: 0;
   width: calc(var(--role-size) * 0.18);
-  border-top: 1px solid var(--color-accentDim, var(--color-accent));
-  border-bottom: 1px solid var(--color-accentDim, var(--color-accent));
-  opacity: 0.34;
+  border-top: 1px solid var(--color-accent);
+  border-bottom: 1px solid var(--color-accent);
+  opacity: var(--slot-alpha);
 }
 
 .slot::before {
-  left: 0;
+  left: calc(var(--slot-spread) * -1px);
   border-left: 1px solid var(--color-accent);
 }
 
 .slot::after {
-  right: 0;
+  right: calc(var(--slot-spread) * -1px);
   border-right: 1px solid var(--color-accent);
 }
 

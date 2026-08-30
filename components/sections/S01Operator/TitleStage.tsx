@@ -24,6 +24,14 @@ export const STACK_BREAKPOINT = 760;
 /** Beat positions on a 0-1 timeline. Named because the order is the design. */
 const ROLE_IN = 0.05;
 const CENTRE = 0.15;
+/**
+ * When the bracketed slot and the readout arrive.
+ *
+ * Deliberately after the centring beat has finished (CENTRE + its duration):
+ * the instrument reads the lockup, so it has no business being there while the
+ * lockup is still assembling itself.
+ */
+const DIGITAL_IN = 0.27;
 const CYCLE_START = 0.3;
 const CYCLE_END = 0.84;
 const RECEDE = 0.87;
@@ -54,6 +62,7 @@ export function TitleStage() {
   const lockupRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
   const readoutRef = useRef<HTMLSpanElement>(null);
+  const slotRef = useRef<HTMLDivElement>(null);
 
   useGSAP(
     () => {
@@ -187,6 +196,33 @@ export function TitleStage() {
               CENTRE,
             );
 
+          // The brackets converge and the readout blinks on, both stepped. The
+          // column's travel is the only smooth thing in this sequence; the
+          // instrument around it snaps, the way the reticle's lock-on does.
+          const slot = slotRef.current;
+          const readout = readoutRef.current;
+          if (slot) {
+            timeline.fromTo(
+              slot,
+              { '--slot-spread': 46, '--slot-alpha': 0 },
+              {
+                '--slot-spread': 0,
+                '--slot-alpha': 0.34,
+                duration: 0.05,
+                ease: 'steps(3)',
+              },
+              DIGITAL_IN,
+            );
+          }
+          if (readout) {
+            timeline.fromTo(
+              readout,
+              { opacity: 0 },
+              { opacity: 1, duration: 0.035, ease: 'steps(2)' },
+              DIGITAL_IN + 0.02,
+            );
+          }
+
           // The column rides up one row per step.
           const step = (CYCLE_END - CYCLE_START) / (items.length - 1);
           for (let index = 1; index < items.length; index += 1) {
@@ -226,7 +262,7 @@ export function TitleStage() {
           {/* The active slot, marked and static. The column rides through it,
               so the brackets say "this row is the reading" rather than
               decorating whichever title happens to be solid. */}
-          <div className={styles.slot} data-title-slot />
+          <div className={styles.slot} ref={slotRef} data-title-slot />
           <div className={styles.column} ref={columnRef} data-title-column>
             {OPERATOR_ROLES.map((title) => (
               <span key={title} className={styles.item} data-role-item data-role-active="false">

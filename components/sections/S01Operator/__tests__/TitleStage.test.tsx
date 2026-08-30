@@ -86,6 +86,19 @@ describe('TitleStage', () => {
     expect(slot?.parentElement).toBe(column?.parentElement);
   });
 
+  it('defaults the slot to its settled state, not mid-approach', () => {
+    // The entrance animates these away from their CSS values and back. If the
+    // defaults were the approach state instead, a JS failure would leave the
+    // brackets frozen apart and half-transparent.
+    const css = readFileSync(
+      'components/sections/S01Operator/TitleStage.module.css',
+      'utf8',
+    );
+    const slot = /\.slot\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+    expect(slot).toMatch(/--slot-spread:\s*0\s*;/);
+    expect(slot).toMatch(/--slot-alpha:\s*0\.34\s*;/);
+  });
+
   it('ends the cycle on the title actually being claimed', () => {
     expect(OPERATOR_ROLES[OPERATOR_ROLES.length - 1]).toBe('FULL-STACK');
     expect(OPERATOR_ROLES.length).toBeGreaterThan(1);

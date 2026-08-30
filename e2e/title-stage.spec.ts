@@ -146,6 +146,42 @@ test('the active slot stays put while the column rides through it', async ({ pag
   expect(Math.abs((await slotTop()) - first)).toBeLessThan(4);
 });
 
+test('the instrument arrives only after the lockup has centred', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  const probe = async () =>
+    page.evaluate(() => {
+      const slot = document.querySelector('[data-title-slot]');
+      const readout = document.querySelector('[data-title-readout]');
+      if (!slot || !readout) throw new Error('slot or readout missing');
+      const style = getComputedStyle(slot);
+      return {
+        spread: Number(style.getPropertyValue('--slot-spread')),
+        alpha: Number(style.getPropertyValue('--slot-alpha')),
+        readout: Number(getComputedStyle(readout).opacity),
+      };
+    });
+
+  // Mid-assembly: the instrument reads the lockup, so it has no business being
+  // on screen while the lockup is still putting itself together.
+  await page.evaluate((y) => window.scrollTo(0, y), top + 0.5 * 720);
+  await page.waitForTimeout(900);
+  const early = await probe();
+  expect(early.alpha).toBe(0);
+  expect(early.readout).toBe(0);
+  expect(early.spread).toBeGreaterThan(0);
+
+  // Settled: brackets converged onto the slot, readout lit.
+  await page.evaluate((y) => window.scrollTo(0, y), top + 1.2 * 720);
+  await page.waitForTimeout(900);
+  const settled = await probe();
+  expect(settled.spread).toBe(0);
+  expect(settled.alpha).toBeGreaterThan(0.3);
+  expect(settled.readout).toBe(1);
+});
+
 test('the lockup fits the viewport at its widest title', async ({ page }) => {
   for (const width of [1440, 1280, 375]) {
     await page.setViewportSize({ width, height: 720 });
