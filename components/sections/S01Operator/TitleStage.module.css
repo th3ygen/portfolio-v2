@@ -12,6 +12,14 @@
   justify-content: center;
   height: 100vh;
   pointer-events: none;
+
+  /*
+   * Cancels the section's rail-nav inset. The stage is a full-screen overlay,
+   * so it centres on the viewport; inheriting the section's left margin put the
+   * lockup half a gutter (26px) right of centre on every title.
+   */
+  width: 100vw;
+  margin-left: calc(var(--rail-gutter, 0px) * -1);
   /* The lockup is sized to fit the longest role, but a stray overflow here
      would give the whole page a horizontal scrollbar. */
   overflow: hidden;

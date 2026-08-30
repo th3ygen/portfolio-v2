@@ -17,6 +17,22 @@ export const OPERATOR = {
 } as const;
 
 /**
+ * The two lines the s01 lockup opens on, before the roles.
+ *
+ * They are not roles and do not obey the same rule: `hello world!` stands on
+ * its own with no `dev` after it, which is why the suffix does not appear until
+ * the column reaches `im a`. From there the lockup reads as one sentence —
+ * "im a dev", then "frontend dev", and so on.
+ */
+export const OPERATOR_OPENERS: readonly string[] = ['hello world!', 'im a'] as const;
+
+/**
+ * The index from which the `dev` suffix is part of the reading. Everything
+ * before it stands alone.
+ */
+export const SUFFIX_FROM = 1;
+
+/**
  * The roles the s01 title lockup cycles through, in order.
  *
  * Each is a PREFIX: the lockup renders them against a fixed `dev` suffix, so

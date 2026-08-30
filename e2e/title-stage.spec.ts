@@ -56,11 +56,11 @@ test('the column rides through every title and lands on the last', async ({ page
 
   await page.evaluate((y) => window.scrollTo(0, y), top);
   await page.waitForTimeout(700);
-  expect((await stage(page)).active).toBe('FRONTEND');
+  expect((await stage(page)).active).toBe('hello world!');
 
   const seen = new Set<string>();
   for (let step = 0; step <= 16; step += 1) {
-    await page.evaluate((y) => window.scrollTo(0, y), top + (step / 16) * 3.4 * 720);
+    await page.evaluate((y) => window.scrollTo(0, y), top + (step / 16) * 4.5 * 720);
     await page.waitForTimeout(220);
     seen.add((await stage(page)).active);
   }
@@ -70,12 +70,28 @@ test('the column rides through every title and lands on the last', async ({ page
   expect(seen).toContain('INFRA');
   expect(seen).toContain('FULL-STACK');
 
-  await page.evaluate((y) => window.scrollTo(0, y), top + 3.4 * 720);
+  await page.evaluate((y) => window.scrollTo(0, y), top + 4.3 * 720);
   await page.waitForTimeout(1000);
   const done = await stage(page);
   expect(done.active).toBe('FULL-STACK');
-  // Receded to a backdrop for the rest of the section, not still at full weight.
-  expect(done.opacity).toBeLessThan(0.2);
+});
+
+test('releases its reading at the end instead of fading out', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  await page.evaluate((y) => window.scrollTo(0, y), top + 4.95 * 720);
+  await page.waitForTimeout(1200);
+
+  // The lockup used to dim to 5.5%. It stays at full strength now and the last
+  // title simply stops being the active one, falling back to the hollow outline
+  // every other title already wears.
+  const end = await stage(page);
+  expect(end.opacity).toBeGreaterThan(0.9);
+  await expect(page.locator('[data-role-active="true"]')).toHaveCount(0);
+  // The count holds rather than winding back to 00, which read as a fault.
+  expect(end.readout).toBe('07/07');
 });
 
 test('only one title is solid at a time', async ({ page }) => {
@@ -85,7 +101,7 @@ test('only one title is solid at a time', async ({ page }) => {
   await page.evaluate((y) => window.scrollTo(0, y), top + 1.4 * 720);
   await page.waitForTimeout(900);
   await expect(page.locator('[data-role-active="true"]')).toHaveCount(1);
-  await expect(page.locator('[data-role-item]')).toHaveCount(5);
+  await expect(page.locator('[data-role-item]')).toHaveCount(7);
 });
 
 test('the dev suffix stays locked to the active title, not the column centre', async ({ page }) => {
@@ -112,15 +128,45 @@ test('the readout counts the cycle and cannot disagree with the highlight', asyn
 
   // Written by the same call that moves the highlight, so a mismatch here means
   // the two have been decoupled.
+  // Slot boundaries land at i * (RECEDE / 7) of a five-viewport runway, so each
+  // title owns roughly 0.66 of a viewport. These sample the middle of a slot.
   for (const [mark, expected] of [
-    [0.6, '01/05'],
-    [1.5, '03/05'],
-    [2.5, '05/05'],
+    [0.3, '01/07'],
+    [3.0, '05/07'],
+    [4.3, '07/07'],
   ] as const) {
     await page.evaluate((y) => window.scrollTo(0, y), top + mark * 720);
     await page.waitForTimeout(900);
     expect((await stage(page)).readout, `at ${mark}`).toBe(expected);
   }
+});
+
+test('withholds the suffix until the line needs it', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  const read = async () =>
+    page.evaluate(() => ({
+      active: document.querySelector('[data-role-active="true"]')?.textContent ?? '',
+      dev: Number(
+        getComputedStyle(document.querySelector('[data-title-suffix]') as Element).opacity,
+      ),
+    }));
+
+  // "hello world! dev" is not a sentence. The suffix has to stay off screen
+  // while the column is on a line that stands alone.
+  await page.evaluate((y) => window.scrollTo(0, y), top + 0.3 * 720);
+  await page.waitForTimeout(900);
+  const opening = await read();
+  expect(opening.active).toBe('hello world!');
+  expect(opening.dev).toBe(0);
+
+  await page.evaluate((y) => window.scrollTo(0, y), top + 1.0 * 720);
+  await page.waitForTimeout(900);
+  const phrase = await read();
+  expect(phrase.active).toBe('im a');
+  expect(phrase.dev).toBe(1);
 });
 
 test('the active slot stays put while the column rides through it', async ({ page }) => {
@@ -166,20 +212,57 @@ test('the instrument arrives only after the lockup has centred', async ({ page }
 
   // Mid-assembly: the instrument reads the lockup, so it has no business being
   // on screen while the lockup is still putting itself together.
-  await page.evaluate((y) => window.scrollTo(0, y), top + 0.5 * 720);
+  await page.evaluate((y) => window.scrollTo(0, y), top + 0.3 * 720);
   await page.waitForTimeout(900);
   const early = await probe();
   expect(early.alpha).toBe(0);
   expect(early.readout).toBe(0);
   expect(early.spread).toBeGreaterThan(0);
 
-  // Settled: brackets converged onto the slot, readout lit.
-  await page.evaluate((y) => window.scrollTo(0, y), top + 1.2 * 720);
+  // Settled: brackets converged onto the slot, readout lit. Sampled well past
+  // the entrance — it is timed off the step that reaches `im a`, not off a
+  // fixed position, so it lands later than a fixed beat would.
+  await page.evaluate((y) => window.scrollTo(0, y), top + 1.5 * 720);
   await page.waitForTimeout(900);
   const settled = await probe();
   expect(settled.spread).toBe(0);
   expect(settled.alpha).toBeGreaterThan(0.3);
   expect(settled.readout).toBe(1);
+});
+
+test('gives every title the same slice of scroll', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  // Walk the whole pin in even increments and count how many samples each title
+  // is the active one for. That count IS its share of the scroll.
+  const SAMPLES = 70;
+  const RUNWAY_PX = 5 * 720;
+  const held = new Map<string, number>();
+  for (let i = 0; i <= SAMPLES; i += 1) {
+    await page.evaluate((y) => window.scrollTo(0, y), top + (i / SAMPLES) * RUNWAY_PX);
+    await page.waitForTimeout(70);
+    const active = await page.evaluate(
+      () => document.querySelector('[data-role-active="true"]')?.textContent ?? '',
+    );
+    held.set(active, (held.get(active) ?? 0) + 1);
+  }
+
+  // Past RECEDE nothing is active, which is a state rather than a title.
+  held.delete('');
+  const counts = [...held.values()];
+  expect(held.size).toBe(7);
+
+  // The earlier shape gave the opening line roughly four times the scroll of a
+  // middle title — a long pause, then a flicker. Nothing should be far off the
+  // average now.
+  const average = counts.reduce((a, b) => a + b, 0) / counts.length;
+  for (const [title, count] of held) {
+    expect(Math.abs(count - average), `${title} held ${count} vs avg ${average}`).toBeLessThan(
+      average * 0.6,
+    );
+  }
 });
 
 test('the lockup fits the viewport at its widest title', async ({ page }) => {

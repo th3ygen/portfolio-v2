@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
-import { TitleStage, STACK_BREAKPOINT } from '../TitleStage';
+import { TitleStage, STACK_BREAKPOINT, RUNWAY_VH } from '../TitleStage';
 import { S01Operator } from '../index';
-import { OPERATOR_ROLES } from '@/content/operator';
+import { OPERATOR_OPENERS, OPERATOR_ROLES, SUFFIX_FROM } from '@/content/operator';
 
 describe('TitleStage', () => {
   it('renders every title in the column against a fixed dev suffix', () => {
@@ -13,7 +13,7 @@ describe('TitleStage', () => {
     );
     // All of them are present at once — the column shows the whole list as
     // hollow outlines and only marks one solid.
-    expect(items).toEqual([...OPERATOR_ROLES]);
+    expect(items).toEqual([...OPERATOR_OPENERS, ...OPERATOR_ROLES]);
     expect(container.querySelector('[data-title-suffix]')?.textContent).toBe('dev');
   });
 
@@ -72,7 +72,8 @@ describe('TitleStage', () => {
     const { container } = render(<TitleStage />);
     const readout = container.querySelector('[data-title-readout]');
     expect(readout).toBeInTheDocument();
-    expect(readout?.textContent).toBe(`01/0${OPERATOR_ROLES.length}`);
+    const total = OPERATOR_OPENERS.length + OPERATOR_ROLES.length;
+    expect(readout?.textContent).toBe(`01/0${total}`);
   });
 
   it('marks a static active slot for the column to ride through', () => {
@@ -97,6 +98,26 @@ describe('TitleStage', () => {
     const slot = /\.slot\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
     expect(slot).toMatch(/--slot-spread:\s*0\s*;/);
     expect(slot).toMatch(/--slot-alpha:\s*0\.34\s*;/);
+  });
+
+  it('opens on a line that stands without the suffix', () => {
+    // `hello world!` is not a role and reads alone; `dev` does not appear until
+    // the column reaches SUFFIX_FROM, where the line becomes a whole phrase.
+    expect(OPERATOR_OPENERS[0]).toBe('hello world!');
+    expect(SUFFIX_FROM).toBe(1);
+    expect(OPERATOR_OPENERS[SUFFIX_FROM]).toBe('im a');
+  });
+
+  it('maps the timeline onto exactly the runway it is given', () => {
+    // The runway is the scroll distance the pinned stage is dragged through and
+    // the timeline is mapped onto it. Too short and the sequence is cut off
+    // before it ends; too long and it finishes early and holds.
+    const css = readFileSync(
+      'components/sections/S01Operator/S01Operator.module.css',
+      'utf8',
+    );
+    const runway = /\.titleRunway\s*\{[^}]*height:\s*(\d+)vh/.exec(css)?.[1];
+    expect(Number(runway)).toBe(RUNWAY_VH);
   });
 
   it('ends the cycle on the title actually being claimed', () => {

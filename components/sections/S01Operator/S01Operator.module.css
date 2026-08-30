@@ -1,7 +1,11 @@
 .section {
   position: relative;
   padding: 120px 0;
-  margin-left: 52px;
+  /* Named because the title stage has to cancel it: the section is inset to
+     clear the rail nav, and a pinned full-viewport stage inheriting that inset
+     sits half a gutter right of the screen's centre. */
+  --rail-gutter: 52px;
+  margin-left: var(--rail-gutter);
   border-top: 1px solid var(--color-border);
 }
 
@@ -311,10 +315,11 @@
 }
 
 
-/* 300vh of nothing, so the pinned title stage has a runway to play its beats
-   across before the operator content scrolls up over it. */
+/* Nothing but scroll distance, so the pinned title stage has a runway to play
+   its beats across before the operator content scrolls up over it. MUST match
+   RUNWAY_VH in TitleStage.tsx; there is a test on the two agreeing. */
 .titleRunway {
-  height: 300vh;
+  height: 500vh;
   pointer-events: none;
 }
 
