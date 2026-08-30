@@ -30,7 +30,7 @@ export const STACK_BREAKPOINT = 760;
  * through, and the timeline is mapped onto it — if they disagree the sequence
  * either finishes early and holds, or is cut off before it ends. Tested.
  */
-export const RUNWAY_VH = 500;
+export const RUNWAY_VH = 300;
 
 /** Beat positions on a 0-1 timeline. Named because the order is the design. */
 const INTRO_IN = 0;
@@ -109,38 +109,43 @@ export function TitleStage() {
         if (readoutRef.current && index >= 0) {
           readoutRef.current.textContent = `${pad(index + 1)}/${pad(items.length)}`;
         }
+        // `dev` shares the titles' face, so it can share their released state:
+        // once nothing is active it falls back to the same hollow outline.
+        if (suffixRef.current) {
+          suffixRef.current.dataset.suffixHollow = index < 0 ? 'true' : 'false';
+        }
       };
 
       /** Row height, read live: the clamp on font-size makes it viewport-dependent. */
       const rowHeight = () => first.offsetHeight;
 
       /**
-       * How far the row must slide so the READING is centred, per title.
+       * How far the row must sit from the flex-centred position, in the ONE
+       * state where that differs: before `dev` is on screen.
        *
-       * Centring the lockup box is not the same thing. The column is as wide as
-       * the widest title and its rows are right-aligned, so a short title like
-       * `im a` leaves dead space to its left inside the box — and centring the
-       * box therefore pushes the visible words right of centre by half that
-       * space. The correction is to shift left by half the column's unused
-       * width, recomputed for whichever title is active.
+       * The suffix and its gap are part of the lockup's box but not yet part of
+       * the reading, so the row shifts right by half of what they occupy and
+       * animates back to zero as `dev` arrives.
        *
-       * Before `dev` appears there is a second correction: the suffix and its
-       * gap are part of the box but not yet part of the reading, so the row
-       * shifts right by half of what they occupy.
+       * Deliberately NOT recomputed per title. A per-title correction does
+       * centre every reading exactly — the column is as wide as its widest title
+       * and its rows are right-aligned, so a short title like `im a` leaves dead
+       * space to its left and the words sit right of centre by half of it — but
+       * paying for that means sliding the whole row up to ~130px on every
+       * switch, motion layered on the column's own travel. The titles align to
+       * the slot's right edge instead and the row holds still; the empty part of
+       * the column reads as a field with a right-aligned value, which is the
+       * logic the bracketed slot already states.
        *
        * Zero when stacked: the two are on separate rows there and neither
        * displaces the other.
        */
-      const centreFor = (index: number, stacked: boolean) => {
+      const openingOffset = (stacked: boolean) => {
         if (stacked) return 0;
         const suffix = suffixRef.current;
-        const title = items[index];
-        if (!suffix || !title) return 0;
-
+        if (!suffix) return 0;
         const gap = Number.parseFloat(getComputedStyle(lockup).columnGap) || 0;
-        const unused = column.getBoundingClientRect().width - title.getBoundingClientRect().width;
-        const suffixShown = index >= SUFFIX_FROM;
-        return -unused / 2 + (suffixShown ? 0 : (suffix.getBoundingClientRect().width + gap) / 2);
+        return (suffix.getBoundingClientRect().width + gap) / 2;
       };
 
       // matchMedia rather than a one-shot check of the media queries. Everything
@@ -242,12 +247,21 @@ export function TitleStage() {
           // the line. Stepped, like everything here that is not the column.
           const suffix = suffixRef.current;
           if (suffix) {
-            timeline.fromTo(
-              suffix,
-              { opacity: 0 },
-              { opacity: 1, duration: 0.03, ease: 'steps(2)' },
-              SUFFIX_IN,
-            );
+            timeline
+              .fromTo(
+                suffix,
+                { opacity: 0 },
+                { opacity: 1, duration: 0.03, ease: 'steps(2)' },
+                SUFFIX_IN,
+              )
+              // The only horizontal move in the sequence: the row giving up half
+              // the line as `dev` takes its place on it.
+              .fromTo(
+                lockup,
+                { x: () => openingOffset(stacked) },
+                { x: 0, duration: step * 0.45, ease: 'power3.inOut' },
+                SUFFIX_IN,
+              );
           }
 
           // The brackets converge and the readout blinks on, both stepped. The
@@ -285,15 +299,6 @@ export function TitleStage() {
             const travel = { duration: step * 0.45, ease: 'power3.inOut' } as const;
             timeline
               .to(column, { y: () => -index * rowHeight(), ...travel }, at)
-              // The row re-centres on every switch, because each title leaves a
-              // different amount of the column unused. fromTo on the first one
-              // so the opening position is rendered at build time.
-              .fromTo(
-                lockup,
-                index === 1 ? { x: () => centreFor(0, stacked) } : {},
-                { x: () => centreFor(index, stacked), ...travel },
-                at,
-              )
               // Hard switch rather than a cross-fade: the column's travel is the
               // smooth part, and a title is either the current one or it is not.
               .set(items, { onComplete: () => activate(index) }, at + step * LEAD)
@@ -312,7 +317,9 @@ export function TitleStage() {
           const parting = { duration: 0.05, ease: 'steps(2)' } as const;
           if (slot) timeline.to(slot, { '--slot-alpha': 0, ...parting }, RECEDE);
           if (readout) timeline.to(readout, { opacity: 0, ...parting }, RECEDE);
-          if (suffix) timeline.to(suffix, { opacity: 0, ...parting }, RECEDE);
+          // `dev` is NOT faded here. It goes hollow with the last title, in
+          // activate(-1) — the whole lockup releases together rather than one
+          // half of it dimming out.
         },
       );
 

@@ -319,7 +319,7 @@
    its beats across before the operator content scrolls up over it. MUST match
    RUNWAY_VH in TitleStage.tsx; there is a test on the two agreeing. */
 .titleRunway {
-  height: 500vh;
+  height: 300vh;
   pointer-events: none;
 }
 

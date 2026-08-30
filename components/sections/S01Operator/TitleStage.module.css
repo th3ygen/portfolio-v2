@@ -57,17 +57,25 @@
 }
 
 /*
- * The fixed half of the lockup. Mono, lowercase, against uppercase display
- * titles — it is the constant the column is measured against, not another entry
- * in it, and the face change is what says so.
+ * The fixed half of the lockup. Same face as the titles — it was mono, which
+ * separated it cleanly but put it outside the column's vocabulary, so it could
+ * not take the hollow treatment when the sequence releases. Scale carries the
+ * distinction instead: `dev` is the constant, so it is set larger.
  */
 .suffix {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-weight: 700;
   font-size: clamp(46px, 8vw, 112px);
   line-height: 0.86;
-  letter-spacing: -0.04em;
   color: var(--color-accent);
+  -webkit-text-stroke: 1px transparent;
+}
+
+/*
+ * Released. Mirrors .item exactly, so `dev` falls back to the same outline
+ * every title wears once the sequence has let go of its reading.
+ */
+.suffix[data-suffix-hollow='true'] {
+  color: transparent;
+  -webkit-text-stroke-color: var(--color-surface3);
 }
 
 /* Position in the cycle. Written by the same call that moves the highlight. */

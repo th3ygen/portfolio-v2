@@ -55,17 +55,18 @@ describe('TitleStage', () => {
     expect(breakpoints).toContain(STACK_BREAKPOINT);
   });
 
-  it('sets the suffix in mono, against the display-face titles', () => {
-    // The face change is what says `dev` is the constant and the column is the
-    // variable. In the display face it read as a sixth entry in the list.
+  it('sets the suffix in the same face as the titles', () => {
+    // It has to share their vocabulary to share their released state — in mono
+    // it was outside the column's typography and could not go hollow with it.
     const css = readFileSync(
       'components/sections/S01Operator/TitleStage.module.css',
       'utf8',
     );
     const suffix = /\.suffix\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
-    expect(suffix).toContain('--font-mono');
-    const item = /\.item\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
-    expect(item).not.toContain('--font-mono');
+    expect(suffix).not.toContain('--font-mono');
+
+    // And it must declare the hollow fallback the titles use.
+    expect(css).toMatch(/\.suffix\[data-suffix-hollow='true'\]/);
   });
 
   it('renders a cycle readout sized to the number of titles', () => {

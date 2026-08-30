@@ -8,6 +8,24 @@ async function sectionTop(page: Page): Promise<number> {
   });
 }
 
+/** Viewports of scroll the title beats are spread across (RUNWAY_VH / 100). */
+const RUNWAY_VIEWPORTS = 3;
+const VIEWPORT_H = 720;
+
+/**
+ * Scroll to a fraction of the title runway, 0 to 1.
+ *
+ * Expressed as a fraction rather than in viewports on purpose: the runway's
+ * length is a design knob and has already changed twice, and every absolute
+ * sample point in this file had to be retuned by hand each time.
+ */
+async function seek(page: Page, top: number, fraction: number) {
+  await page.evaluate(
+    (y) => window.scrollTo(0, y),
+    top + fraction * RUNWAY_VIEWPORTS * VIEWPORT_H,
+  );
+}
+
 async function stage(page: Page) {
   return page.evaluate(() => {
     const lockup = document.querySelector('[data-title-lockup]');
@@ -35,14 +53,14 @@ test('the title lockup holds its place while the beats scroll past', async ({ pa
   await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
   const top = await sectionTop(page);
 
-  await page.evaluate((y) => window.scrollTo(0, y), top);
+  await seek(page, top, 0);
   await page.waitForTimeout(700);
   const start = await stage(page);
 
   // position: sticky was inert inside this section — measured, the stage
   // tracked the section's top exactly instead of holding at zero. This is the
   // guard on the ScrollTrigger pin that replaced it.
-  await page.evaluate((y) => window.scrollTo(0, y), top + 1.6 * 720);
+  await seek(page, top, 0.32);
   await page.waitForTimeout(900);
   const held = await stage(page);
 
@@ -54,13 +72,13 @@ test('the column rides through every title and lands on the last', async ({ page
   await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
   const top = await sectionTop(page);
 
-  await page.evaluate((y) => window.scrollTo(0, y), top);
+  await seek(page, top, 0);
   await page.waitForTimeout(700);
   expect((await stage(page)).active).toBe('hello world!');
 
   const seen = new Set<string>();
   for (let step = 0; step <= 16; step += 1) {
-    await page.evaluate((y) => window.scrollTo(0, y), top + (step / 16) * 4.5 * 720);
+    await seek(page, top, (step / 16) * 0.9);
     await page.waitForTimeout(220);
     seen.add((await stage(page)).active);
   }
@@ -70,7 +88,7 @@ test('the column rides through every title and lands on the last', async ({ page
   expect(seen).toContain('INFRA');
   expect(seen).toContain('FULL-STACK');
 
-  await page.evaluate((y) => window.scrollTo(0, y), top + 4.3 * 720);
+  await seek(page, top, 0.86);
   await page.waitForTimeout(1000);
   const done = await stage(page);
   expect(done.active).toBe('FULL-STACK');
@@ -81,7 +99,7 @@ test('releases its reading at the end instead of fading out', async ({ page }) =
   await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
   const top = await sectionTop(page);
 
-  await page.evaluate((y) => window.scrollTo(0, y), top + 4.95 * 720);
+  await seek(page, top, 0.99);
   await page.waitForTimeout(1200);
 
   // The lockup used to dim to 5.5%. It stays at full strength now and the last
@@ -98,7 +116,7 @@ test('only one title is solid at a time', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
   const top = await sectionTop(page);
-  await page.evaluate((y) => window.scrollTo(0, y), top + 1.4 * 720);
+  await seek(page, top, 0.28);
   await page.waitForTimeout(900);
   await expect(page.locator('[data-role-active="true"]')).toHaveCount(1);
   await expect(page.locator('[data-role-item]')).toHaveCount(7);
@@ -111,8 +129,8 @@ test('the dev suffix stays locked to the active title, not the column centre', a
 
   // Centring the lockup aligned `dev` to the column's midpoint, which sits
   // rows away from whichever title is solid.
-  for (const mark of [1.2, 2.0, 2.6]) {
-    await page.evaluate((y) => window.scrollTo(0, y), top + mark * 720);
+  for (const mark of [0.24, 0.4, 0.52]) {
+    await seek(page, top, mark);
     await page.waitForTimeout(800);
     const s = await stage(page);
     expect(Math.abs(s.numberBottom - (s.activeBottom ?? 0)), `at ${mark}`).toBeLessThan(24);
@@ -130,12 +148,14 @@ test('the readout counts the cycle and cannot disagree with the highlight', asyn
   // the two have been decoupled.
   // Slot boundaries land at i * (RECEDE / 7) of a five-viewport runway, so each
   // title owns roughly 0.66 of a viewport. These sample the middle of a slot.
+  // Fractions of the runway. Slot boundaries land at i / 7 of the cycle, so
+  // these sample the middle of the first, fifth and last slots.
   for (const [mark, expected] of [
-    [0.3, '01/07'],
-    [3.0, '05/07'],
-    [4.3, '07/07'],
+    [0.06, '01/07'],
+    [0.6, '05/07'],
+    [0.86, '07/07'],
   ] as const) {
-    await page.evaluate((y) => window.scrollTo(0, y), top + mark * 720);
+    await seek(page, top, mark);
     await page.waitForTimeout(900);
     expect((await stage(page)).readout, `at ${mark}`).toBe(expected);
   }
@@ -156,13 +176,13 @@ test('withholds the suffix until the line needs it', async ({ page }) => {
 
   // "hello world! dev" is not a sentence. The suffix has to stay off screen
   // while the column is on a line that stands alone.
-  await page.evaluate((y) => window.scrollTo(0, y), top + 0.3 * 720);
+  await seek(page, top, 0.06);
   await page.waitForTimeout(900);
   const opening = await read();
   expect(opening.active).toBe('hello world!');
   expect(opening.dev).toBe(0);
 
-  await page.evaluate((y) => window.scrollTo(0, y), top + 1.0 * 720);
+  await seek(page, top, 0.2);
   await page.waitForTimeout(900);
   const phrase = await read();
   expect(phrase.active).toBe('im a');
@@ -181,11 +201,11 @@ test('the active slot stays put while the column rides through it', async ({ pag
       return Math.round(el.getBoundingClientRect().top);
     });
 
-  await page.evaluate((y) => window.scrollTo(0, y), top + 0.9 * 720);
+  await seek(page, top, 0.18);
   await page.waitForTimeout(800);
   const first = await slotTop();
 
-  await page.evaluate((y) => window.scrollTo(0, y), top + 2.3 * 720);
+  await seek(page, top, 0.46);
   await page.waitForTimeout(900);
   // The reading head is static; nesting it inside the column would have it
   // travel with the list it is meant to be reading.
@@ -212,7 +232,7 @@ test('the instrument arrives only after the lockup has centred', async ({ page }
 
   // Mid-assembly: the instrument reads the lockup, so it has no business being
   // on screen while the lockup is still putting itself together.
-  await page.evaluate((y) => window.scrollTo(0, y), top + 0.3 * 720);
+  await seek(page, top, 0.06);
   await page.waitForTimeout(900);
   const early = await probe();
   expect(early.alpha).toBe(0);
@@ -222,7 +242,7 @@ test('the instrument arrives only after the lockup has centred', async ({ page }
   // Settled: brackets converged onto the slot, readout lit. Sampled well past
   // the entrance — it is timed off the step that reaches `im a`, not off a
   // fixed position, so it lands later than a fixed beat would.
-  await page.evaluate((y) => window.scrollTo(0, y), top + 1.5 * 720);
+  await seek(page, top, 0.3);
   await page.waitForTimeout(900);
   const settled = await probe();
   expect(settled.spread).toBe(0);
@@ -238,7 +258,7 @@ test('gives every title the same slice of scroll', async ({ page }) => {
   // Walk the whole pin in even increments and count how many samples each title
   // is the active one for. That count IS its share of the scroll.
   const SAMPLES = 70;
-  const RUNWAY_PX = 5 * 720;
+  const RUNWAY_PX = RUNWAY_VIEWPORTS * VIEWPORT_H;
   const held = new Map<string, number>();
   for (let i = 0; i <= SAMPLES; i += 1) {
     await page.evaluate((y) => window.scrollTo(0, y), top + (i / SAMPLES) * RUNWAY_PX);
@@ -265,13 +285,38 @@ test('gives every title the same slice of scroll', async ({ page }) => {
   }
 });
 
+test('holds still horizontally once dev has arrived', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  const positions: number[] = [];
+  for (const fraction of [0.3, 0.45, 0.6, 0.75, 0.86]) {
+    await seek(page, top, fraction);
+    await page.waitForTimeout(900);
+    positions.push(
+      await page.evaluate(() => {
+        const suffix = document.querySelector('[data-title-suffix]');
+        if (!suffix) throw new Error('suffix missing');
+        return Math.round(suffix.getBoundingClientRect().left);
+      }),
+    );
+  }
+
+  // A per-title centring correction made every reading land dead centre, at the
+  // cost of sliding the whole row up to ~130px on each switch — motion layered
+  // on the column's own travel. The titles align right instead and the row does
+  // not move again after `dev` takes its half of the line.
+  expect(Math.max(...positions) - Math.min(...positions)).toBeLessThan(2);
+});
+
 test('the lockup fits the viewport at its widest title', async ({ page }) => {
   for (const width of [1440, 1280, 375]) {
     await page.setViewportSize({ width, height: 720 });
     await page.goto('/');
     await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
     const top = await sectionTop(page);
-    await page.evaluate((y) => window.scrollTo(0, y), top + 2.4 * 720);
+    await seek(page, top, 0.48);
     await page.waitForTimeout(900);
 
     const box = await stage(page);
@@ -292,7 +337,7 @@ test('rebuilds the sequence when the viewport crosses the stacking breakpoint', 
   await page.goto('/');
   await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
   const top = await sectionTop(page);
-  await page.evaluate((y) => window.scrollTo(0, y), top + 2.4 * 720);
+  await seek(page, top, 0.48);
   await page.waitForTimeout(900);
   expect((await stage(page)).right).toBeLessThanOrEqual(1280);
 
