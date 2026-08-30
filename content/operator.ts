@@ -17,6 +17,43 @@ export const OPERATOR = {
 } as const;
 
 /**
+ * Work photographs drifting down either side of the s01 title sequence.
+ *
+ * They are scenery, not content: heavily desaturated, held at low opacity and
+ * never labelled, because anything legible beside the lockup competes with it.
+ * Their job is to give the pinned title something to be still against.
+ *
+ * `py` is the scroll-parallax distance and is what carries the depth — a plate
+ * that travels further reads as nearer, so `py` and `width` move together. Get
+ * them out of step and the illusion inverts: a large plate creeping past a
+ * small fast one looks like a mistake rather than a background.
+ */
+export type StagePlate = {
+  readonly src: string;
+  readonly side: 'left' | 'right';
+  /** Down the section, as a percentage. */
+  readonly top: number;
+  readonly width: number;
+  /** Scroll parallax distance; larger = nearer. */
+  readonly py: number;
+  /** Pointer parallax depth. */
+  readonly px: number;
+  readonly alpha: number;
+};
+
+export const STAGE_PLATES: readonly StagePlate[] = [
+  // Ordered near to far. width, py and alpha move together on purpose: a plate
+  // that is larger, travels further and sits brighter reads as closer. Break
+  // that ordering and the depth inverts.
+  { src: '/img/projects/camkender/1-0.jpg', side: 'left', top: 7, width: 240, py: 66, px: 11, alpha: 0.26 },
+  { src: '/img/projects/gajahsafe/1-0.jpg', side: 'right', top: 33, width: 224, py: 52, px: 9, alpha: 0.22 },
+  { src: '/img/projects/cammuka/1-0.jpg', side: 'left', top: 62, width: 210, py: 46, px: 8, alpha: 0.21 },
+  { src: '/img/projects/csova/1-0.jpg', side: 'right', top: 70, width: 190, py: 36, px: 6, alpha: 0.17 },
+  { src: '/img/projects/sipfos/1-0.jpg', side: 'left', top: 42, width: 176, py: 30, px: 5, alpha: 0.16 },
+  { src: '/img/projects/topglove/1-0.jpg', side: 'right', top: 16, width: 168, py: 26, px: 4, alpha: 0.15 },
+] as const;
+
+/**
  * The two lines the s01 lockup opens on, before the roles.
  *
  * They are not roles and do not obey the same rule: `hello world!` stands on

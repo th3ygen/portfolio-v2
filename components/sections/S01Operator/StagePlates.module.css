@@ -1,0 +1,86 @@
+/*
+ * Spans the whole section, so plates can be placed anywhere down the title
+ * runway. z-index 0 and declared before the stage in the markup, which is what
+ * puts the lockup in front of them without either needing a raised z-index.
+ */
+.plates {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Plates sit in the margins; a wide one at a narrow viewport must not be able
+     to give the page a horizontal scrollbar. */
+  overflow: hidden;
+}
+
+.plate {
+  position: absolute;
+  padding: 5px;
+  border: 1px solid var(--color-borderDim1);
+  background: var(--color-bgAlt1);
+}
+
+/* Tucked into the margins the content column does not use. */
+.plate[data-side='left'] {
+  left: clamp(4px, 3vw, 64px);
+}
+
+.plate[data-side='right'] {
+  right: clamp(4px, 3vw, 64px);
+}
+
+/*
+ * Corner tick. One accent hairline per plate, at 1px — enough to place them in
+ * the same family as the card frames elsewhere on the page, not enough to read
+ * as something worth looking at.
+ */
+.plate::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 9px;
+  height: 9px;
+  border-top: 1px solid var(--color-accent);
+  border-left: 1px solid var(--color-accent);
+  opacity: 0.25;
+}
+
+/* Scanlines, the same treatment the s03 frames use, over the photo itself. */
+.plate::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.55) 0px,
+    rgba(0, 0, 0, 0.55) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+}
+
+/*
+ * Greyscaled and darkened hard, then held at a per-plate alpha. The photographs
+ * are recognisable enough in s03; here they only have to suggest that work
+ * exists behind the title.
+ */
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: grayscale(1) brightness(0.68) contrast(1.25);
+  opacity: var(--plate-alpha, 0.14);
+}
+
+/*
+ * Gone below this width. The plates live in the margins beside the lockup, and
+ * on a phone there are no margins — they would sit under the title instead of
+ * beside it.
+ */
+@media (max-width: 900px) {
+  .plates {
+    display: none;
+  }
+}

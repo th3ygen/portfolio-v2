@@ -392,3 +392,45 @@ test.describe('reduced motion', () => {
     await expect(page.locator('[data-role-active="true"]')).toHaveText('FULL-STACK');
   });
 });
+
+test('the side plates travel while the lockup holds', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 720 });
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  const sample = async () =>
+    page.evaluate(() => {
+      const lockup = document.querySelector('[data-title-lockup]');
+      if (!lockup) throw new Error('lockup missing');
+      const plates = [...document.querySelectorAll('[data-stage-plate]')].map((el) => ({
+        py: Number((el as HTMLElement).dataset.py),
+        top: el.getBoundingClientRect().top,
+      }));
+      return { lockup: Math.round(lockup.getBoundingClientRect().top), plates };
+    });
+
+  await seek(page, top, 0.2);
+  await page.waitForTimeout(900);
+  const a = await sample();
+
+  await seek(page, top, 0.5);
+  await page.waitForTimeout(900);
+  const b = await sample();
+
+  // The lockup is pinned and does not move; that stillness is what the plates
+  // are measured against.
+  expect(Math.abs(b.lockup - a.lockup)).toBeLessThan(4);
+
+  // Every plate moved, and the ones with more parallax moved further. Placing
+  // them inside the pinned stage would have frozen them flat against it.
+  const moved = a.plates.map((plate, i) => ({
+    py: plate.py,
+    delta: Math.abs((b.plates[i]?.top ?? 0) - plate.top),
+  }));
+  for (const plate of moved) expect(plate.delta, `py=${plate.py}`).toBeGreaterThan(50);
+
+  const nearest = moved.reduce((x, y) => (y.py > x.py ? y : x));
+  const furthest = moved.reduce((x, y) => (y.py < x.py ? y : x));
+  expect(nearest.delta).toBeGreaterThan(furthest.delta);
+});
