@@ -53,6 +53,7 @@ export function TitleStage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const lockupRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
+  const readoutRef = useRef<HTMLSpanElement>(null);
 
   useGSAP(
     () => {
@@ -68,10 +69,17 @@ export function TitleStage() {
       const first = items[0];
       if (!first) return;
 
+      const pad = (value: number) => String(value).padStart(2, '0');
+
       const activate = (index: number) => {
         items.forEach((item, i) => {
           item.dataset.roleActive = i === index ? 'true' : 'false';
         });
+        // The readout is driven from the same call that moves the highlight, so
+        // it cannot disagree with what is on screen.
+        if (readoutRef.current) {
+          readoutRef.current.textContent = `${pad(index + 1)}/${pad(items.length)}`;
+        }
       };
 
       /** Row height, read live: the clamp on font-size makes it viewport-dependent. */
@@ -214,15 +222,27 @@ export function TitleStage() {
   return (
     <div className={styles.stage} ref={stageRef} aria-hidden="true">
       <div className={styles.lockup} ref={lockupRef} data-title-lockup>
-        <div className={styles.column} ref={columnRef} data-title-column>
-          {OPERATOR_ROLES.map((title) => (
-            <span key={title} className={styles.item} data-role-item data-role-active="false">
-              {title}
-            </span>
-          ))}
+        <div className={styles.columnWrap}>
+          {/* The active slot, marked and static. The column rides through it,
+              so the brackets say "this row is the reading" rather than
+              decorating whichever title happens to be solid. */}
+          <div className={styles.slot} data-title-slot />
+          <div className={styles.column} ref={columnRef} data-title-column>
+            {OPERATOR_ROLES.map((title) => (
+              <span key={title} className={styles.item} data-role-item data-role-active="false">
+                {title}
+              </span>
+            ))}
+          </div>
         </div>
-        <span className={styles.suffix} data-title-suffix>
-          {SUFFIX}
+
+        <span className={styles.tail}>
+          <span className={styles.suffix} data-title-suffix>
+            {SUFFIX}
+          </span>
+          <span className={styles.readout} ref={readoutRef} data-title-readout>
+            01/{String(OPERATOR_ROLES.length).padStart(2, '0')}
+          </span>
         </span>
       </div>
     </div>

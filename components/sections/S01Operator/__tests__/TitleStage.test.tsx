@@ -55,6 +55,37 @@ describe('TitleStage', () => {
     expect(breakpoints).toContain(STACK_BREAKPOINT);
   });
 
+  it('sets the suffix in mono, against the display-face titles', () => {
+    // The face change is what says `dev` is the constant and the column is the
+    // variable. In the display face it read as a sixth entry in the list.
+    const css = readFileSync(
+      'components/sections/S01Operator/TitleStage.module.css',
+      'utf8',
+    );
+    const suffix = /\.suffix\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+    expect(suffix).toContain('--font-mono');
+    const item = /\.item\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+    expect(item).not.toContain('--font-mono');
+  });
+
+  it('renders a cycle readout sized to the number of titles', () => {
+    const { container } = render(<TitleStage />);
+    const readout = container.querySelector('[data-title-readout]');
+    expect(readout).toBeInTheDocument();
+    expect(readout?.textContent).toBe(`01/0${OPERATOR_ROLES.length}`);
+  });
+
+  it('marks a static active slot for the column to ride through', () => {
+    const { container } = render(<TitleStage />);
+    // The slot is a sibling of the column, not a child: it must not inherit the
+    // transform, or the reading head would travel with the list it is reading.
+    const slot = container.querySelector('[data-title-slot]');
+    const column = container.querySelector('[data-title-column]');
+    expect(slot).toBeInTheDocument();
+    expect(column?.contains(slot ?? null)).toBe(false);
+    expect(slot?.parentElement).toBe(column?.parentElement);
+  });
+
   it('ends the cycle on the title actually being claimed', () => {
     expect(OPERATOR_ROLES[OPERATOR_ROLES.length - 1]).toBe('FULL-STACK');
     expect(OPERATOR_ROLES.length).toBeGreaterThan(1);

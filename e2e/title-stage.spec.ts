@@ -25,6 +25,7 @@ async function stage(page: Page) {
       opacity: Number(getComputedStyle(lockup).opacity),
       numberBottom: Math.round(numberBox.bottom),
       activeBottom: activeBox ? Math.round(activeBox.bottom) : null,
+      readout: document.querySelector('[data-title-readout]')?.textContent ?? '',
     };
   });
 }
@@ -100,6 +101,49 @@ test('the dev suffix stays locked to the active title, not the column centre', a
     const s = await stage(page);
     expect(Math.abs(s.numberBottom - (s.activeBottom ?? 0)), `at ${mark}`).toBeLessThan(24);
   }
+});
+
+test('the readout counts the cycle and cannot disagree with the highlight', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  // Written by the same call that moves the highlight, so a mismatch here means
+  // the two have been decoupled.
+  for (const [mark, expected] of [
+    [0.6, '01/05'],
+    [1.5, '03/05'],
+    [2.5, '05/05'],
+  ] as const) {
+    await page.evaluate((y) => window.scrollTo(0, y), top + mark * 720);
+    await page.waitForTimeout(900);
+    expect((await stage(page)).readout, `at ${mark}`).toBe(expected);
+  }
+});
+
+test('the active slot stays put while the column rides through it', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 20_000 });
+  const top = await sectionTop(page);
+
+  const slotTop = async () =>
+    page.evaluate(() => {
+      const el = document.querySelector('[data-title-slot]');
+      if (!el) throw new Error('slot missing');
+      return Math.round(el.getBoundingClientRect().top);
+    });
+
+  await page.evaluate((y) => window.scrollTo(0, y), top + 0.9 * 720);
+  await page.waitForTimeout(800);
+  const first = await slotTop();
+
+  await page.evaluate((y) => window.scrollTo(0, y), top + 2.3 * 720);
+  await page.waitForTimeout(900);
+  // The reading head is static; nesting it inside the column would have it
+  // travel with the list it is meant to be reading.
+  expect(Math.abs((await slotTop()) - first)).toBeLessThan(4);
 });
 
 test('the lockup fits the viewport at its widest title', async ({ page }) => {
