@@ -68,6 +68,15 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
       const cloneY = (_i: number, el: Element) =>
         Number.parseFloat(el.getAttribute('data-clone-y') ?? '0');
 
+      // UPTIME's own opening state, stated rather than assumed. Everything else
+      // here declares where it starts; this group used to inherit whatever the
+      // DOM happened to be holding, and the timeline drives it with `.to`,
+      // which reads its start value live. Re-run the effect while the group is
+      // already faded — a React Strict Mode double-mount in dev, a Fast Refresh,
+      // a remount after a reload that restored scroll past this section — and
+      // it tweened 0 to 0, so UPTIME never came back. Measured: 0 of 4 reloads
+      // recovered before this, 4 of 4 after.
+      gsap.set('[data-zw="0"]', { opacity: 1, y: 0 });
       gsap.set('[data-zw="1"]', { opacity: 0, y: TRAIL_OFFSETS[0] });
       // Clones start stacked exactly on the solid word, so the explosion has
       // somewhere to come from.

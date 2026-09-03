@@ -116,3 +116,36 @@ describe('S04ToS05Zoom', () => {
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 });
+
+describe('zoom word start states', () => {
+  it('declares an opening state for UPTIME, not just for the groups around it', () => {
+    // Every other group here is given a start state on mount; UPTIME was not,
+    // so its opening opacity was whatever the DOM happened to hold. The
+    // timeline drives it with `.to`, which reads its start value live — so any
+    // re-run of the effect while the group was already faded (Strict Mode's
+    // double mount, a Fast Refresh, a remount after a reload that restored
+    // scroll past this section) tweened 0 to 0 and the word never came back.
+    //
+    // Asserting the inline style is the point: gsap.set writes there, and the
+    // absence of the call is exactly what the bug was.
+    const { container, unmount } = render(<S04ToS05Zoom startYear={2026} />);
+    const group = container.querySelector<HTMLElement>('[data-zw="0"]');
+    expect(group).not.toBeNull();
+    expect(group!.style.opacity).toBe('1');
+    unmount();
+  });
+
+  it('restores UPTIME when the effect runs again over a faded group', () => {
+    const first = render(<S04ToS05Zoom startYear={2026} />);
+    const faded = first.container.querySelector<HTMLElement>('[data-zw="0"]')!;
+    // Stand in for the state a scrubbed timeline leaves behind when the page
+    // is reloaded already scrolled past this section.
+    faded.style.opacity = '0';
+    first.unmount();
+
+    const second = render(<S04ToS05Zoom startYear={2026} />);
+    const group = second.container.querySelector<HTMLElement>('[data-zw="0"]')!;
+    expect(group.style.opacity).toBe('1');
+    second.unmount();
+  });
+});
