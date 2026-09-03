@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { gsap, ScrollTrigger, useGSAP } from './gsap';
+import { EASE, SCRUB } from './tokens';
 import { prefersReducedMotion } from './useReducedMotion';
 
 /** How fast the pointer-driven layers chase the cursor. */
@@ -33,8 +34,24 @@ export function useParallax(scope: React.RefObject<HTMLElement | null>): void {
     if (typeof window === 'undefined') return;
     if (!window.matchMedia('(pointer: fine)').matches) return;
 
-    const layers = Array.from(document.querySelectorAll<HTMLElement>('[data-px]'));
-    if (layers.length === 0) return;
+    const root = scope.current;
+    if (!root) return;
+
+    // Re-read rather than captured once at mount. The list used to be a
+    // document-wide snapshot taken on the first render, which meant two things:
+    // layers outside the scope were driven by a hook that claims to be scoped,
+    // and any layer rendered later — anything behind a conditional, anything
+    // added by a future section — never moved at all, silently.
+    //
+    // Requerying at the START of a pointer burst is what makes that cheap: it
+    // runs when the cursor begins moving after settling, not per mousemove and
+    // not per frame.
+    let layers: HTMLElement[] = [];
+    const readLayers = () => {
+      layers = Array.from(root.querySelectorAll<HTMLElement>('[data-px]'));
+      return layers;
+    };
+    readLayers();
 
     let targetX = 0;
     let targetY = 0;
@@ -65,7 +82,7 @@ export function useParallax(scope: React.RefObject<HTMLElement | null>): void {
       targetX = (event.clientX / window.innerWidth - 0.5) * 2;
       targetY = (event.clientY / window.innerHeight - 0.5) * 2;
       if (!frame) {
-        hint(layers, true);
+        hint(readLayers(), true);
         frame = window.requestAnimationFrame(tick);
       }
     };
@@ -77,7 +94,7 @@ export function useParallax(scope: React.RefObject<HTMLElement | null>): void {
       hint(layers, false);
       for (const layer of layers) layer.style.transform = '';
     };
-  }, []);
+  }, [scope]);
 
   // Scroll parallax, scrubbed against each element's own parent.
   useGSAP(
@@ -92,12 +109,12 @@ export function useParallax(scope: React.RefObject<HTMLElement | null>): void {
           { y: distance },
           {
             y: -distance,
-            ease: 'none',
+            ease: EASE.linear,
             scrollTrigger: {
               trigger: el.parentElement ?? el,
               start: 'top bottom',
               end: 'bottom top',
-              scrub: 0.8,
+              scrub: SCRUB.loose,
               // Only the layers currently crossing the viewport hold a buffer.
               onToggle: ({ isActive }) => hint([el], isActive),
             },

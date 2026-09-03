@@ -2,6 +2,7 @@
 
 import type { RefObject } from 'react';
 import { gsap, ScrollTrigger, useGSAP } from './gsap';
+import { EASE } from './tokens';
 import { prefersReducedMotion } from './useReducedMotion';
 
 /**
@@ -33,7 +34,7 @@ export function useSectionReveal(
             opacity: 1,
             y: 0,
             duration: 0.8,
-            ease: 'power3.out',
+            ease: EASE.enter,
             stagger: 0.08,
           }),
       });

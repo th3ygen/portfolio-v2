@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { OPERATOR_OPENERS, OPERATOR_ROLES, STAGE_PLATES } from '@/content/operator';
-import { RUNWAY_VH } from './TitleStage';
+import { RUNWAY_VH } from './titleStage.motion';
 import styles from './StagePlates.module.css';
 
 /**

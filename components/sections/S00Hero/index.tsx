@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { CV_HREF, HERO_CTAS, OPERATOR, SOCIALS } from '@/content/operator';
 import { gsap, useGSAP } from '@/components/motion/gsap';
+import { EASE, SCRUB } from '@/components/motion/tokens';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import { DatamoshCanvas } from './DatamoshCanvas';
 import { HudReadout } from './HudReadout';
@@ -49,7 +50,7 @@ export function S00Hero({ bootDone }: { bootDone: boolean }) {
         opacity: 1,
         y: 0,
         duration: 0.8,
-        ease: 'power3.out',
+        ease: EASE.enter,
         stagger: 0.08,
         // Hand the elements back to CSS once landed, so nothing inline is left
         // fighting the parallax transforms on their wrappers.
@@ -60,12 +61,12 @@ export function S00Hero({ bootDone }: { bootDone: boolean }) {
       gsap.to('[data-hero-parallax]', {
         y: -70,
         opacity: 0.12,
-        ease: 'none',
+        ease: EASE.linear,
         scrollTrigger: {
           trigger: rootRef.current,
           start: 'top top',
           end: 'bottom top',
-          scrub: true,
+          scrub: SCRUB.locked,
         },
       });
     },

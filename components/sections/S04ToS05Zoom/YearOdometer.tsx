@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { gsap } from '@/components/motion/gsap';
+import { EASE } from '@/components/motion/tokens';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import {
   ROLL_DURATION_S,
@@ -66,7 +67,7 @@ export function YearOdometer({ year }: { year: number }) {
         gsap.fromTo(
           group,
           { y: 0 },
-          { y: ROLL_TRAVEL_PX, duration: ROLL_DURATION_S, ease: 'power3.out' },
+          { y: ROLL_TRAVEL_PX, duration: ROLL_DURATION_S, ease: EASE.enter },
         );
       } else {
         gsap.set(group, { y: 0 });

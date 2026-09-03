@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from '@/components/motion/gsap';
+import { EASE } from '@/components/motion/tokens';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import styles from './Reticle.module.css';
 
@@ -24,7 +25,7 @@ const INSET = -5;
 /** How far outside that they start, before converging inward. */
 const APPROACH = 26;
 /** Acquisition is stepped, not eased — it snaps shut like a lock, not a glide. */
-const LOCK_EASE = 'steps(3)';
+const LOCK_EASE = EASE.snapFine;
 const LOCK_S = 0.2;
 const RELEASE_S = 0.12;
 
@@ -118,7 +119,7 @@ export function Reticle() {
       gsap.to(brackets, {
         opacity: 0,
         duration: RELEASE_S,
-        ease: 'steps(2)',
+        ease: EASE.snap,
         overwrite: true,
       });
     };

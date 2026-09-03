@@ -10,9 +10,11 @@ import {
   PORTRAIT,
 } from '@/content/operator';
 import { gsap, useGSAP } from '@/components/motion/gsap';
+import { EASE, SCRUB } from '@/components/motion/tokens';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import { StagePlates } from './StagePlates';
 import { TitleStage } from './TitleStage';
+import { RUNWAY_VH } from './titleStage.motion';
 import styles from './S01Operator.module.css';
 
 /**
@@ -57,7 +59,7 @@ export function S01Operator() {
           trigger: rootRef.current,
           start: 'top 78%',
           end: 'top -30%',
-          scrub: 0.45,
+          scrub: SCRUB.tight,
         },
       });
 
@@ -65,7 +67,7 @@ export function S01Operator() {
         .fromTo(
           `.${styles.scan}`,
           { top: '0%', opacity: 1 },
-          { top: '100%', opacity: 1, ease: 'none', duration: 0.8 },
+          { top: '100%', opacity: 1, ease: EASE.linear, duration: 0.8 },
           0,
         )
         .to(`.${styles.scan}`, { opacity: 0, duration: 0.2 }, 0.8)
@@ -80,7 +82,7 @@ export function S01Operator() {
           y: 0,
           clipPath: 'inset(0 0% 0 0)',
           duration: 0.3,
-          ease: 'power2.out',
+          ease: EASE.enterSoft,
           stagger: 0.07,
         },
         0.15,
@@ -96,10 +98,18 @@ export function S01Operator() {
       </div>
       <StagePlates />
       <TitleStage />
-      {/* Pure scroll runway for the title beats. The stage above is sticky, so
+      {/* Pure scroll runway for the title beats. The stage above is pinned, so
           this is what gives it something to be scrolled through before the
-          section's real content arrives. */}
-      <div className={styles.titleRunway} aria-hidden="true" />
+          section's real content arrives.
+
+          Its height comes from RUNWAY_VH — the same constant the beat timeline
+          is mapped onto — rather than from a number repeated in the stylesheet. */}
+      <div
+        className={styles.titleRunway}
+        style={{ '--runway-vh': RUNWAY_VH } as React.CSSProperties}
+        data-title-runway
+        aria-hidden="true"
+      />
 
       <div className={styles.ticks} data-py="26" aria-hidden="true">
         {[22, 38, 16, 46].map((width, index) => (

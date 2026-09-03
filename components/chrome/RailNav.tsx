@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { SECTIONS } from '@/content/sections';
 import { gsap, ScrollTrigger, useGSAP } from '@/components/motion/gsap';
+import { EASE, SCRUB } from '@/components/motion/tokens';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import styles from './RailNav.module.css';
 
@@ -23,8 +24,8 @@ export function RailNav() {
       if (progressRef.current && !reduced) {
         gsap.to(progressRef.current, {
           scaleY: 1,
-          ease: 'none',
-          scrollTrigger: { trigger: document.body, start: 'top top', end: 'bottom bottom', scrub: true },
+          ease: EASE.linear,
+          scrollTrigger: { trigger: document.body, start: 'top top', end: 'bottom bottom', scrub: SCRUB.locked },
         });
       } else if (progressRef.current) {
         gsap.set(progressRef.current, { scaleY: 1 });

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { TRAJECTORY_LABEL } from '@/content/trajectory';
 import { gsap, useGSAP } from '@/components/motion/gsap';
+import { EASE, SCRUB } from '@/components/motion/tokens';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import { zoomScale } from '@/lib/zoom/camera';
 import { handAngles, rewindLabel } from '@/lib/zoom/clock';
@@ -76,13 +77,13 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
 
       const camera = { p: 0 };
       const timeline = gsap.timeline({
-        defaults: { ease: 'none' },
+        defaults: { ease: EASE.linear },
         scrollTrigger: {
           trigger: root,
           start: 'top top',
           end: '+=340%',
           pin: true,
-          scrub: 0.5,
+          scrub: SCRUB.tight,
         },
       });
 
@@ -108,18 +109,18 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
           opacity: 1,
           y: cloneY,
           duration: 0.075,
-          ease: 'power3.out',
+          ease: EASE.enter,
           stagger: { each: 0.011, from: 'center' },
         }, 0)
-        .to('[data-zw="0"]', { y: -520, duration: 0.09, ease: 'power2.in' }, 0.06)
-        .to(clones, { opacity: 0, duration: 0.05, stagger: { each: 0.01, from: 'center' }, ease: 'power1.in' }, 0.085)
+        .to('[data-zw="0"]', { y: -520, duration: 0.09, ease: EASE.exit }, 0.06)
+        .to(clones, { opacity: 0, duration: 0.05, stagger: { each: 0.01, from: 'center' }, ease: EASE.exitSoft }, 0.085)
         // The whole group fades rather than snapping, and finishes before
         // SINCE starts — the two never share a frame.
-        .to('[data-zw="0"]', { opacity: 0, duration: 0.055, ease: 'power2.in' }, 0.105)
+        .to('[data-zw="0"]', { opacity: 0, duration: 0.055, ease: EASE.exit }, 0.105)
         .set('[data-zw="0"]', { opacity: 0 }, 0.16)
-        .to('[data-zw="1"]', { opacity: 1, duration: 0.035, ease: 'power1.out' }, HANDOFF)
-        .to(trail1, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: 'power2.out' }, HANDOFF)
-        .to('[data-zw="1"]', { y: 0, duration: 0.09, ease: 'power3.out' }, HANDOFF);
+        .to('[data-zw="1"]', { opacity: 1, duration: 0.035, ease: EASE.enterSoft }, HANDOFF)
+        .to(trail1, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: EASE.enterSoft }, HANDOFF)
+        .to('[data-zw="1"]', { y: 0, duration: 0.09, ease: EASE.enter }, HANDOFF);
 
       // Year rolls backwards. The numeric counter is the source of truth; the
       // odometer reacts to it.
@@ -129,7 +130,7 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
         {
           value: END_YEAR,
           duration: 0.3,
-          ease: 'power1.inOut',
+          ease: EASE.drift,
           onUpdate: () => setYear(Math.round(counter.value)),
           onComplete: () => setYear(END_YEAR),
         },

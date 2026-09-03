@@ -2,6 +2,7 @@
 
 import type { RefObject } from 'react';
 import { gsap, ScrollTrigger, useGSAP } from './gsap';
+import { EASE } from './tokens';
 import { prefersReducedMotion } from './useReducedMotion';
 
 /** How long the block takes to clear the paragraph. */
@@ -52,7 +53,7 @@ export function useBoxReveal(scope: RefObject<HTMLElement | null>): void {
           gsap.to(batch, {
             '--box-reveal-x': OFF_RIGHT,
             duration: REVEAL_S,
-            ease: 'power3.inOut',
+            ease: EASE.travel,
             stagger: STAGGER_S,
           });
         },

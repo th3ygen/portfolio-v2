@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
-import { TitleStage, STACK_BREAKPOINT, RUNWAY_VH } from '../TitleStage';
+import { TitleStage } from '../TitleStage';
+import { RUNWAY_VH, STACK_BREAKPOINT } from '../titleStage.motion';
 import { S01Operator } from '../index';
 import { OPERATOR_OPENERS, OPERATOR_ROLES, SUFFIX_FROM } from '@/content/operator';
 
@@ -109,16 +110,28 @@ describe('TitleStage', () => {
     expect(OPERATOR_OPENERS[SUFFIX_FROM]).toBe('im a');
   });
 
-  it('maps the timeline onto exactly the runway it is given', () => {
+  it('takes the runway height from the constant the timeline is mapped onto', () => {
     // The runway is the scroll distance the pinned stage is dragged through and
     // the timeline is mapped onto it. Too short and the sequence is cut off
     // before it ends; too long and it finishes early and holds.
+    //
+    // This used to compare two hand-kept numbers. Now the stylesheet states no
+    // height at all, so what is worth guarding is that it stays that way — a
+    // literal vh here would silently take precedence over the constant again.
     const css = readFileSync(
       'components/sections/S01Operator/S01Operator.module.css',
       'utf8',
     );
-    const runway = /\.titleRunway\s*\{[^}]*height:\s*(\d+)vh/.exec(css)?.[1];
-    expect(Number(runway)).toBe(RUNWAY_VH);
+    const rule = /\.titleRunway\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+    expect(rule).toContain('var(--runway-vh');
+    expect(rule).not.toMatch(/height:\s*\d+vh/);
+  });
+
+  it('writes the runway height onto the element as --runway-vh', () => {
+    const { container } = render(<S01Operator />);
+    const runway = container.querySelector<HTMLElement>('[data-title-runway]');
+    expect(runway).not.toBeNull();
+    expect(runway!.style.getPropertyValue('--runway-vh')).toBe(String(RUNWAY_VH));
   });
 
   it('ends the cycle on the title actually being claimed', () => {

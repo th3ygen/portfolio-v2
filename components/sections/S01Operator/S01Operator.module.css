@@ -317,10 +317,15 @@
 
 
 /* Nothing but scroll distance, so the pinned title stage has a runway to play
-   its beats across before the operator content scrolls up over it. MUST match
-   RUNWAY_VH in TitleStage.tsx; there is a test on the two agreeing. */
+   its beats across before the operator content scrolls up over it.
+
+   The height is NOT stated here. --runway-vh is written onto the element from
+   RUNWAY_VH in titleStage.motion.ts, which is the same constant the beat timeline is
+   mapped onto, so the runway and the sequence cannot disagree. They used to be
+   two hand-kept numbers in two languages with a test holding them together;
+   now there is one number and nothing to hold together. */
 .titleRunway {
-  height: 300vh;
+  height: calc(var(--runway-vh, 0) * 1vh);
   pointer-events: none;
 }
 
