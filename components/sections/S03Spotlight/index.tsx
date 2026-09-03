@@ -5,6 +5,7 @@ import { SPOTLIGHTS, SPOTLIGHT_INTRO } from '@/content/spotlights';
 import { FramedImage } from '@/components/media/FramedImage';
 import { ClientGrid } from './ClientGrid';
 import { gsap, useGSAP } from '@/components/motion/gsap';
+import { EASE, SCRUB } from '@/components/motion/tokens';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
 import { useSectionReveal } from '@/components/motion/useSectionReveal';
 import styles from './S03Spotlight.module.css';
@@ -39,8 +40,8 @@ export function S03Spotlight() {
           { yPercent: -4 },
           {
             yPercent: 4,
-            ease: 'none',
-            scrollTrigger: { trigger: frame, start: 'top bottom', end: 'bottom top', scrub: true },
+            ease: EASE.linear,
+            scrollTrigger: { trigger: frame, start: 'top bottom', end: 'bottom top', scrub: SCRUB.locked },
           },
         );
       }
@@ -66,15 +67,28 @@ export function S03Spotlight() {
         const image = card.querySelector<HTMLElement>('img');
         if (!image) continue;
 
-        const scaleTo = gsap.quickTo(image, 'scale', { duration: 0.55, ease: 'power3.out' });
+        // scaleX and scaleY separately, NOT `scale`. quickTo re-aims a tween
+        // through resetTo, which looks the property up among the tween's own
+        // PropTweens — and CSSPlugin never makes one called `scale`, only the
+        // two axes it expands to. Asking for `scale` silently found nothing,
+        // re-initialised the tween as `scale: '+=0'` and animated the image by
+        // exactly nothing, warning `scale not eligible for reset` on every
+        // hover. Measured: the computed transform stayed at the identity matrix
+        // through enter, settle and release.
+        const axis = { duration: 0.55, ease: EASE.enter } as const;
+        const scaleXTo = gsap.quickTo(image, 'scaleX', axis);
+        const scaleYTo = gsap.quickTo(image, 'scaleY', axis);
         const enter = () => {
           image.style.willChange = 'transform';
-          scaleTo(HOVER_SCALE);
+          scaleXTo(HOVER_SCALE);
+          scaleYTo(HOVER_SCALE);
         };
         const leave = () => {
           // quickTo takes only a value, so the release hangs off the tween it
-          // hands back rather than a vars object.
-          scaleTo(1).eventCallback('onComplete', () => {
+          // hands back rather than a vars object. Both axes share a duration
+          // and ease, so either one finishing means both have.
+          scaleXTo(1);
+          scaleYTo(1).eventCallback('onComplete', () => {
             image.style.willChange = '';
           });
         };
