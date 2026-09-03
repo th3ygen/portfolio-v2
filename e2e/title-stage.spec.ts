@@ -526,3 +526,56 @@ test('the pointer moves the plates by depth', async ({ page }) => {
   const furthest = shifted.reduce((x, y) => (y.px < x.px ? y : x));
   expect(nearest.shift).toBeGreaterThan(furthest.shift * 2);
 });
+
+/**
+ * Samples the computed colour of one title while the sequence crosses a beat,
+ * and reports how many distinct values it passed through. Two means a hard
+ * flip; more means it eased.
+ */
+async function coloursAcross(
+  page: Page,
+  top: number,
+  from: number,
+  to: number,
+  index: number,
+) {
+  await seek(page, top, from);
+  await page.waitForTimeout(1000);
+  await seek(page, top, to);
+  return page.evaluate(async (i) => {
+    const items = [...document.querySelectorAll('[data-role-item]')];
+    const el = i < 0 ? items[items.length - 1] : items[i];
+    const seen = new Set<string>();
+    for (let n = 0; n < 24; n += 1) {
+      seen.add(getComputedStyle(el).color);
+      await new Promise((r) => setTimeout(r, 35));
+    }
+    return [...seen];
+  }, index);
+}
+
+test('lets go of the last reading smoothly while switches stay hard', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: VIEWPORT_H });
+  await page.goto('/');
+  const top = await sectionTop(page);
+
+  // The end of the sequence is a release, not a switch: the lockup letting go
+  // rather than swapping one reading for another. Snapping there read as a
+  // glitch. Anything beyond two values means it passed through intermediates.
+  const release = await coloursAcross(page, top, 0.86, 0.96, -1);
+  expect(release.length).toBeGreaterThan(2);
+
+  // ...and the beat before it must NOT have softened with it. A title is the
+  // reading or it is not; putting the transition on .item unconditionally
+  // rather than gating it on the lockup smooths these too, which is exactly
+  // the regression worth catching.
+  const active = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-role-item]')].findIndex(
+      (i) => (i as HTMLElement).dataset.roleActive === 'true',
+    ),
+  );
+  expect(active).toBe(-1);
+
+  const switched = await coloursAcross(page, top, 0.52, 0.62, 4);
+  expect(switched.length).toBe(2);
+});

@@ -41,6 +41,10 @@
   letter-spacing: -0.02em;
   will-change: transform, opacity;
 
+  /* How the reading is let go of at the end of the sequence. */
+  --release-ms: 420ms;
+  --release-ease: cubic-bezier(0.33, 0, 0.15, 1);
+
   /* Single source for the row geometry. The slot's height and the distance the
      column travels are both this number, and the clamp makes it
      viewport-dependent — so it cannot be written twice. */
@@ -181,6 +185,32 @@
 .item[data-role-active='true'] {
   color: var(--color-accent);
   -webkit-text-stroke-color: transparent;
+}
+
+/*
+ * The release eases; every switch before it does not.
+ *
+ * Title-to-title is deliberately a hard flip — a title is the reading or it is
+ * not, and the column's travel is the only smooth thing in the sequence. The
+ * END of the sequence is a different gesture: the lockup letting go of its
+ * reading rather than swapping one for another, and snapping there read as a
+ * glitch rather than as a release.
+ *
+ * Gated on the lockup so it applies ONLY across that beat. Put this transition
+ * on .item unconditionally and every switch softens with it.
+ */
+.lockup[data-releasing='true'] .item,
+.lockup[data-releasing='true'] .suffix {
+  transition:
+    color var(--release-ms) var(--release-ease),
+    -webkit-text-stroke-color var(--release-ms) var(--release-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lockup[data-releasing='true'] .item,
+  .lockup[data-releasing='true'] .suffix {
+    transition: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

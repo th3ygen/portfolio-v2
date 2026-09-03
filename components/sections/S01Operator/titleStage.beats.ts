@@ -95,6 +95,22 @@ export function buildBeats(
     );
   }
 
+  /**
+   * Arms the eased release. The transition itself lives in CSS, gated on this
+   * attribute so it covers ONLY the final beat — leave it on and every hard
+   * switch softens with it.
+   *
+   * Disarmed on the way back up rather than on the way down, and BEFORE the
+   * switch it sits on, so scrolling back out of the release does not drag the
+   * easing onto the switch below it.
+   */
+  const releasing = (on: boolean) => {
+    lockup.dataset.releasing = on ? 'true' : 'false';
+  };
+  releasing(false);
+
+  const lastIndex = items.length - 1;
+
   for (let index = 1; index < items.length; index += 1) {
     timeline
       .to(
@@ -105,7 +121,16 @@ export function buildBeats(
       // Hard switch rather than a cross-fade: the column's travel is the smooth
       // part, and a title is either the current one or it is not.
       .set(items, { onComplete: () => activate(index) }, timing.switchAt(index))
-      .set(items, { onReverseComplete: () => activate(index - 1) }, timing.switchAt(index));
+      .set(
+        items,
+        {
+          onReverseComplete: () => {
+            if (index === lastIndex) releasing(false);
+            activate(index - 1);
+          },
+        },
+        timing.switchAt(index),
+      );
   }
 
   // The lockup does NOT fade. The last title simply stops being the active one,
@@ -114,8 +139,19 @@ export function buildBeats(
   // The instrument steps out with it, because a reading head pointed at nothing
   // is just furniture.
   timeline
-    .set(items, { onComplete: () => activate(-1) }, timing.recede)
-    .set(items, { onReverseComplete: () => activate(items.length - 1) }, timing.recede);
+    .set(
+      items,
+      {
+        onComplete: () => {
+          releasing(true);
+          activate(-1);
+        },
+      },
+      timing.recede,
+    )
+    // Still armed on the way back, so the reading is picked up as smoothly as
+    // it was let go of.
+    .set(items, { onReverseComplete: () => activate(lastIndex) }, timing.recede);
 
   const parting = { duration: flicker.part, ease: EASE.snap } as const;
   if (slot) timeline.to(slot, { '--slot-alpha': 0, ...parting }, timing.recede);
