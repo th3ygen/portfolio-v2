@@ -1,21 +1,16 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import { useRef } from 'react';
-import {
-  CORE_LOADOUT,
-  LOADOUT_HEAD,
-  OPERATOR,
-  OPERATOR_CARD,
-  PORTRAIT,
-} from '@/content/operator';
-import { gsap, useGSAP } from '@/components/motion/gsap';
-import { EASE, SCRUB } from '@/components/motion/tokens';
-import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
-import { StagePlates } from './StagePlates';
-import { TitleStage } from './TitleStage';
-import { RUNWAY_VH } from './titleStage.motion';
-import styles from './S01Operator.module.css';
+import Image from "next/image";
+import { useRef } from "react";
+import { OPERATOR_CARD, PORTRAIT } from "@/content/operator";
+import { gsap, useGSAP } from "@/components/motion/gsap";
+import { EASE, SCRUB } from "@/components/motion/tokens";
+import { prefersReducedMotion } from "@/components/motion/useReducedMotion";
+import { Gear } from "./Gear";
+import { StagePlates } from "./StagePlates";
+import { TitleStage } from "./TitleStage";
+import { RUNWAY_VH } from "./titleStage.motion";
+import styles from "./S01Operator.module.css";
 
 /**
  * The operator section.
@@ -46,10 +41,10 @@ export function S01Operator() {
         // Final state, no scrub: copy in place. Neither the portrait nor the
         // cutout needs anything here — useBoxReveal has its own reduced-motion
         // branch, and the cutout is never hidden in the first place.
-        gsap.set('[data-op-line]', {
+        gsap.set("[data-op-line]", {
           opacity: 1,
           y: 0,
-          clipPath: 'inset(0 0% 0 0)',
+          clipPath: "inset(0 0% 0 0)",
         });
         return;
       }
@@ -57,8 +52,8 @@ export function S01Operator() {
       const timeline = gsap.timeline({
         scrollTrigger: {
           trigger: rootRef.current,
-          start: 'top 78%',
-          end: 'top -30%',
+          start: "top 78%",
+          end: "top -30%",
           scrub: SCRUB.tight,
         },
       });
@@ -66,21 +61,26 @@ export function S01Operator() {
       timeline
         .fromTo(
           `.${styles.scan}`,
-          { top: '0%', opacity: 1 },
-          { top: '100%', opacity: 1, ease: EASE.linear, duration: 0.8 },
+          { top: "0%", opacity: 1 },
+          { top: "100%", opacity: 1, ease: EASE.linear, duration: 0.8 },
           0,
         )
         .to(`.${styles.scan}`, { opacity: 0, duration: 0.2 }, 0.8)
-        .fromTo(`.${styles.tag}`, { opacity: 0 }, { opacity: 1, duration: 0.05 }, 0)
+        .fromTo(
+          `.${styles.tag}`,
+          { opacity: 0 },
+          { opacity: 1, duration: 0.05 },
+          0,
+        )
         .to(`.${styles.tag}`, { opacity: 0, duration: 0.1 }, 0.55);
 
       timeline.fromTo(
-        '[data-op-line]',
-        { opacity: 0, y: 14, clipPath: 'inset(0 100% 0 0)' },
+        "[data-op-line]",
+        { opacity: 0, y: 14, clipPath: "inset(0 100% 0 0)" },
         {
           opacity: 1,
           y: 0,
-          clipPath: 'inset(0 0% 0 0)',
+          clipPath: "inset(0 0% 0 0)",
           duration: 0.3,
           ease: EASE.enterSoft,
           stagger: 0.07,
@@ -93,7 +93,12 @@ export function S01Operator() {
 
   return (
     <section id="s01" ref={rootRef} className={styles.section}>
-      <div className={styles.ghost} data-py="-46" data-ghost-numeral aria-hidden="true">
+      <div
+        className={styles.ghost}
+        data-py="-46"
+        data-ghost-numeral
+        aria-hidden="true"
+      >
         01
       </div>
       <StagePlates />
@@ -106,7 +111,7 @@ export function S01Operator() {
           is mapped onto — rather than from a number repeated in the stylesheet. */}
       <div
         className={styles.titleRunway}
-        style={{ '--runway-vh': RUNWAY_VH } as React.CSSProperties}
+        style={{ "--runway-vh": RUNWAY_VH } as React.CSSProperties}
         data-title-runway
         aria-hidden="true"
       />
@@ -115,7 +120,9 @@ export function S01Operator() {
         {[22, 38, 16, 46].map((width, index) => (
           <div key={width} className={styles.tick}>
             <div className={styles.tickLine} style={{ width }} />
-            <div className={index === 1 ? styles.tickBoxLive : styles.tickBox} />
+            <div
+              className={index === 1 ? styles.tickBoxLive : styles.tickBox}
+            />
           </div>
         ))}
       </div>
@@ -135,20 +142,39 @@ export function S01Operator() {
           ACQUIRING OPERATOR
         </div>
 
-        <div className={styles.grid}>
-          <div className={styles.card} data-px="5">
+        {/* The gear panel owns the portrait now: it mounts the photograph
+            between two rails of equipment slots, so the card is its centre
+            column rather than a sibling of the loadout. */}
+        <Gear>
+          {/* No data-px. The photograph and the identity rows under it are
+              the fixed part of the gear panel — the slots either side do not
+              move, so a card drifting between them read as the panel coming
+              loose. Only the cutout parallaxes now, which is the whole
+              subject of the effect anyway. */}
+          <div className={styles.card}>
             <div className={styles.cardFrame}>
               <div className={styles.portrait} data-lock={PORTRAIT.filename}>
                 {PORTRAIT.src ? (
-                  <Image
-                    className={styles.portraitImage}
-                    src={PORTRAIT.src}
-                    alt={PORTRAIT.alt}
-                    width={971}
-                    height={1413}
-                  />
+                  // Two elements because the effect is two properties that
+                  // must not multiply. clip-path is resolved in the element's
+                  // own coordinate space BEFORE its transform, so a scaled
+                  // image scales its own clip window with it — the aperture
+                  // would widen exactly as the photo zoomed and neither move
+                  // would be visible. The window clips; the image zooms.
+                  <div className={styles.portraitWindow} data-portrait-window>
+                    <Image
+                      className={styles.portraitImage}
+                      src={PORTRAIT.src}
+                      alt={PORTRAIT.alt}
+                      width={971}
+                      height={1413}
+                    />
+                  </div>
                 ) : (
-                  <div className={styles.portraitPending} data-portrait-pending>
+                  <div
+                    className={styles.portraitPending}
+                    data-portrait-pending
+                  >
                     PORTRAIT PENDING
                     <br />
                     AWAITING SOURCE FILE
@@ -156,19 +182,19 @@ export function S01Operator() {
                 )}
               </div>
               {/* Decorative duplicate: same subject, background removed,
-                    drifting over the flat original to give the frame depth.
-                    Announcing it again would just repeat the alt text. Sits
-                    between the photo and .cardMeta on purpose — that paint
-                    order is what sends the feet behind the meta bar. Never
-                    faded or hidden: it is simply always there. */}
+                  drifting over the flat original to give the frame depth.
+                  Announcing it again would just repeat the alt text. Sits
+                  between the photo and .cardMeta on purpose — that paint
+                  order is what sends the feet behind the meta bar. Never
+                  faded or hidden: it is simply always there. */}
               {PORTRAIT.src ? (
                 <div
                   className={styles.portraitAlpha}
                   data-portrait-alpha
-                  data-py="5"
+                  data-py="32"
                   aria-hidden="true"
                 >
-                  <div className={styles.portraitAlphaInner} data-px="6">
+                  <div className={styles.portraitAlphaInner} data-px="3">
                     <Image
                       className={styles.portraitAlphaImage}
                       src={PORTRAIT.alphaSrc}
@@ -192,43 +218,20 @@ export function S01Operator() {
               {OPERATOR_CARD.map((row) => (
                 <div key={row.label} className={styles.idRow}>
                   <dt className={styles.idLabel}>{row.label}</dt>
-                  <dd className={row.label === 'CALL SIGN' ? styles.idCallSign : undefined}>
+                  <dd
+                    className={
+                      row.label === "CALL SIGN"
+                        ? styles.idCallSign
+                        : undefined
+                    }
+                  >
                     {row.value}
                   </dd>
                 </div>
               ))}
             </dl>
           </div>
-
-          <div>
-            <p className={styles.lead} data-box-reveal>
-              {OPERATOR.lead[0]} <span className={styles.leadAccent}>{OPERATOR.lead[1]}</span>{' '}
-              {OPERATOR.lead[2]}
-            </p>
-
-            {OPERATOR.body.map((block) => (
-              <p key={block} className={styles.body} data-box-reveal>
-                {block}
-              </p>
-            ))}
-
-            <div className={styles.loadoutHead} data-op-line>
-              <span className={styles.loadoutTitle}>{LOADOUT_HEAD.title}</span>
-              <span className={styles.loadoutNote}>{LOADOUT_HEAD.note}</span>
-            </div>
-
-            <ul className={styles.loadout}>
-              {CORE_LOADOUT.map((item) => (
-                <li key={item.name} className={styles.loadoutItem} data-lock={item.name}>
-                  <div className={styles.loadoutName} data-accent={item.accent ? 'true' : 'false'}>
-                    {item.name}
-                  </div>
-                  <div className={styles.loadoutDetail}>{item.detail}</div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        </Gear>
       </div>
     </section>
   );

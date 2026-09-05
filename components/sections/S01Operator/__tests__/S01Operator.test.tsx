@@ -2,38 +2,28 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { S01Operator } from '../index';
-import { CORE_LOADOUT, OPERATOR, OPERATOR_CARD, PORTRAIT } from '@/content/operator';
+import { CORE_LOADOUT, OPERATOR_CARD, PORTRAIT } from '@/content/operator';
 
 beforeEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('S01Operator', () => {
-  it('renders the lead statement as one sentence across its three parts', () => {
+  // The lead statement and its three body paragraphs are gone: two of the
+  // three retold s05's career history without its dates, and the third named
+  // domains s00's intro already lists. What is left of s01 is the operator and
+  // the gear, which is what the section is for.
+
+  it('mounts every core loadout entry in a labelled gear slot', () => {
     const { container } = render(<S01Operator />);
-    // Queried as the section's first paragraph, not by a motion attribute —
-    // this is a content assertion and should not move when the reveal does.
-    const lead = container.querySelector('p');
-    expect(lead?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      `${OPERATOR.lead[0]} ${OPERATOR.lead[1]} ${OPERATOR.lead[2]}`,
+    const labels = [...container.querySelectorAll('[class*="slotLabel"]')].map(
+      (el) => el.textContent,
     );
-  });
-
-  it('renders every body copy block', () => {
-    render(<S01Operator />);
-    for (const block of OPERATOR.body) {
-      expect(screen.getByText(block)).toBeInTheDocument();
-    }
-  });
-
-  it('renders all eight core loadout items as a list', () => {
-    render(<S01Operator />);
-    const items = screen.getAllByRole('listitem');
-    expect(items).toHaveLength(CORE_LOADOUT.length);
+    expect(labels).toEqual(CORE_LOADOUT.map((item) => item.slot));
     expect(CORE_LOADOUT).toHaveLength(8);
   });
 
-  it('renders each loadout name and its detail line', () => {
+  it('names each mounted item and its detail inside the slot', () => {
     render(<S01Operator />);
     for (const item of CORE_LOADOUT) {
       expect(screen.getByText(item.name)).toBeInTheDocument();
@@ -43,11 +33,10 @@ describe('S01Operator', () => {
 
   it('marks exactly the two accented loadout entries', () => {
     const { container } = render(<S01Operator />);
-    const accented = container.querySelectorAll('[data-accent="true"]');
-    expect(Array.from(accented).map((el) => el.textContent)).toEqual([
-      'MQTT / Socket.io',
-      'WebRTC',
-    ]);
+    const accented = container.querySelectorAll('[class*="slot_"][data-accent="true"]');
+    expect(
+      Array.from(accented).map((el) => el.querySelector('[class*="slotName"]')?.textContent),
+    ).toEqual(['MQTT / Socket.io', 'WebRTC']);
   });
 
   it('renders the identity card as a description list', () => {
@@ -70,10 +59,14 @@ describe('S01Operator', () => {
   it('leaves the portrait frame out of the page-wide box reveal', () => {
     const { container } = render(<S01Operator />);
     // The accent block sweeping the photo fought the cutout drifting over it —
-    // two competing motions on one card. The body copy still takes the reveal.
+    // two competing motions on one card.
     const base = container.querySelector(`img[alt="${PORTRAIT.alt}"]`);
     expect(base?.parentElement).not.toHaveAttribute('data-box-reveal');
-    expect(container.querySelectorAll('[data-box-reveal]').length).toBeGreaterThan(0);
+    // There used to be a second assertion here that s01 revealed SOMETHING, as
+    // a check that the attribute had not simply been dropped everywhere. The
+    // body copy it counted is gone, so the section now legitimately reveals
+    // nothing and the check can only fail. The guard above is the real one.
+    expect(container.querySelectorAll('[data-box-reveal]')).toHaveLength(0);
   });
 
   it('layers a decorative alpha cutout over the flat portrait', () => {

@@ -79,13 +79,6 @@
   pointer-events: none;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: var(--gap-64);
-  align-items: start;
-}
-
 .card { position: relative; }
 
 .cardFrame {
@@ -109,42 +102,70 @@
  * overflow: hidden above only crops the photo to the frame — it hides nothing
  * the reader needs, and the photograph is visible with no JS at all.
  */
-.portraitImage { width: 100%; height: 100%; object-fit: cover; }
+/*
+ * The aperture, and what is behind it.
+ *
+ * At rest the photograph is seen through a window 10% narrower than the frame,
+ * and the photograph itself is held at a slight zoom inside that window. Point
+ * at the card and both give way together: the window opens to the full frame
+ * while the image pulls back to its natural scale. One gesture, two directions
+ * — the aperture widens, the picture recedes — which reads as a lens opening
+ * rather than as a picture growing.
+ *
+ * They are on separate elements deliberately. clip-path resolves in the
+ * element's own coordinate space and is then carried by its transform, so a
+ * single element doing both would scale its own aperture in step with the
+ * image and cancel the effect exactly.
+ */
+.portraitWindow {
+  width: 100%;
+  height: 100%;
+  clip-path: inset(0 var(--aperture, 5%));
+  transition: clip-path var(--aperture-ms, 620ms) var(--aperture-ease, cubic-bezier(0.5, 0, 0.2, 1));
+}
+
+.portraitImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(var(--portrait-zoom, 1.14));
+  transition: transform var(--aperture-ms, 620ms) var(--aperture-ease, cubic-bezier(0.5, 0, 0.2, 1));
+}
 
 /*
- * Depth pass over the flat photograph.
+ * Hover on the frame rather than on the photo: the cutout lying over it is
+ * pointer-events: none, and the meta bar beneath is part of the same card. A
+ * target that excluded them would drop the effect wherever the silhouette
+ * overhangs, which is most of where a pointer actually lands.
+ */
+.cardFrame:hover .portraitWindow {
+  --aperture: 0%;
+}
+
+.cardFrame:hover .portraitImage {
+  --portrait-zoom: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Held open and unzoomed. The rest state is the interesting one, but it is
+     only legible as a state you can change — with no transition it is just a
+     cropped photograph, so show the plain one instead. */
+  .portraitWindow,
+  .portraitImage {
+    transition: none;
+    --aperture: 0%;
+    --portrait-zoom: 1;
+  }
+}
+
+/*
+ * The cutout, layered over the aperture.
  *
- * operator-alpha.png is the same frame with the background cut away, moved
- * independently of operator.jpg: `data-py` on the outer element for scroll,
- * `data-px` on the inner for pointer. They cannot share one element —
- * useParallax's pointer loop assigns style.transform directly and would stomp
- * the GSAP scroll tween — hence the nesting.
- *
- * PAINT ORDER is what makes the effect read. The cutout must sit above the flat
- * photo but below the meta bar, so the figure's feet pass behind OPERATOR.JPG
- * instead of ending in a hard cut in mid-air. Within a stacking context a
- * positioned element paints above non-positioned in-flow content whatever the
- * DOM order, so .cardMeta is given position: relative and an opaque background
- * and placed after this in the markup — that, not a z-index, is what puts it in
- * front. It sits inside .cardFrame (which does not clip) rather than inside
- * .portrait, which crops the photo to the frame and would crop the cutout with
- * it.
- *
- * transform-origin is load-bearing twice over. Scaling moves a point away from
- * the origin in proportion to its DISTANCE from it, so anything near the origin
- * gains almost no clearance and the flat original ghosts through beside it — a
- * centred origin left the ear ~24px out, earning ~4px against 14px of travel,
- * a visible second ear. Sitting it low keeps every visible silhouette edge far
- * away. But at exactly 50% 100% the bottom edge is a fixed point and the feet
- * cannot extend past the frame to be occluded at all, so it rides slightly
- * above the bottom: the figure grows up out of the top of the frame and down
- * behind the meta bar at the same time. At 84% the feet clear the frame by
- * ~19px, which the ~23px meta bar covers.
- *
- * Budget: nearest visible silhouette edge (the ear) is ~133px from the origin,
- * so 1.28 clears ~37px against 11px of travel — deliberately generous, because
- * the travel was tuned down by eye rather than to the limit. Raising data-py or
- * data-px without raising the scale reintroduces the ghost; there is a test.
+ * Anchored to the FRAME, not to the window: it is the one layer that must not
+ * be clipped, because the silhouette breaking past the photograph's edge is the
+ * whole effect. It also does not react to hover — the aperture opening beneath
+ * a figure that holds still is what gives the card its depth.
  */
 .portraitAlpha {
   position: absolute;
@@ -239,79 +260,11 @@
 .idLabel { color: var(--color-textDim); }
 .idCallSign { color: var(--color-accent); }
 
-.lead {
-  margin: 0 0 var(--gap-22);
-  font-family: var(--font-display), Impact, sans-serif;
-  font-size: clamp(24px, 2.6vw, 38px);
-  line-height: 1.18;
-  letter-spacing: -0.02em;
-  color: var(--color-textPrimary);
-  text-wrap: balance;
-}
-
-.leadAccent { color: var(--color-accent); }
-
-.body {
-  margin: 0 0 18px;
-  max-width: 62ch;
-  font-size: 14px;
-  line-height: 1.85;
-  color: var(--color-textSecondary);
-  text-wrap: pretty;
-}
-
-.body:last-of-type { margin-bottom: var(--gap-40); }
-
-.loadoutHead {
-  display: flex;
-  align-items: baseline;
-  gap: var(--gap-12);
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 9px;
-  margin-bottom: 20px;
-}
-
-.loadoutTitle { font-size: var(--fs-micro); letter-spacing: var(--track-label); color: var(--color-textDim); }
-
-.loadoutNote {
-  flex: 1;
-  text-align: right;
-  font-size: var(--fs-micro);
-  letter-spacing: 0.14em;
-  color: var(--color-textFaint);
-}
-
-/* 1px gap over a background is the hairline grid — no borders per cell. */
-.loadout {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 1px;
-  background: var(--color-borderDim1);
-  border: 1px solid var(--color-borderDim1);
-  list-style: none;
-}
-
-.loadoutItem { background: var(--color-bgAlt1); padding: 15px; }
-.loadoutItem:hover { background: var(--color-surface1); }
-
-.loadoutName {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-textPrimary);
-  margin-bottom: 5px;
-}
-
-.loadoutName[data-accent='true'] { color: var(--color-accent); }
-
-.loadoutDetail { font-size: var(--fs-micro); letter-spacing: 0.1em; color: var(--color-textDim); }
-
 @media (max-width: 900px) {
-  .grid { grid-template-columns: minmax(0, 1fr); gap: var(--gap-40); }
-  .card { max-width: 340px; }
+  .section { margin-left: 0; padding: 80px 0; }
 }
 
 @media (max-width: 700px) {
-  .section { margin-left: 0; padding: 80px 0; }
   .headNote { display: none; }
 }
 

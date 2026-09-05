@@ -35,7 +35,10 @@ describe('paragraph reveals', () => {
       (count, file) => count + paragraphTags(readFileSync(file, 'utf8')).length,
       0,
     );
-    expect(total).toBeGreaterThanOrEqual(10);
+    // A smoke test on the scan itself, not a quota: it exists so the suite
+    // fails loudly if the glob or the regex stops matching anything. It came
+    // down from 10 when s01's lead and body copy were removed.
+    expect(total).toBeGreaterThanOrEqual(8);
   });
 
   for (const file of FILES) {

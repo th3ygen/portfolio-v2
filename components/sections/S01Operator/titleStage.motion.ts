@@ -31,8 +31,26 @@ export const STACK_BREAKPOINT = 760;
  * The runway element in S01Operator takes its height from this value, so the
  * distance the pin is dragged through and the distance the timeline is mapped
  * onto are the same number by construction.
+ *
+ * 420, up from 300, because the runway is also the scenery's band: the stage
+ * plates and the hollow title marks are spread across TITLE_BAND_VH below, and
+ * at 300 the twelve plates had to sit closer together than their own heights on
+ * anything but a tall viewport. Twelve plates want the room; the sequence gets
+ * a slower read out of it, which is the same trade the marks already make.
  */
-export const RUNWAY_VH = 300;
+export const RUNWAY_VH = 420;
+
+/**
+ * The full band the title sequence occupies: the pinned stage's own viewport
+ * plus the runway it is dragged through.
+ *
+ * Everything positioned AGAINST the sequence rather than against the section —
+ * the plates, the hollow marks — measures itself in percentages of this. The
+ * section is far taller, because the operator's own content follows; scenery
+ * placed against the section spread into that content and sat behind the gear
+ * panel, which is what this constant exists to prevent.
+ */
+export const TITLE_BAND_VH = RUNWAY_VH + 100;
 
 /** Beat positions on a 0-1 timeline. Named because the order is the design. */
 const INTRO_IN = 0;

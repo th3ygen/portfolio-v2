@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { OPERATOR_OPENERS, OPERATOR_ROLES, STAGE_PLATES } from '@/content/operator';
-import { RUNWAY_VH } from './titleStage.motion';
+import { beatTiming, RUNWAY_VH, TITLE_BAND_VH } from './titleStage.motion';
 import styles from './StagePlates.module.css';
 
 /**
@@ -32,21 +32,45 @@ import styles from './StagePlates.module.css';
 const TITLES = [...OPERATOR_OPENERS, ...OPERATOR_ROLES];
 
 /**
- * Vertical spacing between hollow title marks, in vh.
+ * Vertical spacing between hollow title marks, in vh — one title's worth of
+ * scroll, taken from the beat timing itself.
  *
- * The title sequence occupies the stage's own 100vh plus the runway, so one
- * mark per title across that span puts each roughly where its slot falls.
+ * This used to be the band divided by the title count, which is a different
+ * number and always was: the beats occupy only the first RECEDE of the
+ * timeline, so a title holds 0.92/7 of the runway while the band spans the
+ * runway plus the stage's own viewport. The marks therefore stepped about 19vh
+ * further than their titles did and walked out of step with the sequence,
+ * roughly a title and a half adrift by the end of it.
+ *
+ * Derived rather than tuned, so lengthening the runway cannot break the
+ * alignment again — which is exactly how it broke this time.
  */
-const MARK_STEP_VH = (RUNWAY_VH + 100) / TITLES.length;
+const MARK_STEP_VH = beatTiming(TITLES.length).step * RUNWAY_VH;
+
+/**
+ * Where a mark sits relative to the middle of its own title's scroll window.
+ *
+ * Half a viewport puts the mark's TOP on the centre line; the mark is roughly
+ * 18vh tall at a desktop viewport, so backing off by half of that centres the
+ * word itself against the lockup rather than hanging it below.
+ */
+const MARK_CENTRE_VH = 50 - 9;
 
 export function StagePlates() {
   return (
-    <div className={styles.plates} aria-hidden="true">
+    <div
+      className={styles.plates}
+      style={{ '--title-band-vh': TITLE_BAND_VH } as React.CSSProperties}
+      aria-hidden="true"
+    >
       {TITLES.map((title, index) => (
         <div
           key={title}
           className={styles.markSlot}
-          style={{ top: `${(index + 0.55) * MARK_STEP_VH}vh` }}
+          // Centred on its title's window, not stepped from zero: the first
+          // title is already on screen when the pin engages, so a mark placed
+          // at the START of each window arrives a full half-title early.
+          style={{ top: `${(index + 0.5) * MARK_STEP_VH + MARK_CENTRE_VH}vh` }}
         >
           {/* Smallest depths on the page: the furthest thing drifts least, and
               the plates crossing in front of it are what sell that as distance. */}

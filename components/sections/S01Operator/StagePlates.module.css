@@ -9,12 +9,37 @@
  */
 .plates {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /*
+   * The TITLE BAND, not the section.
+   *
+   * This was `inset: 0`, which made every plate's `top` a percentage of the
+   * whole of s01 — stage, runway, and the operator's own content underneath.
+   * The lower plates therefore landed behind the gear panel and the copy,
+   * where a photograph is not scenery, it is something to read through.
+   *
+   * --title-band-vh is written on from TITLE_BAND_VH, the same constant the
+   * marks are stepped by, so the plates cannot drift out of the sequence they
+   * belong to.
+   */
+  height: calc(var(--title-band-vh, 0) * 1vh);
   z-index: 0;
   pointer-events: none;
-  /* A wide plate at a narrow viewport must not be able to give the page a
-     horizontal scrollbar. */
-  overflow: hidden;
+  /*
+   * Horizontally only. The rule exists so a wide plate at a narrow viewport
+   * cannot give the page a horizontal scrollbar — it was never meant to crop
+   * the plates vertically, and once the band stopped being the whole section it
+   * started doing exactly that: the topmost plate has the largest `py` of any
+   * layer here and drifts about 90px past the band's own edge, which arrived as
+   * a hard horizontal cut across a photograph.
+   *
+   * `clip` rather than `hidden`, because `overflow-x: hidden` forces the other
+   * axis to compute as `auto` and would make this a scroll container.
+   */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 /* Sized and placed; exists only to be the plate's parallax trigger. */

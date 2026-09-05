@@ -8,8 +8,15 @@ async function sectionTop(page: Page): Promise<number> {
   });
 }
 
-/** Viewports of scroll the title beats are spread across (RUNWAY_VH / 100). */
-const RUNWAY_VIEWPORTS = 3;
+/**
+ * Viewports of scroll the title beats are spread across (RUNWAY_VH / 100).
+ *
+ * Kept by hand, and it has to be: the spec drives the page from outside, so it
+ * cannot import the constant. Every sample point below is a FRACTION of this,
+ * which is what keeps the retune to this one line — it went 3 -> 4.2 when the
+ * runway lengthened to give the stage plates room, and nothing else moved.
+ */
+const RUNWAY_VIEWPORTS = 4.2;
 const VIEWPORT_H = 720;
 
 /**

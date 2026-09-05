@@ -1,0 +1,247 @@
+/*
+ * The operator gear screen: portrait centred, equipment rails either side.
+ *
+ * Every width here is against the section's left grid column, which widened
+ * from 340px to 560px to make room for the rails. The portrait itself did not
+ * grow — the rails took the new space.
+ */
+.root {
+  position: relative;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-16);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+  margin-bottom: 18px;
+}
+
+/* Pushed to the far right, so the head reads title / count ... note. */
+.note {
+  flex: 1;
+  text-align: right;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  color: var(--color-textFaint);
+}
+
+.title {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
+  color: var(--color-textDim);
+}
+
+.count {
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+
+/*
+ * Rail, subject, rail. The centre is given the remaining space rather than a
+ * width of its own so the two rails stay identical: a portrait sized in px
+ * would push one rail narrower than the other at every viewport it did not
+ * exactly fit.
+ */
+/*
+ * Rail, subject, rail — across the whole section now.
+ *
+ * The centre is capped rather than given the remaining space: a portrait that
+ * grows with the viewport reaches 700px tall on a wide screen while the rails
+ * stop at about 400, and the panel becomes a photograph with two short columns
+ * stranded beside it. Capped at 420 the three columns finish at roughly the
+ * same depth, which is what makes it read as one panel.
+ */
+.bay {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px) minmax(0, 1fr);
+  gap: var(--gap-22);
+  align-items: start;
+  justify-content: center;
+}
+
+.subject {
+  position: relative;
+}
+
+.rail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 10px;
+  align-content: start;
+}
+
+.mount {
+  /* Half a rail by default; the wide slots opt out. */
+  grid-column: span 1;
+}
+
+.mount[data-wide='true'] {
+  grid-column: span 2;
+}
+
+/*
+ * Above the box, not inside it. The label names the SLOT and stays put while
+ * what is mounted in it changes, which is the whole reason the panel reads as
+ * equipment rather than as a list of logos.
+ */
+.slotLabel {
+  display: block;
+  margin-bottom: 5px;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.18em;
+  color: var(--color-textDim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  /* Reserved, not fixed: `MQTT / Socket.io` over `REAL-TIME TRANSPORT` wraps to
+     two lines in a half-width slot, and the box has to grow for it rather than
+     clip it. */
+  min-height: 124px;
+  padding: 14px 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bgAlt1);
+  color: var(--color-textSecondary);
+  text-align: center;
+  transition:
+    border-color 140ms linear,
+    background 140ms linear,
+    color 140ms linear;
+}
+
+.slot:hover {
+  background: var(--color-surface1);
+  border-color: var(--color-borderBright, var(--color-textDim));
+  color: var(--color-textPrimary);
+}
+
+/*
+ * The primary mount wears an accent frame, the way the reference marks the
+ * equipped MAIN. Border colour only — a border WIDTH change would shift the
+ * glyph by a pixel against every neighbouring slot.
+ */
+.slot[data-primary='true'] {
+  border-color: var(--color-accent);
+}
+
+/* Rarity, not decoration: these are the entries the content marks accent. */
+.slot[data-accent='true'] {
+  color: var(--color-accent);
+}
+
+/*
+ * The brand mark. Held as a flat monochrome silhouette at rest and revealed in
+ * the brand's own colour under the pointer.
+ *
+ * Post-processed rather than dropped in raw: eight vendor logos at full
+ * saturation, sitting in a grid, would be the loudest thing on a page built out
+ * of hairlines and one accent green — it would read as a sponsor wall. Held
+ * monochrome they read as equipment, and the colour becomes something the slot
+ * gives up when you point at it.
+ */
+.logo {
+  width: 28px;
+  height: 28px;
+  background-color: var(--color-textDim);
+  /* --logo and --logo-color are set per slot from the content. */
+  mask: var(--logo) center / contain no-repeat;
+  -webkit-mask: var(--logo) center / contain no-repeat;
+  transition:
+    background-color 260ms ease-out,
+    transform 260ms ease-out;
+}
+
+.slot:hover .logo {
+  background-color: var(--logo-color);
+  /* A touch larger, so the reveal is legible even where the brand colour is
+     close to the monochrome it replaces. */
+  transform: scale(1.06);
+}
+
+/*
+ * The accent entries do NOT get the accent green on their mark. Rarity is
+ * carried by the slot's label and name; tinting the logo green would say the
+ * brand is green, which for MQTT and WebRTC it is not. They do sit a step
+ * brighter at rest, which is the whole of the difference.
+ *
+ * `:not(:hover)` is load-bearing. Without it this selector and the hover rule
+ * above score identical specificity, and being the later of the two it won in
+ * BOTH states — measured, MQTT and WebRTC were the only two marks that never
+ * changed colour under the pointer.
+ */
+.slot[data-accent='true']:not(:hover) .logo {
+  background-color: var(--color-textSecondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo {
+    transition: none;
+  }
+
+  .slot:hover .logo {
+    transform: none;
+  }
+}
+
+.slotName {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-textPrimary);
+}
+
+.slot[data-accent='true'] .slotName {
+  color: var(--color-accent);
+}
+
+.slotDetail {
+  font-size: var(--fs-micro);
+  letter-spacing: 0.1em;
+  line-height: 1.5;
+  color: var(--color-textDim);
+}
+
+/*
+ * Below 1100px there is not room for a portrait between two rails of named
+ * slots. The portrait leads and the rails stack under it, each keeping its own
+ * two-across grid — the same information without the flanking arrangement that
+ * needs the width.
+ */
+@media (max-width: 1100px) {
+  .bay {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gap-22);
+  }
+
+  .subject {
+    /* Order 1 so the portrait leads the stack, with both rails beneath it. */
+    order: -1;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .mount[data-wide='true'] {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 620px) {
+  .rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mount[data-wide='true'] {
+    grid-column: span 1;
+  }
+}

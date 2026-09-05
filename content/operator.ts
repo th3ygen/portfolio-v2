@@ -8,12 +8,6 @@ export const OPERATOR = {
   prompt: '$ whoami',
   intro:
     'I build systems that run in the real world — vehicle telemetry, prison security, factory floors, fish ponds, elephant fences. Six years of shipping software that has to keep working when nobody is watching it.',
-  lead: ['Most of my work has a', 'physical consequence', 'when it breaks.'] as const,
-  body: [
-    'I started in 2020 as a research assistant at Universiti Malaysia Pahang, building monitoring systems for people who needed them to work on Monday. That never really changed. Since then I have shipped for Cyber Security Malaysia, a national prison, a glove manufacturer, prawn farmers, and a Singapore fintech — and founded Ascenity Solutions along the way.',
-    'The work is usually the same shape: sensors or cameras produce data faster than anyone can read it, and someone needs a screen that tells them what to do about it. I do the whole path — firmware handshake to dashboard, CAN bus to Chart.js, Raspberry Pi to Vercel.',
-    'Currently building a cross-platform financial app in Flutter for Arki Finance in Singapore. Still fuelled by coffee. Still convinced the CPU is doing most of the work.',
-  ] as const,
 } as const;
 
 /**
@@ -45,18 +39,24 @@ export const STAGE_PLATES: readonly StagePlate[] = [
   // Ordered near to far. width, py, px and alpha move together on purpose: a
   // plate that is larger, travels further and sits brighter reads as closer.
   // Break that ordering and the depth inverts. There is a test on it.
-  { src: '/img/projects/camkender/2-0.jpg', side: 'left', top: 6, width: 560, py: 120, px: 34, alpha: 0.3 },
-  { src: '/img/projects/gajahsafe/1-0.jpg', side: 'right', top: 14, width: 520, py: 108, px: 31, alpha: 0.28 },
-  { src: '/img/projects/csova/2-1.jpg', side: 'left', top: 24, width: 480, py: 96, px: 28, alpha: 0.26 },
-  { src: '/img/projects/pcasso/0-0.jpg', side: 'right', top: 33, width: 450, py: 86, px: 25, alpha: 0.24 },
-  { src: '/img/projects/camkender/2-1.jpg', side: 'left', top: 41, width: 420, py: 76, px: 22, alpha: 0.23 },
-  { src: '/img/projects/gajahsafe/1-4.jpg', side: 'right', top: 49, width: 400, py: 68, px: 20, alpha: 0.22 },
-  { src: '/img/projects/justgood/1-2.jpg', side: 'left', top: 57, width: 380, py: 60, px: 17, alpha: 0.21 },
-  { src: '/img/projects/gapura/0-0.jpg', side: 'right', top: 64, width: 365, py: 54, px: 15, alpha: 0.2 },
-  { src: '/img/projects/sipfos/1-0.jpg', side: 'left', top: 72, width: 350, py: 48, px: 13, alpha: 0.19 },
-  { src: '/img/projects/camkender/3-1.jpg', side: 'right', top: 79, width: 340, py: 42, px: 11, alpha: 0.18 },
-  { src: '/img/projects/gajahsafe/0-2.jpg', side: 'left', top: 86, width: 330, py: 36, px: 9, alpha: 0.17 },
-  { src: '/img/projects/gajahsafe/4-1.jpg', side: 'right', top: 92, width: 320, py: 30, px: 8, alpha: 0.16 },
+  //
+  // `top` is a percentage of the TITLE BAND — the pinned stage plus its runway
+  // — not of the section. Evenly stepped across it, one plate roughly per
+  // title, so the scenery keeps pace with the sequence instead of thinning out
+  // where the beats are densest. Even steps matter more than the exact numbers:
+  // uneven ones read as plates that drift and then bunch.
+  { src: '/img/projects/camkender/2-0.jpg', side: 'left', top: 3, width: 560, py: 120, px: 34, alpha: 0.3 },
+  { src: '/img/projects/gajahsafe/1-0.jpg', side: 'right', top: 11.2, width: 520, py: 108, px: 31, alpha: 0.28 },
+  { src: '/img/projects/csova/2-1.jpg', side: 'left', top: 19.4, width: 480, py: 96, px: 28, alpha: 0.26 },
+  { src: '/img/projects/pcasso/0-0.jpg', side: 'right', top: 27.5, width: 450, py: 86, px: 25, alpha: 0.24 },
+  { src: '/img/projects/camkender/2-1.jpg', side: 'left', top: 35.7, width: 420, py: 76, px: 22, alpha: 0.23 },
+  { src: '/img/projects/gajahsafe/1-4.jpg', side: 'right', top: 43.9, width: 400, py: 68, px: 20, alpha: 0.22 },
+  { src: '/img/projects/justgood/1-2.jpg', side: 'left', top: 52.1, width: 380, py: 60, px: 17, alpha: 0.21 },
+  { src: '/img/projects/gapura/0-0.jpg', side: 'right', top: 60.3, width: 365, py: 54, px: 15, alpha: 0.2 },
+  { src: '/img/projects/sipfos/1-0.jpg', side: 'left', top: 68.5, width: 350, py: 48, px: 13, alpha: 0.19 },
+  { src: '/img/projects/camkender/3-1.jpg', side: 'right', top: 76.6, width: 340, py: 42, px: 11, alpha: 0.18 },
+  { src: '/img/projects/gajahsafe/0-2.jpg', side: 'left', top: 84.8, width: 330, py: 36, px: 9, alpha: 0.17 },
+  { src: '/img/projects/gajahsafe/4-1.jpg', side: 'right', top: 93, width: 320, py: 30, px: 8, alpha: 0.16 },
 ] as const;
 
 /**
@@ -152,15 +152,32 @@ export const HERO_CTAS: readonly {
  * of 90 skills across 9 categories.
  */
 export const CORE_LOADOUT: readonly LoadoutItem[] = [
-  { name: 'Next.js', detail: 'APP ROUTER · SERVER ACTIONS' },
-  { name: 'TypeScript', detail: 'ZOD · STRICT' },
-  { name: 'Node.js', detail: 'EXPRESS · PM2' },
-  { name: 'PostgreSQL', detail: 'PRISMA ORM' },
-  { name: 'MQTT / Socket.io', detail: 'REAL-TIME TRANSPORT', accent: true },
-  { name: 'WebRTC', detail: 'LIVE VIDEO · INTERCOM', accent: true },
-  { name: 'Flutter', detail: 'CURRENT ROLE' },
-  { name: 'Tensorflow.js', detail: 'ON-DEVICE INFERENCE' },
+  // Order is the panel's layout, not a ranking: the first four mount on the
+  // left rail and the last four on the right, so moving an entry moves a slot.
+  { name: 'Next.js', detail: 'APP ROUTER · SERVER ACTIONS', slot: 'PRIMARY', logo: 'nextdotjs', logoColor: '#FFFFFF' },
+  { name: 'TypeScript', detail: 'ZOD · STRICT', slot: 'LANGUAGE', logo: 'typescript', logoColor: '#3178C6' },
+  { name: 'Node.js', detail: 'EXPRESS · PM2', slot: 'RUNTIME', logo: 'nodedotjs', logoColor: '#5FA04E' },
+  { name: 'PostgreSQL', detail: 'PRISMA ORM', slot: 'STORE', logo: 'postgresql', logoColor: '#4169E1' },
+  {
+    name: 'MQTT / Socket.io',
+    detail: 'REAL-TIME TRANSPORT',
+    slot: 'TRANSPORT',
+    logo: 'mqtt',
+    logoColor: '#C700C7',
+    accent: true,
+  },
+  { name: 'WebRTC', detail: 'LIVE VIDEO · INTERCOM', slot: 'COMMS', logo: 'webrtc', logoColor: '#FFFFFF', accent: true },
+  { name: 'Flutter', detail: 'CURRENT ROLE', slot: 'MOBILE', logo: 'flutter', logoColor: '#0372CD' },
+  { name: 'Tensorflow.js', detail: 'ON-DEVICE INFERENCE', slot: 'INFERENCE', logo: 'tensorflow', logoColor: '#FF6F00' },
 ] as const;
+
+/**
+ * How the eight slots divide between the two rails flanking the portrait.
+ *
+ * Four and four, which is what makes the panel symmetrical about the
+ * photograph rather than lopsided against it.
+ */
+export const GEAR_RAIL_SPLIT = 4;
 
 /** Ticker content. Rendered twice back to back so om-tick loops seamlessly. */
 export const TICKER: readonly string[] = [
@@ -186,7 +203,9 @@ export const CV_HREF = '/docs/cv.pdf';
 
 export const LOADOUT_HEAD = {
   title: 'CORE LOADOUT',
-  note: 'DAILY DRIVERS — FULL MANIFEST IN 02',
+  // Shorter than the old 'DAILY DRIVERS — FULL MANIFEST IN 02': the head now
+  // sits in the 340px portrait column, where that line wrapped to three rows.
+  note: 'FULL MANIFEST IN 02',
 } as const;
 
 /**

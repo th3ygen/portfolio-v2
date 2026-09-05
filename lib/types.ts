@@ -2,6 +2,37 @@
 export type LoadoutItem = {
   readonly name: string;
   readonly detail: string;
+  /**
+   * The equipment slot this item is mounted in — PRIMARY, TRANSPORT, and so on.
+   *
+   * The gear panel labels the SLOT, not the item, exactly as a character screen
+   * labels HEAD and CHEST rather than the helmet in them. It is what lets eight
+   * unrelated technologies read as one loadout: the roles are fixed, and these
+   * are what happens to be equipped in them.
+   */
+  readonly slot: string;
+  /**
+   * The brand mark's slug under `public/img/logos`, without the extension.
+   *
+   * Used as a CSS mask rather than as an image, so the slot can hold the
+   * silhouette at rest and cross to `logoColor` on hover. That is only possible
+   * because the files are single-path marks with no inline fill — see the
+   * README beside them.
+   */
+  readonly logo: string;
+
+  /**
+   * What the mark resolves to when a pointer is on the slot.
+   *
+   * The brand hex where it survives this page's near-black ground, and an
+   * adjustment where it does not — the threshold is 4:1 against #070809.
+   * Next.js and WebRTC are achromatic marks whose own dark-background form is
+   * white; MQTT's #660066 and Flutter's #02569B are lightened along their own
+   * hue rather than replaced, so the brand is still recognisable. Stated per
+   * item rather than computed at runtime: this is a design decision about
+   * eight specific marks, not a rule worth a colour library.
+   */
+  readonly logoColor: string;
   /** Two entries are accent-coloured in the design; this is not decorative. */
   readonly accent?: boolean;
 };
