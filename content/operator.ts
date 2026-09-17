@@ -230,7 +230,13 @@ export const PORTRAIT: {
   readonly alt: string;
   readonly filename: string;
 } = {
-  src: '/img/operator.jpg',
+  // The filename carries a suffix, and a REPLACEMENT SHOULD CARRY A NEW ONE.
+  // Next's image optimizer keys its cache on url + width + quality, so swapping
+  // the bytes under a stable path leaves every already-optimized width serving
+  // the old picture — locally that survives a dev restart, and on Vercel the
+  // cache is shared and long-lived. Renaming is the only change the cache
+  // cannot miss.
+  src: '/img/operator-bg.jpg',
   alphaSrc: '/img/operator-alpha.png',
   alt: 'Muhd Aidil Syazwan Hamdan',
   filename: 'OPERATOR.JPG',
