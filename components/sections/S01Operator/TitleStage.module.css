@@ -94,6 +94,31 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * What the current role runs on. Absolutely placed under the readout so its
+ * width never counts toward the lockup's: the lockup is centred on its own
+ * box, and a line that changes length on every switch would slide `dev`
+ * sideways each time.
+ */
+.tail { position: relative; }
+
+.stack {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: var(--color-textMuted);
+}
+
+.stack > span:not(:empty)::before {
+  content: '› ';
+  color: var(--color-accent);
+}
+
 /* Holds the static slot against the moving column. */
 .columnWrap {
   position: relative;
@@ -188,6 +213,42 @@
 }
 
 /*
+ * The typed opener. JS marks characters untyped only once it is about to type
+ * them, so with no script the line is simply whole. `visibility`, not
+ * `display`: a hidden character keeps its width and the line never reflows.
+ */
+.char { position: relative; }
+.char[data-typed='false'] { visibility: hidden; }
+
+/*
+ * The caret rides the last typed character, or waits before the first. It
+ * belongs to the opener only while the opener is the reading — once the column
+ * moves on, a blinking cursor on a hollow title would be a line still being
+ * written.
+ */
+.char[data-caret='after']::after,
+.char[data-caret='before']::before {
+  content: '_';
+  position: absolute;
+  bottom: 0;
+  visibility: visible;
+  color: var(--color-accent);
+  -webkit-text-stroke: 0;
+  animation: caret-blink 1s steps(1, end) infinite;
+}
+
+.char[data-caret='after']::after { left: 100%; margin-left: 0.06em; }
+.char[data-caret='before']::before { left: 0; }
+
+.item[data-role-active='false'] .char::after,
+.item[data-role-active='false'] .char::before { display: none; }
+
+@keyframes caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+/*
  * The release eases; every switch before it does not.
  *
  * Title-to-title is deliberately a hard flip — a title is the reading or it is
@@ -215,6 +276,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lockup { will-change: auto; }
+  .char::after,
+  .char::before { animation: none; }
 }
 
 /*
@@ -243,5 +306,12 @@
 
   .suffix {
     font-size: clamp(38px, 11vw, 64px);
+  }
+
+  .tail { align-items: center; }
+
+  .stack {
+    left: 50%;
+    transform: translateX(-50%);
   }
 }

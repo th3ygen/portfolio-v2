@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { TitleStage } from '../TitleStage';
 import { RUNWAY_VH, STACK_BREAKPOINT } from '../titleStage.motion';
 import { S01Operator } from '../index';
-import { OPERATOR_OPENERS, OPERATOR_ROLES, SUFFIX_FROM } from '@/content/operator';
+import { OPERATOR_OPENERS, OPERATOR_ROLE_STACKS, OPERATOR_ROLES, SUFFIX_FROM } from '@/content/operator';
 
 describe('TitleStage', () => {
   it('renders every title in the column against a fixed dev suffix', () => {
@@ -16,6 +16,26 @@ describe('TitleStage', () => {
     // hollow outlines and only marks one solid.
     expect(items).toEqual([...OPERATOR_OPENERS, ...OPERATOR_ROLES]);
     expect(container.querySelector('[data-title-suffix]')?.textContent).toBe('dev');
+  });
+
+  it('splits only the opener into characters, so it can type itself out', () => {
+    const { container } = render(<TitleStage />);
+    const chars = [...container.querySelectorAll('[data-type-char]')];
+    expect(chars.map((c) => c.textContent).join('')).toBe(OPERATOR_OPENERS[0]);
+    // All in the first title; every other title is a single text run.
+    const first = container.querySelector('[data-role-item]');
+    expect(chars.every((c) => first?.contains(c))).toBe(true);
+    // Whole without script: nothing is marked untyped until JS types it.
+    expect(container.querySelector('[data-typed="false"]')).toBeNull();
+  });
+
+  it('gives every role a stack line and the openers none', () => {
+    for (const role of OPERATOR_ROLES) {
+      expect(OPERATOR_ROLE_STACKS[role], role).toBeTruthy();
+    }
+    for (const opener of OPERATOR_OPENERS) {
+      expect(OPERATOR_ROLE_STACKS[opener]).toBeUndefined();
+    }
   });
 
   it('keeps every title readable as a prefix of the suffix', () => {

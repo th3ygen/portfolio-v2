@@ -1,11 +1,11 @@
 'use client';
 
 import { useRef } from 'react';
-import { OPERATOR_OPENERS, OPERATOR_ROLES } from '@/content/operator';
+import { OPERATOR_OPENERS, OPERATOR_ROLE_STACKS, OPERATOR_ROLES } from '@/content/operator';
 import { gsap, ScrollTrigger, useGSAP } from '@/components/motion/gsap';
 import { EASE, SCRUB } from '@/components/motion/tokens';
 import { buildBeats } from './titleStage.beats';
-import { beatTiming, RUNWAY_VH, STACK_BREAKPOINT } from './titleStage.motion';
+import { beatTiming, RUNWAY_VH, STACK_BREAKPOINT, TYPE } from './titleStage.motion';
 import { createReading } from './titleStage.reading';
 import styles from './TitleStage.module.css';
 
@@ -15,14 +15,20 @@ const SUFFIX = 'dev';
 /** The column, in order: two opening lines, then the roles. */
 const TITLES = [...OPERATOR_OPENERS, ...OPERATOR_ROLES] as const;
 
+/** The stack line for each title, index-aligned. The openers have none. */
+const STACKS = TITLES.map((title) => OPERATOR_ROLE_STACKS[title] ?? '');
+
+/** The first title types itself out, so it is rendered one span per character. */
+const TYPED_INDEX = 0;
+
 /**
  * The s01 opening sequence.
  *
- * `dev` alone at centre, the title column dropping in to its left and pushing
- * it right as the pair settles, then the column riding upward one title at a
- * time — every title is present as a hollow outline and the one in the active
- * slot is solid accent. The whole thing then recedes to a backdrop the rest of
- * the section sits on.
+ * `hello world!` typing itself out at centre, `dev` arriving beside it as the
+ * column reaches `im a`, then the column riding upward one title at a time —
+ * every title is present as a hollow outline and the one in the active slot is
+ * solid accent, with that role's stack flickering in under the counter. The
+ * whole thing then recedes to a backdrop the rest of the section sits on.
  *
  * The column replaced a per-letter glyph scramble, which read as noise rather
  * than as a system reporting state.
@@ -48,6 +54,8 @@ export function TitleStage() {
   const readoutRef = useRef<HTMLSpanElement>(null);
   const slotRef = useRef<HTMLDivElement>(null);
   const suffixRef = useRef<HTMLSpanElement>(null);
+  const stackRef = useRef<HTMLSpanElement>(null);
+  const stackTextRef = useRef<HTMLSpanElement>(null);
 
   useGSAP(
     () => {
@@ -63,11 +71,29 @@ export function TitleStage() {
       const first = items[0];
       if (!first) return;
 
-      const activate = createReading({
+      const readingTargets = {
         items,
         readout: readoutRef.current,
         suffix: suffixRef.current,
-      });
+        stack: stackTextRef.current,
+        stacks: STACKS,
+      };
+
+      const chars = gsap.utils.toArray<HTMLElement>('[data-type-char]', column);
+
+      /**
+       * Shows the first `count` characters of the opener, with the caret on the
+       * last one shown (or before the first, at zero). Hidden characters keep
+       * their width — visibility, not display — so the line never reflows and
+       * the right-aligned column does not shift as it types.
+       */
+      const type = (count: number) => {
+        chars.forEach((char, i) => {
+          char.dataset.typed = i < count ? 'true' : 'false';
+          char.dataset.caret =
+            count === 0 && i === 0 ? 'before' : i === count - 1 ? 'after' : 'none';
+        });
+      };
 
       /** Row height, read live: the clamp on font-size makes it viewport-dependent. */
       const rowHeight = () => first.offsetHeight;
@@ -128,6 +154,8 @@ export function TitleStage() {
             reduce: boolean;
           };
 
+          const activate = createReading({ ...readingTargets, flicker: !reduce });
+
           if (reduce) {
             // A static title card. Nothing is pinned here, so the stage simply
             // scrolls past like any other block; the runway collapses to zero
@@ -139,6 +167,29 @@ export function TitleStage() {
           }
 
           activate(0);
+
+          // The opener types itself out once, on the clock, as the section comes
+          // up the screen. `end: 'max'` so that loading the page anywhere below
+          // the start still fires it — past a normal end the trigger would never
+          // enter, and the opener would stay blank on the way back up.
+          if (chars.length > 0) {
+            const typed = { count: 0 };
+            type(0);
+            const typing = gsap.to(typed, {
+              count: chars.length,
+              duration: chars.length * TYPE.perChar,
+              ease: EASE.linear,
+              paused: true,
+              onUpdate: () => type(Math.round(typed.count)),
+            });
+            ScrollTrigger.create({
+              trigger: section,
+              start: TYPE.start,
+              end: 'max',
+              once: true,
+              onEnter: () => typing.play(),
+            });
+          }
 
           // Held for the section's whole length, not just the beats, so the
           // lockup is still there to be a backdrop. pinSpacing: false because
@@ -176,11 +227,16 @@ export function TitleStage() {
               suffix: suffixRef.current,
               slot: slotRef.current,
               readout: readoutRef.current,
+              stack: stackRef.current,
             },
             { rowHeight, openingOffset: () => openingOffset(stacked) },
             beatTiming(items.length),
             activate,
           );
+
+          // Condition reverted (resize across the breakpoint, motion preference
+          // toggled): leave the opener whole rather than mid-type.
+          return () => type(chars.length);
         },
       );
 
@@ -201,9 +257,15 @@ export function TitleStage() {
               decorating whichever title happens to be solid. */}
           <div className={styles.slot} ref={slotRef} data-title-slot />
           <div className={styles.column} ref={columnRef} data-title-column>
-            {TITLES.map((title) => (
+            {TITLES.map((title, index) => (
               <span key={title} className={styles.item} data-role-item data-role-active="false">
-                {title}
+                {index === TYPED_INDEX
+                  ? [...title].map((char, i) => (
+                      <span key={i} className={styles.char} data-type-char>
+                        {char}
+                      </span>
+                    ))
+                  : title}
               </span>
             ))}
           </div>
@@ -215,6 +277,9 @@ export function TitleStage() {
           </span>
           <span className={styles.readout} ref={readoutRef} data-title-readout>
             01/{String(TITLES.length).padStart(2, '0')}
+          </span>
+          <span className={styles.stack} ref={stackRef} data-title-stack>
+            <span ref={stackTextRef} data-title-stack-text />
           </span>
         </span>
       </div>

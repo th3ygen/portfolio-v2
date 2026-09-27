@@ -52,9 +52,6 @@ export const RUNWAY_VH = 420;
  */
 export const TITLE_BAND_VH = RUNWAY_VH + 100;
 
-/** Beat positions on a 0-1 timeline. Named because the order is the design. */
-const INTRO_IN = 0;
-
 /**
  * The cycle runs from zero to RECEDE, divided into one equal slot per title.
  *
@@ -85,7 +82,7 @@ const DIGITAL_LAG_OF_STEP = 0.5;
  * Deliberately tiny. These are state changes, not transitions — the duration
  * exists only so `steps()` has something to divide.
  */
-const FLICKER = { intro: 0.05, suffix: 0.03, slot: 0.05, readout: 0.035, part: 0.05 } as const;
+const FLICKER = { suffix: 0.03, slot: 0.05, readout: 0.035, part: 0.05 } as const;
 
 export type BeatTiming = ReturnType<typeof beatTiming>;
 
@@ -103,8 +100,6 @@ export function beatTiming(titleCount: number) {
 
   return {
     step,
-    /** The column dropping in. */
-    introIn: INTRO_IN,
     /** When the column reaches the first title that reads against `dev`. */
     suffixIn,
     /** When the bracketed slot and the readout step on. */
@@ -125,3 +120,18 @@ export function beatTiming(titleCount: number) {
     flicker: FLICKER,
   };
 }
+
+/**
+ * The opener types itself out, on the clock rather than on the scroll.
+ *
+ * Scrubbed, the line would be half-typed wherever the reader stopped, and the
+ * first frame of the section would be an empty cursor — the blank arrival this
+ * replaced. Played once as the section comes up the screen, it has finished by
+ * the time the stage pins, so the section always opens on a complete line.
+ */
+export const TYPE = {
+  /** Seconds per character. `hello world!` is twelve, so about 0.7s. */
+  perChar: 0.06,
+  /** Where the section's top must reach before typing starts. */
+  start: 'top 70%',
+} as const;

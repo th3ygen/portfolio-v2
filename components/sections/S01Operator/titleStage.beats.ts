@@ -17,6 +17,8 @@ export type BeatTargets = {
   readonly suffix: HTMLElement | null;
   readonly slot: HTMLElement | null;
   readonly readout: HTMLElement | null;
+  /** The stack line under the readout. Steps in and out with it. */
+  readonly stack: HTMLElement | null;
 };
 
 export type BeatMeasures = {
@@ -33,20 +35,18 @@ export function buildBeats(
   timing: BeatTiming,
   activate: (index: number) => void,
 ): gsap.core.Timeline {
-  const { lockup, column, items, suffix, slot, readout } = targets;
+  const { lockup, column, items, suffix, slot, readout, stack } = targets;
   const { flicker } = timing;
 
-  // fromTo, not a set() ahead of the timeline: fromTo renders its start state
-  // immediately at build time AND recomputes it on refresh. A .set() inside the
-  // timeline did neither — a scrubbed timeline parked at progress 0 has never
-  // rendered, and setting progress to the value it already holds is a no-op, so
-  // the opening state never reached the DOM at all.
-  timeline.fromTo(
-    column,
-    { opacity: 0, y: -80 },
-    { opacity: 1, y: 0, duration: flicker.intro, ease: EASE.enterSoft },
-    timing.introIn,
-  );
+  // No entrance for the column. It is on screen from the section's first
+  // frame, with the opener typing itself out on the clock (see TYPE); it used
+  // to drop in from opacity 0 at progress 0, which meant the section arrived
+  // as an empty screen of plates until the reader had scrolled into it.
+  //
+  // Every start state below is a fromTo, not a set() ahead of the timeline:
+  // fromTo renders its start state immediately at build time AND recomputes it
+  // on refresh. A scrubbed timeline parked at progress 0 has never rendered, so
+  // a .set() there never reached the DOM at all.
 
   // `hello world!` stands alone, so the row opens with the column on centre and
   // `dev` absent. Both land together at the step that reaches `im a`: the suffix
@@ -89,6 +89,14 @@ export function buildBeats(
   if (readout) {
     timeline.fromTo(
       readout,
+      { opacity: 0 },
+      { opacity: 1, duration: flicker.readout, ease: EASE.snap },
+      timing.digitalIn + 0.02,
+    );
+  }
+  if (stack) {
+    timeline.fromTo(
+      stack,
       { opacity: 0 },
       { opacity: 1, duration: flicker.readout, ease: EASE.snap },
       timing.digitalIn + 0.02,
@@ -156,6 +164,7 @@ export function buildBeats(
   const parting = { duration: flicker.part, ease: EASE.snap } as const;
   if (slot) timeline.to(slot, { '--slot-alpha': 0, ...parting }, timing.recede);
   if (readout) timeline.to(readout, { opacity: 0, ...parting }, timing.recede);
+  if (stack) timeline.to(stack, { opacity: 0, ...parting }, timing.recede);
   // `dev` is NOT faded here. It goes hollow with the last title, in activate(-1)
   // — the whole lockup releases together rather than one half of it dimming out.
 

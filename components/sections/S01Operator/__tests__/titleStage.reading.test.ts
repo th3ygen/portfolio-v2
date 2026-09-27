@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createReading } from '../titleStage.reading';
 
 function makeTargets(count: number) {
@@ -42,5 +42,34 @@ describe('createReading', () => {
     const activate = createReading({ items, readout: null, suffix: null });
     expect(() => activate(0)).not.toThrow();
     expect(items[0]!.dataset.roleActive).toBe('true');
+  });
+
+  it('writes the stack line for the reading, and holds it on release', () => {
+    const t = makeTargets(3);
+    const stack = document.createElement('span');
+    const activate = createReading({ ...t, stack, stacks: ['', 'a · b', 'c · d'] });
+
+    activate(0);
+    expect(stack.textContent).toBe('');
+    activate(2);
+    expect(stack.textContent).toBe('c · d');
+    activate(-1);
+    // Like the counter: the timeline steps it out, the reading does not wipe it.
+    expect(stack.textContent).toBe('c · d');
+  });
+
+  it('flickers the stack line only when it changes and flicker is on', () => {
+    const t = makeTargets(3);
+    const stack = document.createElement('span');
+    const animate = vi.fn();
+    stack.animate = animate as unknown as HTMLElement['animate'];
+
+    createReading({ ...t, stack, stacks: ['', 'x', 'x'] })(1);
+    expect(animate).not.toHaveBeenCalled();
+
+    const activate = createReading({ ...t, stack, stacks: ['', 'y', 'y'], flicker: true });
+    activate(1);
+    activate(2);
+    expect(animate).toHaveBeenCalledTimes(1);
   });
 });

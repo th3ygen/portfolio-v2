@@ -94,6 +94,22 @@ export const OPERATOR_ROLES: readonly string[] = [
   'FULL-STACK',
 ] as const;
 
+/**
+ * The line that flickers in under the s01 counter while each role holds: what
+ * that role actually runs on, drawn from the s02 manifest. The openers have
+ * none — they are not roles.
+ *
+ * FULL-STACK does not get a fifth list. It IS the four above it, and saying so
+ * is the point of landing on it.
+ */
+export const OPERATOR_ROLE_STACKS: Readonly<Record<string, string>> = {
+  FRONTEND: 'Next.js · React · TypeScript · Flutter',
+  BACKEND: 'Node.js · PostgreSQL · Prisma · GraphQL',
+  INFRA: 'Docker · Nginx · PM2 · AWS',
+  AIoT: 'MQTT · CAN Bus · Raspberry Pi · Tensorflow.js',
+  'FULL-STACK': 'all of the above',
+};
+
 /** Identity card facts shown beside the s01 portrait. */
 export const OPERATOR_CARD: readonly Stat[] = [
   { label: 'CALL SIGN', value: 'DIL' },

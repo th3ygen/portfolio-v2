@@ -44,7 +44,7 @@ describe('beatTiming', () => {
 
   it('leaves the whole sequence inside the runway it is mapped onto', () => {
     const t = beatTiming(TITLE_COUNT);
-    expect(t.introIn).toBeGreaterThanOrEqual(0);
+    expect(t.switchAt(0)).toBeGreaterThanOrEqual(0);
     expect(t.recede).toBeLessThanOrEqual(1);
     expect(RUNWAY_VH).toBeGreaterThan(0);
     expect(STACK_BREAKPOINT).toBeGreaterThan(0);
