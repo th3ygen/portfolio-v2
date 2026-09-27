@@ -51,44 +51,228 @@
   text-wrap: pretty;
 }
 
-.tableWrap {
+/*
+ * Bento grid. Four columns; the spotlit projects span 2×2 and `dense`
+ * backfills the singles around them.
+ */
+.grid {
+  --tile-ease: cubic-bezier(0.22, 1, 0.36, 1); /* power3.out, EASE.enter */
+  --tile-reveal: 640ms;
+
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(190px, auto);
+  grid-auto-flow: dense;
+  gap: var(--gap-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--gap-16);
+  min-width: 0;
+  padding: var(--gap-16);
+  overflow: hidden;
   border: 1px solid var(--color-borderDim1);
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-body-sm);
-  color: var(--color-textMuted);
-  text-align: left;
-}
-
-.table thead {
   background: var(--color-surface1);
+  color: var(--color-textMuted);
+  transition: border-color 240ms var(--tile-ease);
+}
+
+.tile[data-size='hero'] {
+  grid-column: span 2;
+  grid-row: span 2;
+  padding: var(--gap-22);
+}
+
+.tile:hover { border-color: var(--color-borderMid3); }
+.tile[data-spotlit='true']:hover { border-color: var(--color-accent); }
+
+/* ── The hero reveal ───────────────────────────────────────────────────────
+ * The screen sits behind the type, clipped to nothing at the bottom edge.
+ * Hover opens the clip upward while the image settles from 1.12 to 1, and a
+ * single accent scan line rides the leading edge. The image gets the same
+ * duotone as FramedImage so bright screenshots sit inside the palette. */
+.reveal {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  clip-path: inset(100% 0 0 0);
+  transition: clip-path var(--tile-reveal) var(--tile-ease);
+  background: var(--color-surface2);
+}
+
+.reveal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--color-accent);
+  mix-blend-mode: color;
+  opacity: 0.22;
+}
+
+.reveal::after {
+  /* Scanlines, plus a floor of shade so the type stays readable over it. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.03) 0px,
+      rgba(255, 255, 255, 0.03) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(180deg, rgba(7, 8, 9, 0.55) 0%, rgba(7, 8, 9, 0.2) 40%, rgba(7, 8, 9, 0.92) 100%);
+}
+
+.revealImage {
+  object-fit: cover;
+  transform: scale(1.12);
+  filter: grayscale(1) brightness(0.52) contrast(1.28);
+  transition:
+    transform calc(var(--tile-reveal) * 1.5) var(--tile-ease),
+    filter var(--tile-reveal) var(--tile-ease);
+}
+
+.revealEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   font-size: var(--fs-micro);
   letter-spacing: var(--track-org);
   color: var(--color-textDim);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-borderMid1) 0px,
+    var(--color-borderMid1) 5px,
+    transparent 5px,
+    transparent 12px
+  );
 }
 
-.table th {
-  padding: 11px var(--gap-12);
+.scan {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-top: 2px solid var(--color-accent);
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.tile:hover .reveal { clip-path: inset(0 0 0 0); }
+.tile:hover .revealImage {
+  transform: scale(1);
+  filter: grayscale(0.35) brightness(0.62) contrast(1.2);
+}
+.tile:hover .scan { animation: tile-scan var(--tile-reveal) var(--tile-ease) forwards; }
+
+@keyframes tile-scan {
+  0% { opacity: 1; transform: translateY(100%); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(0); }
+}
+
+/* ── Type ──────────────────────────────────────────────────────────────── */
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-12);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+}
+
+.id { color: var(--color-textFaint); transition: color 240ms var(--tile-ease); }
+.code { color: var(--color-accent); }
+
+.access {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 1px solid var(--color-borderMid1);
+  color: var(--color-textDim);
+}
+.access[data-access='PUBLIC'] { border-color: var(--color-accent); color: var(--color-accent); }
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-6);
+  transition: transform var(--tile-reveal) var(--tile-ease);
+}
+
+.sector {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  text-transform: uppercase;
+  color: var(--color-textDim);
+}
+
+.name {
+  margin: 0;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: 18px;
   font-weight: 400;
-  white-space: nowrap;
+  line-height: 1.1;
+  color: var(--color-textPrimary);
+  overflow-wrap: anywhere;
 }
 
-.table tbody tr { border-top: 1px solid var(--color-surface2); }
-.table tbody tr:hover { background: var(--color-surface1); }
-
-.table td { padding: 13px var(--gap-12); }
-
-.colId { width: 46px; color: var(--color-textFaint); }
-.colName { min-width: 160px; color: var(--color-textPrimary); font-weight: 700; }
+.tile[data-size='hero'] .name { font-size: clamp(26px, 3vw, 40px); }
 /* The four projects that also appear in s03. */
-.colName[data-spotlit='true'] { color: var(--color-accent); }
-.colSector { width: 140px; }
-.colTech { min-width: 200px; }
-.colAccess { width: 92px; color: var(--color-textDim); }
+.tile[data-spotlit='true'] .name { color: var(--color-accent); }
+
+.tagline {
+  margin: 0;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: var(--color-textSecondary);
+}
+
+.tech {
+  margin: var(--gap-6) 0 0;
+  font-size: var(--fs-body-sm);
+  line-height: 1.6;
+  color: var(--color-textMuted);
+  transition: color 240ms var(--tile-ease);
+}
+
+.tile:hover .id { color: var(--color-textSecondary); }
+.tile:hover .tech { color: var(--color-textSecondary); }
+.tile:hover .body { transform: translateY(-4px); }
+
+/* No hover to reveal with: show every screen, dimmer, from the start. */
+@media (hover: none) {
+  .reveal { clip-path: inset(0 0 0 0); opacity: 0.55; }
+  .revealImage { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .revealImage,
+  .body { transition: none; }
+  .tile:hover .scan { animation: none; }
+  .tile:hover .body { transform: none; }
+}
+
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(160px, auto); }
+  .tile[data-size='hero'] { grid-column: auto; grid-row: span 1; min-height: 260px; }
+}
 
 .note {
   margin: var(--gap-22) 0 0;

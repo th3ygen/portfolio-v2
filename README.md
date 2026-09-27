@@ -83,7 +83,7 @@ Four projects, detailed: **CAM Kenderaan**, **CAM Muka**, **Piping Calc Tools**,
 
 ### `s04` — Full index
 
-16-row monospace project index. Dense, tabular, low-contrast — deliberately a lookup table, not cards.
+16-tile bento grid, four columns. The four s03 spotlights take 2×2 tiles; `grid-auto-flow: dense` backfills the singles. At rest each tile is type only; hovering wipes the project's screen up from the bottom edge (clip-path, accent scan line on the leading edge, image settling from 1.12 to 1). Without hover, the screens show dimmed from the start.
 
 ### `s05` — Trajectory (career timeline) — **the signature section**
 

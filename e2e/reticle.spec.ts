@@ -80,7 +80,7 @@ test('the crosshair acquires a lockable target and names it', async ({ page }) =
   // At rest the brackets are not on screen at all.
   expect(await brackets.first().evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
 
-  const row = page.locator('#s04 tbody tr[data-lock]').first();
+  const row = page.locator('#s04 li[data-lock]').first();
   await row.scrollIntoViewIfNeeded();
   const name = await row.getAttribute('data-lock');
   await row.hover();
@@ -104,7 +104,7 @@ test('the crosshair releases the target when the pointer leaves it', async ({ pa
   await page.goto('/');
   await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
 
-  const row = page.locator('#s04 tbody tr[data-lock]').first();
+  const row = page.locator('#s04 li[data-lock]').first();
   await row.scrollIntoViewIfNeeded();
   await row.hover();
   await page.waitForTimeout(400);

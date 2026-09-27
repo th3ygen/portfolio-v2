@@ -1,18 +1,24 @@
 'use client';
 
 import { useRef } from 'react';
-import { INDEX_COLUMNS, INDEX_INTRO, INDEX_NOTE, INDEX_ROWS } from '@/content/index-rows';
+import Image from 'next/image';
+import { INDEX_INTRO, INDEX_NOTE, INDEX_ROWS } from '@/content/index-rows';
 import { SPOTLIGHTS } from '@/content/spotlights';
 import { useSectionReveal } from '@/components/motion/useSectionReveal';
 import styles from './S04Index.module.css';
 
 /** Derived, not hand-flagged, so the two sections cannot drift apart. */
-const SPOTLIT = new Set(SPOTLIGHTS.map((project) => project.name));
+const SPOTLIT = new Map(SPOTLIGHTS.map((project) => [project.name, project]));
 
 /**
- * The full index: 16 rows, dense and low-contrast. Deliberately a lookup
- * table, not cards — so it is built as a real table rather than a grid of
- * divs, which is what makes it navigable.
+ * The full index: 16 tiles in a bento grid. The four projects that also
+ * appear in s03 take 2×2 tiles; `grid-auto-flow: dense` backfills the
+ * singles around them, and 4 × 4 + 12 × 1 cells fills seven rows of four
+ * with no holes.
+ *
+ * At rest a tile is type only. Hovering it wipes the project's screen up
+ * from the bottom edge behind the type — the hero reveal. The screen is
+ * decoration here (s03 carries the described images), so it is alt="".
  */
 export function S04Index() {
   const rootRef = useRef<HTMLElement>(null);
@@ -33,37 +39,49 @@ export function S04Index() {
 
         <p className={styles.intro} data-box-reveal>{INDEX_INTRO}</p>
 
-        <div className={styles.tableWrap} data-reveal>
-          <table className={styles.table}>
-            <caption className="sr-only">
-              Every system shipped, with its sector, key technologies, and access level.
-            </caption>
-            <thead>
-              <tr>
-                {INDEX_COLUMNS.map((column) => (
-                  <th key={column} scope="col">{column}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {INDEX_ROWS.map((row) => (
-                <tr key={row.n} data-lock={row.name}>
-                  <td className={styles.colId}>{row.n}</td>
-                  <th
-                    scope="row"
-                    className={styles.colName}
-                    data-spotlit={SPOTLIT.has(row.name) ? 'true' : 'false'}
-                  >
-                    {row.name}
-                  </th>
-                  <td className={styles.colSector}>{row.sector}</td>
-                  <td className={styles.colTech}>{row.keyTech}</td>
-                  <td className={styles.colAccess}>{row.access}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className={styles.grid} aria-label="Every system shipped">
+          {INDEX_ROWS.map((row) => {
+            const spotlight = SPOTLIT.get(row.name);
+            return (
+              <li
+                key={row.n}
+                className={styles.tile}
+                data-size={spotlight ? 'hero' : 'cell'}
+                data-spotlit={spotlight ? 'true' : 'false'}
+                data-lock={row.name}
+                data-reveal
+              >
+                <div className={styles.reveal} aria-hidden="true">
+                  {row.image ? (
+                    <Image
+                      className={styles.revealImage}
+                      src={row.image}
+                      alt=""
+                      fill
+                      sizes={spotlight ? '(max-width: 700px) 100vw, 700px' : '(max-width: 700px) 100vw, 350px'}
+                    />
+                  ) : (
+                    <div className={styles.revealEmpty}>NO VISUAL ON FILE</div>
+                  )}
+                </div>
+                <div className={styles.scan} aria-hidden="true" />
+
+                <div className={styles.top}>
+                  <span className={styles.id}>{row.n}</span>
+                  {spotlight && <span className={styles.code}>{spotlight.code}</span>}
+                  <span className={styles.access} data-access={row.access}>{row.access}</span>
+                </div>
+
+                <div className={styles.body}>
+                  <span className={styles.sector}>{row.sector}</span>
+                  <h3 className={styles.name}>{row.name}</h3>
+                  {spotlight && <span className={styles.tagline}>{spotlight.tagline}</span>}
+                  <span className={styles.tech}>{row.keyTech}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
 
         <p className={styles.note} data-box-reveal>{INDEX_NOTE}</p>
       </div>

@@ -64,13 +64,15 @@ export type Spotlight = {
   readonly image: string;
 };
 
-/** One row of the 16-row s04 lookup table. */
+/** One tile of the 16-tile s04 bento index. */
 export type IndexRow = {
   readonly n: string;
   readonly name: string;
   readonly sector: string;
   readonly keyTech: string;
   readonly access: 'PRIVATE' | 'PUBLIC';
+  /** The screen revealed on hover. Absent when there is nothing showable. */
+  readonly image?: string;
 };
 
 /** One of the 5 reverse-chronological s05 career posts. */
