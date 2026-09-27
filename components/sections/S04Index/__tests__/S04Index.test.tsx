@@ -1,10 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { act, render, screen, within } from '@testing-library/react';
 import { S04Index } from '../index';
 import { INDEX_ROWS } from '@/content/index-rows';
 import { SPOTLIGHTS } from '@/content/spotlights';
 
 describe('S04Index', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders a labelled list with one tile per record', () => {
     render(<S04Index />);
     const list = screen.getByRole('list', { name: 'Every system shipped' });
@@ -45,6 +49,27 @@ describe('S04Index', () => {
   it('makes every tile a reticle lock target', () => {
     const { container } = render(<S04Index />);
     expect(container.querySelectorAll('li[data-lock]')).toHaveLength(INDEX_ROWS.length);
+  });
+
+  it('keeps the screens lazy until the grid nears the viewport, then loads them', () => {
+    let report: IntersectionObserverCallback = () => {};
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          report = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+
+    const { container } = render(<S04Index />);
+    const loading = () => [...container.querySelectorAll('img')].map((img) => img.getAttribute('loading'));
+    expect(new Set(loading())).toEqual(new Set(['lazy']));
+
+    act(() => report([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+    expect(new Set(loading())).toEqual(new Set(['eager']));
   });
 
   it('renders the section heading', () => {

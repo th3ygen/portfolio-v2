@@ -45,3 +45,21 @@ Object.defineProperty(window, 'scrollTo', {
  */
 HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as unknown as
   HTMLCanvasElement['getContext'];
+
+/**
+ * jsdom does not implement IntersectionObserver. The default never reports an
+ * intersection; tests that need one override it with vi.stubGlobal.
+ */
+if (!window.IntersectionObserver) {
+  class NeverIntersects {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+    takeRecords = vi.fn(() => []);
+  }
+  Object.defineProperty(window, 'IntersectionObserver', {
+    writable: true,
+    configurable: true,
+    value: NeverIntersects,
+  });
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import Image from 'next/image';
 import { INDEX_INTRO, INDEX_NOTE, INDEX_ROWS } from '@/content/index-rows';
 import { SPOTLIGHTS } from '@/content/spotlights';
@@ -22,6 +22,8 @@ const SPOTLIT = new Map(SPOTLIGHTS.map((project) => [project.name, project]));
  */
 export function S04Index() {
   const rootRef = useRef<HTMLElement>(null);
+  const gridRef = useRef<HTMLUListElement>(null);
+  const near = useNear(gridRef);
   useSectionReveal(rootRef, '[data-reveal]');
 
   return (
@@ -39,7 +41,7 @@ export function S04Index() {
 
         <p className={styles.intro} data-box-reveal>{INDEX_INTRO}</p>
 
-        <ul className={styles.grid} aria-label="Every system shipped">
+        <ul ref={gridRef} className={styles.grid} aria-label="Every system shipped">
           {INDEX_ROWS.map((row) => {
             const spotlight = SPOTLIT.get(row.name);
             return (
@@ -58,6 +60,7 @@ export function S04Index() {
                       src={row.image}
                       alt=""
                       fill
+                      loading={near ? 'eager' : 'lazy'}
                       sizes={spotlight ? '(max-width: 700px) 100vw, 700px' : '(max-width: 700px) 100vw, 350px'}
                     />
                   ) : (
@@ -87,4 +90,32 @@ export function S04Index() {
       </div>
     </section>
   );
+}
+
+/**
+ * True once the element is within a viewport of the screen, and stays true.
+ *
+ * Native lazy loading never fires for the reveal screens: they sit under
+ * clip-path: inset(100% 0 0 0), which Chrome treats as not intersecting, so
+ * the fetch only started on hover and the wipe opened onto an empty tile.
+ * Switching them to eager as the grid approaches warms them in time without
+ * putting fifteen screenshots in the first-load queue.
+ */
+function useNear(ref: RefObject<HTMLElement | null>): boolean {
+  const [near, setNear] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || near) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setNear(true);
+      },
+      { rootMargin: '100% 0px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref, near]);
+
+  return near;
 }
