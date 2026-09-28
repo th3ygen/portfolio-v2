@@ -234,7 +234,7 @@
     <div class="group">
       <div class="label">MODE</div>
       <div class="modes" id="modes"></div>
-      <p class="hint">AUTO picks from the data below: night sleeps, low coffee is grumpy, high coffee is hyper. Tap the pet to make it purr; circle the cursor round it three times to make it dizzy.</p>
+      <p class="hint">AUTO picks from the data below: night (22:00–07:00 MYT) starts it asleep, low coffee is grumpy, high coffee is hyper. Tap the pet to make it purr; circle the cursor round it three times to make it dizzy.</p>
     </div>
 
     <div class="group">
@@ -373,6 +373,10 @@ const MOODS = {
   lookup: { eye: 1.12, pupil: 0.85, drop: -1, tailAmp: 0.45, tailSpeed: 2.2, breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
   // Startled: eyes wide, pupils down to pinpricks, ears up, tail going.
   startled: { eye: 1.15, pupil: 0, drop: -2, tailAmp: 0.8, tailSpeed: 7, breathRate: 3, breathAmp: 0.03, jitter: 0.1, happy: 0, dizzy: 0, earsBack: 0 },
+  // Nodding off: eyes to slits, head heavy (the nod itself is in step).
+  drowsy: { eye: 0.3,  pupil: 0.3,  drop: 1.5, tailAmp: 0.1, tailSpeed: 0.8, breathRate: 0.9, breathAmp: 0.045, jitter: 0,   happy: 0, dizzy: 0, earsBack: 0.25 },
+  // Woken by the cursor: eyes wide, head up, a startled blink.
+  waking: { eye: 1.1,  pupil: 0.7,  drop: -0.5, tailAmp: 0.4, tailSpeed: 2, breathRate: 1.4, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
   // Poked a few times: ears going back, eyes narrowing, tail flicking.
   irked:  { eye: 0.7,  pupil: 0.3,  drop: 0.5, tailAmp: 0.5, tailSpeed: 3.5, breathRate: 1.2, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0.6 },
   // Poked too much: ears flat, a grumpy squint, head turned away (see step).
@@ -391,6 +395,18 @@ const VEIN = [
   '........',
   '##....##',
   '.#....#.',
+];
+
+/** A crescent moon, the same way, for the corner of the view at night. */
+const MOON = [
+  '...###..',
+  '.###....',
+  '.##.....',
+  '###.....',
+  '###.....',
+  '.##.....',
+  '.###....',
+  '...###..',
 ];
 
 /** A bold '!', the same way: a cell wide, three tall. */
@@ -499,7 +515,7 @@ const ROUTINES = {
   },
 };
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED' };
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP' };
 
 class Sim {
   constructor() {
@@ -526,7 +542,15 @@ class Sim {
 
     // Where the cat wants to look, -1..1 on each axis.
     this.gaze = { x: 0, y: 0 };
-    this.cursorAt = -10;       // last time the cursor moved
+    this.cursorAt = 0;         // last time the cursor moved
+    // Dozing off with the cursor still: drowsy after `drowsy` seconds, asleep
+    // after `asleep`.
+    this.doze = { on: true, drowsy: 20, asleep: 26 };
+    // Dozed right off: stays asleep, whatever the cursor does, until woken
+    // by a few taps or a startle.
+    this.asleep = false;
+    this.nightAware = true;
+    this.wasNight = false;
     this.nextWander = 0;
     this.wander = { x: 0, y: 0 };
 
@@ -542,12 +566,29 @@ class Sim {
   mood() {
     if (this.transient && this.t < this.transient.until) return this.transient.mood;
     if (this.forced !== 'auto') return this.forced;
+    if (this.doze.on && this.asleep) return 'sleep';
+    if (this.doze.on && this.t - this.cursorAt >= this.dozeTimes().drowsy) return 'drowsy';
     if (this.neutral) return this.neutral;
-    const night = this.data.time === 'night' || (this.data.time === 'live' && mytHour() < 7);
-    if (night) return 'sleep';
     if (this.data.coffee < 20) return 'grumpy';
     if (this.data.coffee > 85) return 'hyper';
     return 'idle';
+  }
+
+  /**
+   * Night, 22:00 to 07:00 in Malaysia (or forced). Only where the pet keeps
+   * the usual hours — ALL, and the DOZE tab; the other lab tabs keep it calm.
+   */
+  isNight() {
+    if (!this.nightAware) return false;
+    if (this.data.time !== 'live') return this.data.time === 'night';
+    const h = mytHour();
+    return h >= 22 || h < 7;
+  }
+
+  /** When it gets drowsy and drops off, in seconds still: much sooner at night. */
+  dozeTimes() {
+    const d = this.doze;
+    return this.isNight() ? { drowsy: Math.round(d.drowsy * 0.3), asleep: Math.round(d.asleep * 0.35) } : d;
   }
 
   /** A mood on top of everything for a while; `then`, another after it. */
@@ -562,6 +603,8 @@ class Sim {
   /** Jump out of its skin: a hop, fur on end, and a '!'. */
   startle() {
     this.startledAt = this.t;
+    this.asleep = false;
+    this.cursorAt = this.t;
     // Jolted awake, it stays up a while before dozing off again.
     this.react('startled', 1.3, { mood: 'idle', seconds: 6 });
     const husky = this.species === 'husky';
@@ -572,7 +615,24 @@ class Sim {
   look(x, y) {
     this.gaze.x = clamp(x, -1, 1);
     this.gaze.y = clamp(y, -1, 1);
+    // Drowsy, a move keeps it awake; asleep, it does not notice.
     this.cursorAt = this.t;
+  }
+
+  /** Woken from a doze: a startled blink, eyes wide, a '?'. */
+  wake() {
+    this.asleep = false;
+    this.cursorAt = this.t;
+    this.react('waking', 1.2);
+    this.blinkAt = this.t;
+    this.slowBlink = false;
+    this.particles.push({ text: '?', x: 66, y: this.species === 'husky' ? 14 : 26, vx: 1, vy: -5, life: 0.9, cls: 'l' });
+  }
+
+  /** A tap that doesn't wake it: an ear twitches, it mumbles. */
+  stir() {
+    if (Math.random() < 0.5) this.twitchL = 1; else this.twitchR = 1;
+    this.particles.push({ text: 'mm..', x: 64, y: this.species === 'husky' ? 18 : 30, vx: 1, vy: -3, life: 1.1, life0: 1.1, cls: 's', typed: 8 });
   }
 
   step(dt) {
@@ -634,6 +694,23 @@ class Sim {
     p.lookX = approach(p.lookX, gx, mood === 'hyper' ? 20 : 9, dt);
     p.lookY = approach(p.lookY, gy, mood === 'hyper' ? 20 : 9, dt);
 
+    // Night falls: it is asleep. (Woken, it stays up until it dozes off again,
+    // which at night is soon.)
+    const night = this.isNight();
+    if (night && !this.wasNight && this.doze.on) this.asleep = true;
+    this.wasNight = night;
+    // Still long enough, it drops right off.
+    if (this.doze.on && !this.asleep && this.t - this.cursorAt >= this.dozeTimes().asleep) this.asleep = true;
+
+    // Drowsy: the head sinks slowly and jerks back up, eyes flickering open
+    // on each jerk — nodding off.
+    if (mood === 'drowsy') {
+      const c = (this.t - this.cursorAt - this.dozeTimes().drowsy) % 2.2;
+      const sink = c < 1.8 ? c / 1.8 : 1 - (c - 1.8) / 0.4;
+      p.drop = 1 + 3.5 * sink * sink;
+      p.eye = c < 1.8 ? 0.32 - 0.22 * sink : 0.6;
+    }
+
     // Idle routines: left alone — calm, nothing else going on, the cursor
     // still for a few seconds — it now and then does something on its own.
     p.mouth = 0;
@@ -685,7 +762,8 @@ class Sim {
       this.particles.push({ text, x, y, vx, vy, life, life0: life, cls, typed });
       this.nextParticle = this.t + gap;
     };
-    if (mood === 'sleep') spawn(Math.random() < 0.5 ? 'z' : 'Z', 66, 26, rand(3, 6), -7, 3, 's', 1.1);
+    if (mood === 'drowsy') spawn('z', 64, 30, rand(2, 4), -5, 1.6, 's', 2.6);
+    else if (mood === 'sleep') spawn(Math.random() < 0.5 ? 'z' : 'Z', 66, 26, rand(3, 6), -7, 3, 's', 1.1);
     else if (mood === 'happy') spawn('<3', rand(30, 70), 22, rand(-4, 4), -12, 1.6, 'a', 0.35);
     else if (mood === 'hyper') spawn(Math.random() < 0.5 ? '!' : '*', rand(28, 72), 20, rand(-10, 10), -14, 0.8, 'l', 0.25);
     else if (mood === 'grumpy') spawn('...', 70, 28, 2, -3, 2, 's', 2.2);
@@ -1692,6 +1770,19 @@ class AsciiView {
       }
     }
 
+    // Night: a moon in the top corner, and two stars that twinkle in turn.
+    if (sim.isNight()) {
+      const view = species.view;
+      const mc = Math.round((ox + (view.x + 3) * u) / CELL_W);
+      const mr = Math.round((oy + (view.y + 3) * u) / CELL_H);
+      stampSprite(MOON, mr, mc, 'l', grid, cls, cols, rows);
+      const twinkle = Math.floor(sim.t * 1.5) % 2;
+      for (const [dc, dr, on] of [[6, 1, twinkle], [3, 5, 1 - twinkle]]) {
+        const i = (mr + dr) * cols + mc + dc;
+        if (mr + dr < rows && mc + dc < cols) { grid[i] = on ? '+' : '.'; cls[i] = on ? 'l' : 's'; }
+      }
+    }
+
     // Sprites last, over text particles: the anger mark, on the forehead.
     for (const q of sim.particles) {
       if (!q.sprite) continue;
@@ -2107,6 +2198,17 @@ const LAB = {
     rest: 'sleep',
     hint: 'The pet is asleep here. Dart the cursor at it, fast, from off to one side: it jumps out of its skin — a hop, fur on end, wide eyes, a "!" — then stays awake a few seconds before dozing off again. Awake, it only watches; moving at normal speed, or fast but not at it, does nothing.',
   },
+  doze: {
+    label: 'DOZE',
+    hint: 'Keep the cursor still: it gets drowsy — eyes to slits, head nodding — then falls asleep. Drowsy, moving the cursor keeps it awake; asleep, it takes three taps (one only makes it stir) or a dart at it (a startle) to wake it. Here that takes 5 and 10 seconds; normally 20 and 26. At night (set TIME to FORCE NIGHT to try it) it starts asleep, a moon is up, and once woken it drops off again far sooner.',
+    readout: () => {
+      const still = sim.t - sim.cursorAt;
+      const taps = wakeTaps.filter((t) => performance.now() - t < WAKE.windowMs).length;
+      return sim.asleep
+        ? `asleep   wake taps ${taps} / ${WAKE.taps} (within ${WAKE.windowMs / 1000}s), or dart at it\nstate ${MOOD_LABEL[sim.mood()]}`
+        : `cursor still for ${still.toFixed(1)}s   (drowsy at ${sim.dozeTimes().drowsy}s, asleep at ${sim.dozeTimes().asleep}s${sim.isNight() ? ', night' : ''})\nstate ${MOOD_LABEL[sim.mood()]}`;
+    },
+  },
   idle: {
     label: 'IDLE',
     hint: 'Leave it alone — keep the cursor still — and every few seconds it does something on its own: yawns, stretches, grooms, sneezes; the husky sometimes howls. Here it goes every 3 to 5 seconds instead of 8 to 14; the buttons play one now.',
@@ -2140,6 +2242,13 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.routines = { on: on('idle'), gap: key === 'idle' ? [3, 5] : [8, 14] };
     sim.action = null;
     sim.nextRoutine = sim.t + rand(...sim.routines.gap);
+    // Dozing is on in ALL and DOZE; DOZE nods off much sooner. The click on
+    // the tab counts as the cursor moving.
+    sim.doze = key === 'doze' ? { on: true, drowsy: 5, asleep: 10 } : { on: on('doze'), drowsy: 20, asleep: 26 };
+    sim.cursorAt = sim.t;
+    sim.asleep = false;
+    sim.nightAware = on('doze');
+    sim.wasNight = false;
   });
   $('labTabs').append(b);
 }
@@ -2174,10 +2283,20 @@ window.addEventListener('mousemove', (e) => {
 // every tap keeps it annoyed a while longer, up to a limit.
 const POKE = { irked: 4, annoyed: 6, windowMs: 2500, annoyedFor: 4, extend: 1.5, maxLeft: 6 };
 let pokes = [];
+// Taps on a dozing pet that has dropped off: a few in quick succession wake
+// it; fewer, and it only stirs.
+const WAKE = { taps: 3, windowMs: 2000 };
+let wakeTaps = [];
 for (const v of views) {
   v.pre.addEventListener('pointerdown', (e) => {
     if (!e.isPrimary || e.button !== 0) return;
     const now = performance.now();
+    if (sim.doze.on && sim.asleep) {
+      wakeTaps = wakeTaps.filter((t) => now - t < WAKE.windowMs);
+      wakeTaps.push(now);
+      if (wakeTaps.length >= WAKE.taps) { wakeTaps = []; sim.wake(); } else sim.stir();
+      return;
+    }
     if (on('poke')) {
       pokes = pokes.filter((t) => now - t < POKE.windowMs);
       pokes.push(now);
@@ -2217,7 +2336,7 @@ let moves = [];
 let startleInfo = { speed: 0, aim: 0, r: 0 };
 let lastStartle = -10;
 window.addEventListener('pointermove', (e) => {
-  if (!e.isPrimary || !on('startle')) return;
+  if (!e.isPrimary || !(on('startle') || on('doze'))) return;
   const now = performance.now();
   moves.push({ t: now, x: e.clientX, y: e.clientY });
   moves = moves.filter((m) => now - m.t <= STARTLE.sampleMs);
