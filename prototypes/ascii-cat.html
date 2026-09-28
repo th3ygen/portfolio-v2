@@ -309,6 +309,7 @@
       <div class="caption">INTERACTION LAB — each tab runs one interaction alone, on a calm pet</div>
       <div class="tabs" id="labTabs" role="tablist" aria-label="Interaction"></div>
       <p class="labhint" id="labHint"></p>
+      <div class="modes" id="labControls"></div>
       <pre class="labout" id="labOut"></pre>
     </div>
 
@@ -395,6 +396,109 @@ const VEIN = [
 /** A bold '!', the same way: a cell wide, three tall. */
 const BANG = ['##', '##', '##', '##', '..', '##'];
 
+/**
+ * Idle routines: short things the pet does on its own when left alone. Each
+ * runs for `dur` seconds and, every frame, bends the pose toward its shape by
+ * `apply(k, p, act)`, k going 0 to 1 — after the mood and gaze have had their
+ * say, so a routine plays over whatever the pet was doing and hands back
+ * smoothly. Values that carry over between frames (drop, eye, gaze) are
+ * blended toward a target, never added to — added to, they pile up frame on
+ * frame. `utter(act, key, particle)` drops a particle once per routine.
+ */
+const lerp = (a, b, t) => a + (b - a) * t;
+/** 0 to 1 by `a`, 1 until `b`, back to 0 by the end — eased at both ends. */
+const env = (k, a, b) => {
+  const x = k < a ? k / a : k > b ? (1 - k) / (1 - b) : 1;
+  return x * x * (3 - 2 * x);
+};
+const utter = (act, key, particle) => {
+  if (act.said.has(key)) return;
+  act.said.add(key);
+  act.sim.particles.push({ vx: 0, vy: -3, life: 1.4, cls: 's', ...particle, life0: particle.life ?? 1.4 });
+};
+const ROUTINES = {
+  // Head tips back, eyes squeeze shut, mouth opens wide, and back.
+  yawn: {
+    dur: 2.4,
+    apply(k, p) {
+      const w = env(k, 0.25, 0.75);
+      p.eye = lerp(p.eye, 0, env(k, 0.2, 0.82));
+      p.mouth = env(k, 0.35, 0.7);
+      p.lookY = lerp(p.lookY, -0.8, w);
+      p.drop = lerp(p.drop, -1.5, w);
+      p.earsBack = lerp(p.earsBack, 0.6, w);
+    },
+  },
+  // Up tall on its toes, eyes shut, then settles back down.
+  stretch: {
+    dur: 2.6,
+    apply(k, p) {
+      const w = env(k, 0.35, 0.65);
+      p.stretch = 1 + 0.07 * w;
+      p.eye = lerp(p.eye, 0, env(k, 0.25, 0.75));
+      p.mouth = 0.3 * w;
+      p.lookY = lerp(p.lookY, -0.5, w);
+      p.earsBack = lerp(p.earsBack, 0.45, w);
+    },
+  },
+  // Head dips to one side, eyes shut, and a lick or two.
+  groom: {
+    dur: 3.2,
+    apply(k, p, act) {
+      const w = env(k, 0.2, 0.8);
+      p.lookX = lerp(p.lookX, act.side * 0.8, w);
+      p.lookY = lerp(p.lookY, 0.9, w);
+      p.drop = lerp(p.drop, 2.5, w);
+      p.eye = lerp(p.eye, 0, w);
+      p.earsBack = lerp(p.earsBack, 0.25, w);
+      // Two licks, each a tongue flicking out of a slightly open mouth and back.
+      const lick = (a, b) => (k > a && k < b ? Math.sin((Math.PI * (k - a)) / (b - a)) : 0);
+      p.tongue = Math.max(lick(0.3, 0.46), lick(0.58, 0.74));
+      p.mouth = p.tongue * 0.35;
+      const at = { x: 50 + act.side * 18, y: act.husky ? 50 : 58 };
+      if (k > 0.3) utter(act, 'lick1', { text: 'lick', ...at, typed: 10 });
+      if (k > 0.58) utter(act, 'lick2', { text: 'lick', x: at.x, y: at.y + 4, typed: 10 });
+    },
+  },
+  // Ah... ah... CHOO: squint and head up, then a snap forward and a hop.
+  sneeze: {
+    dur: 1.8,
+    apply(k, p, act) {
+      if (k < 0.55) {
+        const w = env(k / 0.55, 0.9, 1);
+        p.eye = lerp(p.eye, 0.35, w);
+        p.lookY = lerp(p.lookY, -0.7, w);
+        p.drop = lerp(p.drop, -1.2, w);
+        p.mouth = 0.3 * w;
+        utter(act, 'ah', { text: 'ah..', x: 66, y: act.husky ? 22 : 32, typed: 5, life: 1 });
+      } else {
+        const w = env((k - 0.55) / 0.45, 0.08, 0.3);
+        p.eye = lerp(p.eye, 0, w);
+        p.drop = lerp(p.drop, 3, w);
+        p.mouth = 0.55 * w;
+        p.bodyY -= 1.5 * env((k - 0.55) / 0.45, 0.1, 0.25);
+        utter(act, 'choo', { text: 'CHOO!', x: 74, y: act.husky ? 40 : 50, vx: 6, vy: -2, cls: 'l', typed: 30, life: 0.9 });
+        utter(act, 'spray', { text: '* .', x: 50, y: act.husky ? 58 : 62, vx: 3, vy: 4, life: 0.6 });
+      }
+    },
+  },
+  // Husky only: nose to the sky, eyes shut, mouth an 'o' — AWOOOO.
+  howl: {
+    dur: 3.4,
+    husky: true,
+    apply(k, p, act) {
+      const w = env(k, 0.2, 0.85);
+      p.lookY = lerp(p.lookY, -1, w);
+      p.lookX = lerp(p.lookX, 0, w);
+      p.drop = lerp(p.drop, -4, w);
+      p.eye = lerp(p.eye, 0, w);
+      p.mouth = env(k, 0.28, 0.82) * (0.6 + 0.08 * Math.sin(act.sim.t * 18));
+      p.earsBack = lerp(p.earsBack, 0.25, w);
+      if (k > 0.28) utter(act, 'awoo', { text: 'AWOOOO~', x: 70, y: 2, vx: 2, vy: -1.5, cls: 'l', typed: 5, life: 2.2 });
+    },
+  },
+};
+
 const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED' };
 
 class Sim {
@@ -406,8 +510,12 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0 };
     this.startledAt = -10;
+    // The routine playing, if any, and when the next may start.
+    this.action = null;
+    this.nextRoutine = rand(8, 14);
+    this.routines = { on: true, gap: [8, 14] };
 
     this.nextBlink = rand(1.5, 4);
     this.blinkAt = -10;
@@ -444,6 +552,12 @@ class Sim {
 
   /** A mood on top of everything for a while; `then`, another after it. */
   react(mood, seconds, then = null) { this.transient = { mood, until: this.t + seconds, then }; }
+
+  /** Start an idle routine by name. */
+  perform(name) {
+    const husky = this.species === 'husky';
+    this.action = { name, t0: this.t, said: new Set(), side: Math.random() < 0.5 ? -1 : 1, husky, sim: this };
+  }
 
   /** Jump out of its skin: a hop, fur on end, and a '!'. */
   startle() {
@@ -519,6 +633,25 @@ class Sim {
     if (mood === 'annoyed') { gx = this.gaze.x > 0 ? -0.95 : 0.95; gy = -0.45; }
     p.lookX = approach(p.lookX, gx, mood === 'hyper' ? 20 : 9, dt);
     p.lookY = approach(p.lookY, gy, mood === 'hyper' ? 20 : 9, dt);
+
+    // Idle routines: left alone — calm, nothing else going on, the cursor
+    // still for a few seconds — it now and then does something on its own.
+    p.mouth = 0;
+    p.tongue = 0;
+    p.stretch = 1;
+    if (!this.action && this.routines.on && mood === 'idle' && !this.transient && this.t - this.cursorAt > 3 && this.t > this.nextRoutine) {
+      const names = Object.keys(ROUTINES).filter((n) => !ROUTINES[n].husky || this.species === 'husky');
+      this.perform(names[Math.floor(Math.random() * names.length)]);
+    }
+    if (this.action) {
+      const r = ROUTINES[this.action.name];
+      const k = (this.t - this.action.t0) / r.dur;
+      // Anything else happening — a tap, a mood — cuts the routine short.
+      if (k >= 1 || (this.transient && this.t < this.transient.until)) {
+        this.action = null;
+        this.nextRoutine = this.t + rand(...this.routines.gap);
+      } else r.apply(k, p, this.action);
+    }
 
     this.emit(mood);
     for (const q of this.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; }
@@ -954,6 +1087,18 @@ function drawCat(pen, p) {
     // ── Nose, mouth, whiskers: straight lines.
     pen.stroke([[-2.5, 6], [0, 8.5], [2.5, 6]]);
     pen.stroke([[-4.5, 10.5], [-2, 12], [0, 9.5], [2, 12], [4.5, 10.5]]);
+    // Open (yawning, sneezing): a dark mouth under the nose, as wide and deep
+    // as the pose says.
+    if (p.mouth > 0.12) {
+      const m = p.mouth;
+      pen.blob([[-2.5 - 1.5 * m, 10], [2.5 + 1.5 * m, 10], [1.5 + m, 11 + 4 * m], [-1.5 - m, 11 + 4 * m]]);
+    }
+    // The tongue, out for a lick: bright, from the mouth down, squared off
+    // with a point — no curves.
+    if (p.tongue > 0.1) {
+      const L = 5 * p.tongue;
+      pen.blob([[-1.8, 11], [1.8, 11], [1.8, 11 + L], [0, 12 + L], [-1.8, 11 + L]], 'shine');
+    }
     for (const side of [-1, 1]) {
       pen.stroke([[side * 9, 7], [side * 27, 4 + s * 1.5]]);
       pen.stroke([[side * 9, 9.5], [side * 27, 11 + s * 1.5]]);
@@ -1151,8 +1296,17 @@ function drawHusky(pen, p) {
     for (const side of [-1, 1]) {
       pen.stroke([[0, 16], [side * 3.5, 17.2], [side * 7, 16.5], [side * 10, 14.2]], false, { dark: true });
     }
-    if (p.happy > 0.5) {
+    if (p.mouth > 0.12) {
+      // Open (yawning, howling, sneezing), as wide and deep as the pose says.
+      const m = p.mouth;
+      pen.blob([[-3 - 2 * m, 16.5], [3 + 2 * m, 16.5], [2 + 1.5 * m, 17.5 + 4 * m], [-2 - 1.5 * m, 17.5 + 4 * m]]);
+    } else if (p.happy > 0.5) {
       pen.blob([[-4.5, 17], [4.5, 17], [3, 19.5], [-3, 19.5]]);
+    }
+    // The tongue, out for a lick (only then — the resting face has none).
+    if (p.tongue > 0.1) {
+      const L = 6 * p.tongue;
+      pen.blob([[-2.4, 17.5], [2.4, 17.5], [2.4, 17.5 + L], [0, 18.8 + L], [-2.4, 17.5 + L]], 'shine');
     }
   }, { x: hx, y: hy, rot: tilt });
 }
@@ -1330,7 +1484,7 @@ class AsciiView {
       // The whole pet: puffed up from its feet, and lifted by a hop.
       const k = 1 + 0.07 * sim.pose.puff;
       c.translate(50, 97 + sim.pose.bodyY);
-      c.scale(k, k);
+      c.scale(k, k * sim.pose.stretch);
       c.translate(-50, -97);
       // Hard edges: anti-aliased shape edges would smear the bands.
       c.imageSmoothingEnabled = false;
@@ -1750,6 +1904,10 @@ for (const tab of document.querySelectorAll('[data-species]')) {
   tab.addEventListener('click', () => {
     opts.species = tab.dataset.species;
     sim.species = opts.species;
+    // A routine for the other pet stops; the buttons follow the pet (only the
+    // husky howls).
+    sim.action = null;
+    showLabControls();
     // A purr left floating from the other pet would be the wrong sound.
     sim.particles = [];
     for (const other of document.querySelectorAll('[data-species]')) {
@@ -1949,6 +2107,13 @@ const LAB = {
     rest: 'sleep',
     hint: 'The pet is asleep here. Dart the cursor at it, fast, from off to one side: it jumps out of its skin — a hop, fur on end, wide eyes, a "!" — then stays awake a few seconds before dozing off again. Awake, it only watches; moving at normal speed, or fast but not at it, does nothing.',
   },
+  idle: {
+    label: 'IDLE',
+    hint: 'Leave it alone — keep the cursor still — and every few seconds it does something on its own: yawns, stretches, grooms, sneezes; the husky sometimes howls. Here it goes every 3 to 5 seconds instead of 8 to 14; the buttons play one now.',
+    controls: () => Object.keys(ROUTINES)
+      .filter((n) => !ROUTINES[n].husky || sim.species === 'husky')
+      .map((n) => [n.toUpperCase(), () => { sim.action = null; sim.transient = null; sim.perform(n); }]),
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -1970,10 +2135,27 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.neutral = key === 'all' ? null : entry.rest ?? 'idle';
     sim.transient = null;
     entry.reset?.();
+    showLabControls();
+    // Routines are on in ALL and IDLE; IDLE runs them much more often.
+    sim.routines = { on: on('idle'), gap: key === 'idle' ? [3, 5] : [8, 14] };
+    sim.action = null;
+    sim.nextRoutine = sim.t + rand(...sim.routines.gap);
   });
   $('labTabs').append(b);
 }
 $('labHint').textContent = LAB[lab].hint;
+
+/** Buttons for the current lab tab, if it has any. */
+function showLabControls() {
+  $('labControls').replaceChildren(
+    ...(LAB[lab].controls?.() ?? []).map(([label, fn]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.addEventListener('click', fn);
+      return b;
+    }),
+  );
+}
 
 // Gaze follows the cursor, measured from the enlarged view's centre.
 window.addEventListener('mousemove', (e) => {
