@@ -370,6 +370,8 @@ const MOODS = {
   petted: { eye: 0,    pupil: 0.4,  drop: 1.5, tailAmp: 0.25, tailSpeed: 1.1, breathRate: 1.0, breathAmp: 0.045, jitter: 0,   happy: 0, dizzy: 0, earsBack: 0.35 },
   // Just after: wide eyes, big pupils, head up — "why did you stop?"
   lookup: { eye: 1.12, pupil: 0.85, drop: -1, tailAmp: 0.45, tailSpeed: 2.2, breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
+  // Startled: eyes wide, pupils down to pinpricks, ears up, tail going.
+  startled: { eye: 1.15, pupil: 0, drop: -2, tailAmp: 0.8, tailSpeed: 7, breathRate: 3, breathAmp: 0.03, jitter: 0.1, happy: 0, dizzy: 0, earsBack: 0 },
   // Poked a few times: ears going back, eyes narrowing, tail flicking.
   irked:  { eye: 0.7,  pupil: 0.3,  drop: 0.5, tailAmp: 0.5, tailSpeed: 3.5, breathRate: 1.2, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0.6 },
   // Poked too much: ears flat, a grumpy squint, head turned away (see step).
@@ -390,7 +392,10 @@ const VEIN = [
   '.#....#.',
 ];
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED' };
+/** A bold '!', the same way: a cell wide, three tall. */
+const BANG = ['##', '##', '##', '##', '..', '##'];
+
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED' };
 
 class Sim {
   constructor() {
@@ -399,7 +404,10 @@ class Sim {
     this.transient = null;     // { mood, until } — a click reaction on top of everything
     this.data = { coffee: 45, time: 'live' };
 
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0 };
+    // bodyY and puff move the whole pet: a hop (design units, up is negative)
+    // and fur standing on end (0..1, scaled up from the feet).
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0 };
+    this.startledAt = -10;
 
     this.nextBlink = rand(1.5, 4);
     this.blinkAt = -10;
@@ -426,7 +434,7 @@ class Sim {
   mood() {
     if (this.transient && this.t < this.transient.until) return this.transient.mood;
     if (this.forced !== 'auto') return this.forced;
-    if (this.neutral) return 'idle';
+    if (this.neutral) return this.neutral;
     const night = this.data.time === 'night' || (this.data.time === 'live' && mytHour() < 7);
     if (night) return 'sleep';
     if (this.data.coffee < 20) return 'grumpy';
@@ -434,7 +442,17 @@ class Sim {
     return 'idle';
   }
 
-  react(mood, seconds) { this.transient = { mood, until: this.t + seconds }; }
+  /** A mood on top of everything for a while; `then`, another after it. */
+  react(mood, seconds, then = null) { this.transient = { mood, until: this.t + seconds, then }; }
+
+  /** Jump out of its skin: a hop, fur on end, and a '!'. */
+  startle() {
+    this.startledAt = this.t;
+    // Jolted awake, it stays up a while before dozing off again.
+    this.react('startled', 1.3, { mood: 'idle', seconds: 6 });
+    const husky = this.species === 'husky';
+    this.particles.push({ sprite: BANG, x: 73, y: husky ? 6 : 18, vx: 3, vy: -8, life: 0.8, cls: 'a' });
+  }
 
   /** The cursor, relative to the centre of a view, in units of that view's half-size. */
   look(x, y) {
@@ -445,6 +463,8 @@ class Sim {
 
   step(dt) {
     this.t += dt;
+    const tr = this.transient;
+    if (tr && this.t >= tr.until && tr.then) this.react(tr.then.mood, tr.then.seconds);
     const mood = this.mood();
     const target = MOODS[mood];
     const p = this.pose;
@@ -457,6 +477,12 @@ class Sim {
     p.wobble = p.dizzy * Math.sin(this.t * 7) * 0.22;
     p.jx = p.jitter * rand(-1.3, 1.3);
     p.jy = p.jitter * rand(-0.8, 0.8);
+
+    // The startle: straight up and down in 0.35s, a little bounce on landing,
+    // and the fur settling over a second or so.
+    const st = this.t - this.startledAt;
+    p.bodyY = st < 0.35 ? -4.5 * Math.sin((Math.PI * st) / 0.35) : st < 0.55 ? -1.2 * Math.sin((Math.PI * (st - 0.35)) / 0.2) : 0;
+    p.puff = st < 1.4 ? Math.exp(-st * 2.4) : 0;
 
     // Blinking; now and then a slow blink — the cat's "I trust you".
     if (this.t > this.nextBlink) {
@@ -516,7 +542,7 @@ class Sim {
       this.nextSound = this.t + 2.6;
     }
     // Annoyed: an anger mark on the head, for as long as it lasts.
-    if (mood === 'annoyed' && !this.particles.some((q) => q.sprite)) {
+    if (mood === 'annoyed' && !this.particles.some((q) => q.sprite === VEIN)) {
       const husky = this.species === 'husky';
       this.particles.push({ sprite: VEIN, x: husky ? 58 : 58, y: husky ? 23 : 34, vx: 0, vy: 0, life: 0.5, cls: 'a', throb: true });
     }
@@ -1301,6 +1327,11 @@ class AsciiView {
       c.fillStyle = '#000';
       c.fillRect(0, 0, W, H);
       c.setTransform(u, 0, 0, u, ox, oy);
+      // The whole pet: puffed up from its feet, and lifted by a hop.
+      const k = 1 + 0.07 * sim.pose.puff;
+      c.translate(50, 97 + sim.pose.bodyY);
+      c.scale(k, k);
+      c.translate(-50, -97);
       // Hard edges: anti-aliased shape edges would smear the bands.
       c.imageSmoothingEnabled = false;
     }
@@ -1913,6 +1944,11 @@ const LAB = {
     label: 'POKE',
     hint: 'Tap the pet over and over. The first few taps it purrs; tap on quickly and it gets irked; six taps in a couple of seconds and it is annoyed — ears flat, head turned away from you, swearing. Poke it while it is annoyed and it stays annoyed longer.',
   },
+  startle: {
+    label: 'STARTLE',
+    rest: 'sleep',
+    hint: 'The pet is asleep here. Dart the cursor at it, fast, from off to one side: it jumps out of its skin — a hop, fur on end, wide eyes, a "!" — then stays awake a few seconds before dozing off again. Awake, it only watches; moving at normal speed, or fast but not at it, does nothing.',
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -1930,7 +1966,8 @@ for (const [key, entry] of Object.entries(LAB)) {
     lab = key;
     for (const other of $('labTabs').children) other.setAttribute('aria-pressed', String(other === b));
     $('labHint').textContent = entry.hint;
-    sim.neutral = key !== 'all';
+    // The mood the pet rests in: calm, or whatever the interaction needs.
+    sim.neutral = key === 'all' ? null : entry.rest ?? 'idle';
     sim.transient = null;
     entry.reset?.();
   });
@@ -1985,6 +2022,55 @@ LAB.poke.readout = () => {
   return `taps ${n}   (irked at ${POKE.irked}, annoyed at ${POKE.annoyed}, within ${POKE.windowMs / 1000}s)\nstate ${MOOD_LABEL[sim.mood()]}${left}`;
 };
 LAB.poke.reset = () => { pokes = []; };
+
+/*
+ * Startle: the cursor darting at the pet. Speed is taken over the last few
+ * moves, in screen pixels a second, so a flick reads the same at either
+ * size; it has to be aimed at the pet's middle and start near it — a fast
+ * move that passes by, or one across the other side of the screen, is not
+ * aimed at the pet.
+ */
+const STARTLE = { speed: 6000, aim: 0.82, near: 2.2, cooldown: 2.5, sampleMs: 70 };
+let moves = [];
+let startleInfo = { speed: 0, aim: 0, r: 0 };
+let lastStartle = -10;
+window.addEventListener('pointermove', (e) => {
+  if (!e.isPrimary || !on('startle')) return;
+  const now = performance.now();
+  moves.push({ t: now, x: e.clientX, y: e.clientY });
+  moves = moves.filter((m) => now - m.t <= STARTLE.sampleMs);
+  if (moves.length < 2) return;
+  const a = moves[0];
+  const dt = Math.max(8, now - a.t) / 1000;
+  const vx = (e.clientX - a.x) / dt;
+  const vy = (e.clientY - a.y) / dt;
+  const speed = Math.hypot(vx, vy);
+  for (const v of views) {
+    const box = v.pre.getBoundingClientRect();
+    const half = Math.max(box.width, box.height) / 2;
+    const tx = box.left + box.width / 2 - e.clientX;
+    const ty = box.top + box.height / 2 - e.clientY;
+    const r = Math.hypot(tx, ty) / half;
+    const aim = speed ? (vx * tx + vy * ty) / (speed * Math.hypot(tx, ty) || 1) : 0;
+    if (v === big) startleInfo = { speed, aim, r };
+    // Only a sleeping pet startles: awake, it sees the cursor coming.
+    if (sim.mood() !== 'sleep') continue;
+    if (speed > STARTLE.speed && aim > STARTLE.aim && r < STARTLE.near && sim.t - lastStartle > STARTLE.cooldown) {
+      lastStartle = sim.t;
+      sim.startle();
+      break;
+    }
+  }
+});
+LAB.startle.readout = () => {
+  const { speed, aim, r } = startleInfo;
+  const cool = Math.max(0, STARTLE.cooldown - (sim.t - lastStartle));
+  return [
+    `ENLARGED   speed ${Math.round(speed)} px/s (needs ${STARTLE.speed})   aim ${aim.toFixed(2)} (needs ${STARTLE.aim})   distance ${r.toFixed(2)} (within ${STARTLE.near})`,
+    `state      ${MOOD_LABEL[sim.mood()]}${sim.mood() === 'sleep' ? '' : '   (startles only when asleep)'}${cool ? `   cooldown ${cool.toFixed(1)}s` : ''}`,
+  ].join('\n');
+};
+LAB.startle.reset = () => { moves = []; lastStartle = -10; };
 
 /*
  * Circle the pointer round a pet three times: dizzy. The pointer's angle
