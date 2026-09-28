@@ -669,6 +669,22 @@ const ROUTINES = {
       if (k > 0.28) utter(act, 'awoo', { text: 'AWOOOO~', x: 70, y: 2, vx: 2, vy: -1.5, cls: 'l', typed: 5, life: 2.2 });
     },
   },
+  // Dizziness wearing off: a quick shake, head to toe, fur fluffed — brrr.
+  // Only then (`manual`), never on its own.
+  shakeoff: {
+    dur: 1,
+    manual: true,
+    apply(k, p, act) {
+      const w = env(k, 0.1, 0.75);
+      const shake = Math.sin(k * 2 * Math.PI * 5);
+      p.wobble = shake * 0.35 * w;
+      p.jx = shake * 1.4 * w;
+      p.puff = Math.max(p.puff, 0.45 * w);
+      p.eye = lerp(p.eye, 0.15, w);
+      p.earsBack = lerp(p.earsBack, 0.5, w);
+      utter(act, 'brr', { text: act.husky ? 'brrrrr' : 'brrr', x: 66, y: act.husky ? 12 : 24, vx: 3, vy: -3, typed: 14, life: 1.1, cls: 's' });
+    },
+  },
   // Fed coffee: head down over the mug, eyes shut, three glugs — and then
   // it is off the walls. Only when fed (`manual`), never on its own.
   drink: {
@@ -740,6 +756,8 @@ class Sim {
     this.wasNight = false;
     this.nextWander = 0;
     this.wander = { x: 0, y: 0 };
+    // Last frame's mood, to see the dizziness end.
+    this.lastMood = 'idle';
 
     this.particles = [];
     this.nextParticle = 0;
@@ -939,6 +957,13 @@ class Sim {
         if (k >= 1) r.end?.(this);
       } else r.apply(k, p, this.action);
     }
+
+    // Dizziness over: it shakes it off (not if it went straight to sleep).
+    if (this.lastMood === 'dizzy' && mood !== 'dizzy' && mood !== 'sleep') {
+      this.transient = null;
+      this.perform('shakeoff');
+    }
+    this.lastMood = mood;
 
     this.emit(mood);
     for (const q of this.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; }
@@ -2552,7 +2577,7 @@ $('reduced').addEventListener('change', (e) => { opts.reduced = e.target.checked
 const LAB = {
   all: { label: 'ALL', hint: 'Everything on at once, over the usual moods.' },
   tap: { label: 'TAP', hint: 'Tap or click the pet: it purrs.' },
-  dizzy: { label: 'DIZZY', hint: 'Circle the cursor round a pet three times, the same way, within 8 seconds: it gets dizzy.' },
+  dizzy: { label: 'DIZZY', hint: 'Circle the cursor round a pet three times, the same way, within 8 seconds: it gets dizzy. When it comes round, it shakes it off — brrr.' },
   poke: {
     label: 'POKE',
     hint: 'Tap the pet over and over. The first few taps it purrs; tap on quickly and it gets irked; six taps in a couple of seconds and it is annoyed — ears flat, head turned away from you, swearing. Poke it while it is annoyed and it stays annoyed longer.',
