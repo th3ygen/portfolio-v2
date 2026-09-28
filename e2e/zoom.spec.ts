@@ -83,3 +83,25 @@ test('UPTIME is gone before SINCE arrives', async ({ page }) => {
   await scrub(page, 0.2);
   expect((await both()).since).toBeGreaterThan(0.9);
 });
+
+test('the zoom goes through the dot and lands on the dark ground', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-boot]')).toHaveCount(0, { timeout: 15_000 });
+
+  const hole = page.locator('[data-zoom-hole]');
+  const dotR = Number(await page.locator('[data-zoom-dot]').getAttribute('r'));
+
+  await scrub(page, 0.3);
+  expect(Number(await hole.getAttribute('r'))).toBe(0);
+
+  await scrub(page, 0.98);
+  expect(Number(await hole.getAttribute('r'))).toBeCloseTo(dotR, 1);
+  // Nothing on the stage is painting the accent over the whole frame.
+  const flood = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-zoom-stage] *')].some((el) => {
+      const cs = getComputedStyle(el);
+      return cs.position === 'absolute' && cs.inset === '0px' && cs.backgroundColor === 'rgb(198, 242, 26)';
+    }),
+  );
+  expect(flood).toBe(false);
+});

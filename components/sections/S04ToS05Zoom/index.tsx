@@ -9,7 +9,17 @@ import { zoomScale } from '@/lib/zoom/camera';
 import { handAngles, rewindLabel } from '@/lib/zoom/clock';
 import { BrutalistClock } from './BrutalistClock';
 import { ZoomWords, TRAIL_OFFSETS, TRAIL_OPACITY } from './ZoomWords';
+import { DOT_R } from '@/components/odometer/YearOdometer';
 import styles from './S04ToS05Zoom.module.css';
+
+/**
+ * When the dot opens into a ring, and when the opening reaches the dot's full
+ * radius. By the start the dot is a couple of hundred pixels across on a
+ * desktop frame — big enough to read as something you could go through. By
+ * the end the ring's green band has swept out past the corners.
+ */
+const OPEN_FROM = 0.55;
+const OPEN_TO = 0.9;
 
 /** The year the trajectory rewinds to — POST.01. */
 const END_YEAR = 2020;
@@ -44,7 +54,6 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
         setYear(END_YEAR);
         gsap.set('[data-zw="0"]', { autoAlpha: 0 });
         gsap.set('[data-zw="1"]', { autoAlpha: 1, y: 0 });
-        gsap.set(`.${styles.flood}`, { opacity: 1 });
         gsap.set('[data-clock]', { opacity: 0 });
         return;
       }
@@ -169,11 +178,23 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
           0.1,
         );
 
-      // Chrome clears out early; the flood snaps green as the dot fills the frame.
+      // Chrome clears out early.
       timeline
         .to(`.${styles.meta}`, { opacity: 0, duration: 0.1 }, 0)
-        .to(`.${styles.grid}`, { opacity: 0, duration: 0.3 }, 0)
-        .fromTo(`.${styles.flood}`, { opacity: 0 }, { opacity: 1, duration: 0.05 }, 0.96);
+        .to(`.${styles.grid}`, { opacity: 0, duration: 0.3 }, 0);
+
+      // The camera goes through the dot, not into it. This used to end on a
+      // full-screen accent flood, which the section after it inherited as its
+      // ground — a whole screen of #c6f21a on an otherwise dark page. The dot
+      // opens instead: its green becomes a ring, the ring's band sweeps out
+      // past the frame, and what is left is the inside of the dot, which is
+      // the page background.
+      timeline.fromTo(
+        '[data-zoom-hole]',
+        { attr: { r: 0 } },
+        { attr: { r: DOT_R }, duration: OPEN_TO - OPEN_FROM },
+        OPEN_FROM,
+      );
     },
     { scope: rootRef, revertOnUpdate: true },
   );
@@ -196,7 +217,6 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
         </g>
       </svg>
 
-      <div className={styles.flood} aria-hidden="true" />
       <div className={styles.meta}>
         <span>{TRAJECTORY_LABEL}</span>
         <span className={styles.metaRule} aria-hidden="true" />

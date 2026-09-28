@@ -87,7 +87,7 @@ Four projects, detailed: **CAM Kenderaan**, **CAM Muka**, **Piping Calc Tools**,
 
 ### `s05` — Trajectory (career timeline) — **the signature section**
 
-Inverted: background `#c6f21a`, text dark. Five posts, **reverse chronological**, each `min-height: 60vh`, grid `minmax(150px,210px) 24px minmax(0,1fr)`, vertically centred.
+Dark ground, continuous with the end of the zoom (which lands inside the dot on `--color-bg`). Five posts, **reverse chronological**, each `min-height: 60vh`, vertically centred. The year is a single **sticky odometer** in a left column (`minmax(150px,210px)`) — the same `20•20` counter the zoom rewinds, picked up at mid-screen and rolled forward as each post crosses the middle of the viewport; each post keeps its own year and tag in its head for screen readers. The accent marks the year, the post being read (filled rail node, role at full weight) and the two posts still running (`ACTIVE`, with a pulsing dot). Below 700px the year becomes a bar stuck under the masthead.
 
 | # | Year | Organisation |
 |---|------|--------------|
@@ -97,11 +97,11 @@ Inverted: background `#c6f21a`, text dark. Five posts, **reverse chronological**
 | POST.04 | 2023 | SATOK BRIDGE DIGITAL |
 | POST.05 | 2025 | ARKI FINANCE · SINGAPORE · FULL-TIME |
 
-Each post carries a giant ghost year numeral behind it: Archivo Black, `clamp(150px, 21vw, 300px)`, line-height `.7`, `-.05em`, `rgba(7,8,9,.06)`, positioned `right: 1%`, vertically centred. Org labels are `.16em` tracking at `rgba(7,8,9,.62)`. Diagonal hatch greebles at `rgba(7,8,9,.5)`.
+Each post carries a giant ghost year numeral behind it: Archivo Black, `clamp(150px, 21vw, 300px)`, line-height `.78`, `-.05em`, outlined in `--color-surface3`, positioned `right: 1%`, vertically centred. Org labels are `.16em` tracking in `--color-textDim`. An earlier version put this section on a full `#c6f21a` ground, inherited from a flood at the end of the zoom; it was too much green for a dark page.
 
 ### `s06` — Uplink (contact)
 
-Returns to the dark background. Fades back from green on exit from `s05`.
+Dark background, like `s05` before it.
 
 ## Interactions & Behavior
 
@@ -169,7 +169,7 @@ Implemented as an odometer: each digit has a current and next glyph in a clipped
 
 Hands spin **counter-clockwise** (matching the backwards year), driven by a linear `.88`-duration tween from `p = 0.10`: second `-p*2160°`, minute `-p*360°`, hour `-p*90°`. **The clock keeps spinning through the entire zoom and never fades out.** Its label counts down: `REWIND 06Y` → `REWIND 00Y`, using `min(p/.34, 1)` so the countdown finishes with the year roll while the hands continue.
 
-**Flood.** A `#c6f21a` overlay brings the section to full green as the dot fills the viewport. `s06` fades back to dark on exit.
+**Through the dot.** There is no flood. From 55% of the pin the dot opens: a background-coloured disc inside it widens to the dot's full radius by 90%, so the green becomes a ring whose band sweeps out past the frame, and the zoom lands on the dark ground inside the dot. An earlier version ended on a full-screen `#c6f21a` flood that `s05` inherited as its background — too much green for a dark page.
 
 ### Ambient
 
@@ -205,8 +205,6 @@ Two tweakable props on the root component, both booleans defaulting to `true`, g
 | **Accent** | **`#c6f21a`** | Acid green — the single accent |
 | Aberration warm | `#ff8a3d` / `rgba(255,138,61,.5)` | Hero text-shadow only |
 | Aberration cool | `rgba(26,120,242,.35)` | Hero text-shadow only |
-
-On the green `s05` background, dark values are expressed as alpha over green: `rgba(7,8,9,.62)` for labels, `rgba(7,8,9,.45)` for year text, `rgba(7,8,9,.5)` for hatch greebles, `rgba(7,8,9,.06)` for ghost numerals.
 
 ### Typography
 

@@ -28,15 +28,6 @@
   overflow: visible;
 }
 
-.flood {
-  position: absolute;
-  inset: 0;
-  background: var(--color-accent);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 2;
-}
-
 .meta {
   position: absolute;
   bottom: 52px;

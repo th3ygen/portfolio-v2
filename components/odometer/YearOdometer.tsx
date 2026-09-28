@@ -10,6 +10,7 @@ import {
   digitsOf,
   nextDigitState,
   type DigitState,
+  type OdometerMode,
 } from '@/lib/zoom/odometer';
 
 const DIGIT_STYLE: React.CSSProperties = {
@@ -19,6 +20,13 @@ const DIGIT_STYLE: React.CSSProperties = {
   letterSpacing: 2,
   fill: 'var(--color-accent)',
 };
+
+/**
+ * The dot's radius, in the odometer's own units. The camera flies into this
+ * point, and the opening in it is widened to this same radius by the end of
+ * the pin, so the frame lands on nothing but the page background.
+ */
+export const DOT_R = 9;
 
 /** Only the last two digits roll; the century prefix is static. */
 const ROLLING_X = [8, 48] as const;
@@ -35,7 +43,21 @@ const idle = (value: number): DigitState => ({ value, rolling: false, from: valu
  * The whole thing carries one aria-label with the plain year; the individual
  * glyph windows are hidden, or a screen reader reads eight loose digits.
  */
-export function YearOdometer({ year }: { year: number }) {
+export function YearOdometer({
+  year,
+  mode = 'scrub',
+  opening = false,
+}: {
+  year: number;
+  /** How the year arrives — see `OdometerMode`. */
+  mode?: OdometerMode;
+  /**
+   * Draw the opening in the dot that the s04 → s05 camera flies through.
+   * Only the zoom wants it; anywhere else it would be a second element
+   * answering to `[data-zoom-hole]`.
+   */
+  opening?: boolean;
+}) {
   const uid = useId().replace(/:/g, '');
   const groupRefs = useRef<(SVGGElement | null)[]>([]);
   const [states, setStates] = useState<readonly DigitState[]>(() =>
@@ -54,7 +76,7 @@ export function YearOdometer({ year }: { year: number }) {
     const targets = digitsOf(year).slice(2);
     setSeenYear(year);
     setStates((current) =>
-      current.map((state, index) => nextDigitState(state, targets[index] ?? state.value)),
+      current.map((state, index) => nextDigitState(state, targets[index] ?? state.value, mode)),
     );
   }
 
@@ -88,7 +110,15 @@ export function YearOdometer({ year }: { year: number }) {
       <text x={-8} y={0} textAnchor="end" dominantBaseline="middle" style={DIGIT_STYLE} aria-hidden="true">
         20
       </text>
-      <circle data-zoom-dot cx={0} cy={0} r={9} fill="var(--color-accent)" />
+      <circle data-zoom-dot cx={0} cy={0} r={DOT_R} fill="var(--color-accent)" />
+      {/*
+        The opening the camera passes through. Filled with the page background,
+        not left transparent, so what is behind it — the clock, the grid — is
+        swallowed as it widens, and the last frame matches the dark ground the
+        next section starts on. Radius 0 at rest: until the zoom opens it, the
+        dot reads as the solid decimal point in the year.
+      */}
+      {opening ? <circle data-zoom-hole cx={0} cy={0} r={0} fill="var(--color-bg)" /> : null}
 
       {states.map((state, index) => (
         <g key={ROLLING_X[index]} clipPath={`url(#${uid}-roll-${index})`} aria-hidden="true">

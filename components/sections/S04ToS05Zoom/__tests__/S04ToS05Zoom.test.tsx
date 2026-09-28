@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { YearOdometer } from '../YearOdometer';
+import { YearOdometer } from '@/components/odometer/YearOdometer';
 import { BrutalistClock } from '../BrutalistClock';
 import { S04ToS05Zoom } from '../index';
 import { CLONE_OFFSETS } from '../ZoomWords';
@@ -35,9 +35,32 @@ describe('YearOdometer', () => {
     expect(screen.getByRole('img', { name: '2020' })).toBeInTheDocument();
   });
 
-  it('renders the expanding dot that becomes the flood', () => {
+  it('renders the dot the camera flies into', () => {
     const { container } = render(svg(<YearOdometer year={2026} />));
     expect(container.querySelector('[data-zoom-dot]')).toBeInTheDocument();
+  });
+
+  it('keeps the opening in the dot shut at rest, so it reads as a decimal point', () => {
+    const { container } = render(svg(<YearOdometer year={2026} opening />));
+    const hole = container.querySelector('[data-zoom-hole]');
+    expect(hole).toHaveAttribute('r', '0');
+    // Centred on the dot, or the camera flies past the opening instead of
+    // through it.
+    expect(hole).toHaveAttribute('cx', '0');
+    expect(hole).toHaveAttribute('cy', '0');
+    expect(hole).toHaveAttribute('fill', 'var(--color-bg)');
+  });
+
+  it('leaves the opening out unless asked, so only the zoom has one', () => {
+    const { container } = render(svg(<YearOdometer year={2026} />));
+    expect(container.querySelector('[data-zoom-hole]')).toBeNull();
+  });
+
+  it('stacks the opening above the dot', () => {
+    const { container } = render(svg(<YearOdometer year={2026} opening />));
+    const dot = container.querySelector('[data-zoom-dot]')!;
+    const hole = container.querySelector('[data-zoom-hole]')!;
+    expect(dot.compareDocumentPosition(hole) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -64,7 +87,7 @@ describe('BrutalistClock', () => {
 });
 
 describe('S04ToS05Zoom', () => {
-  it('renders the stage, clock, words, and flood', () => {
+  it('renders the stage, clock, and words', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
     expect(container.querySelector('[data-zoom-stage]')).toBeInTheDocument();
     expect(container.querySelector('[data-clock]')).toBeInTheDocument();

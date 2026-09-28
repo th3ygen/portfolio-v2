@@ -10,7 +10,7 @@ type Status = 'idle' | 'sending' | 'sent' | 'failed' | 'invalid';
 type FieldErrors = Partial<Record<'name' | 'email' | 'message', string>>;
 
 /**
- * The uplink. Returns to the dark ground after s05's green.
+ * The uplink.
  *
  * Validated client-side with the same schema the route handler uses, so the
  * form never posts something the server would reject for a different reason.

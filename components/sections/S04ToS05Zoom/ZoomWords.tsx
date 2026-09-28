@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import { YearOdometer } from './YearOdometer';
+import { YearOdometer } from '@/components/odometer/YearOdometer';
 
 const WORD_STYLE: React.CSSProperties = {
   fontFamily: 'var(--font-display), Impact, sans-serif',
@@ -115,7 +115,7 @@ export function ZoomWords({ year }: { year: number }) {
           >
             SINCE
           </text>
-          <YearOdometer year={year} />
+          <YearOdometer year={year} opening />
         </g>
       </g>
     </>

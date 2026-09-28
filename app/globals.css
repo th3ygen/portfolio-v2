@@ -58,12 +58,6 @@
   --aberration-warm: rgba(255, 138, 61, 0.5);
   --aberration-cool: rgba(26, 120, 242, 0.35);
 
-  /* Dark values expressed as alpha over the s05 green background */
-  --on-accent-label: rgba(7, 8, 9, 0.62);
-  --on-accent-year: rgba(7, 8, 9, 0.45);
-  --on-accent-hatch: rgba(7, 8, 9, 0.5);
-  --on-accent-ghost: rgba(7, 8, 9, 0.06);
-
   /* Rhythm */
   --gap-64: 64px;
   --gap-40: 40px;
@@ -110,7 +104,12 @@ body {
   background: var(--color-bg);
   color: var(--color-textPrimary);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* clip, not hidden. `hidden` on body makes body a scroll container of its
+     own — one that never scrolls — and position: sticky anywhere on the page
+     then sticks to it instead of to the viewport, which is to say never. The
+     s05 year is sticky. clip cuts the overflow the same way without making a
+     scroll container. */
+  overflow-x: clip;
   /* The right-side ProgressTrack is the scroll affordance. */
   scrollbar-width: none;
   -ms-overflow-style: none;

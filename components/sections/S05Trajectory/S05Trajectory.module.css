@@ -1,15 +1,16 @@
 /*
- * The signature section, inverted: accent background, dark text.
+ * The trajectory, on the dark ground.
  *
- * Every dark value here is alpha over green, never the opaque text tokens —
- * those were mixed against #070809 and read wrong on this ground.
+ * It used to be the one inverted section: accent background, dark text, every
+ * dark value re-mixed as alpha over green. It now continues straight out of
+ * the zoom, which lands inside the dot on --color-bg — so there is no border
+ * on top, and no change of ground where the pin lets go.
  */
 
 .section {
   position: relative;
   margin-left: 52px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-accent);
+  background: var(--color-bg);
 }
 
 .inner {
@@ -21,14 +22,79 @@
   padding: 110px var(--pad-section-x-tight) var(--pad-section-x-tight);
 }
 
+.track {
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+}
+
+/*
+ * The sticky year.
+ *
+ * The column runs the full height of the posts; the block inside it sticks at
+ * mid-screen, which is the same line the posts are read against, so the year
+ * is always level with the post it names.
+ *
+ * The column is padded top and bottom by half a post less half the block, so
+ * the block starts level with the middle of the first post and stops level
+ * with the middle of the last, rather than riding above the one and below the
+ * other before and after it sticks.
+ */
+.yearCol {
+  --sticky-half: 60px;
+  position: relative;
+  padding: calc(30vh - var(--sticky-half)) 28px calc(30vh - var(--sticky-half)) 0;
+}
+
+.sticky {
+  position: sticky;
+  top: calc(50vh - var(--sticky-half));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--gap-10);
+}
+
+.year {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  height: auto;
+  overflow: hidden;
+}
+
+.stickyMeta {
+  display: flex;
+  gap: var(--gap-10);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: var(--color-textDim);
+  /* Stepped, not faded: the line is a readout changing state. steps(2) is
+     CSS's copy of EASE.snap. */
+  animation: meta-in 0.24s steps(2) both;
+}
+
+.stickyPost { color: var(--color-textMuted); }
+
+@keyframes meta-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.posts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .post {
   position: relative;
   min-height: 60vh;
   display: grid;
-  grid-template-columns: minmax(150px, 210px) 24px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
 }
 
+/* Greebles, re-inked for the dark ground at the same weights as s02's. */
 .ghost {
   position: absolute;
   top: 50%;
@@ -41,7 +107,7 @@
   line-height: 0.78;
   letter-spacing: -0.05em;
   color: transparent;
-  -webkit-text-stroke: 1px rgba(7, 8, 9, 0.13);
+  -webkit-text-stroke: 1px var(--color-surface3);
   user-select: none;
 }
 
@@ -53,11 +119,11 @@
   height: 120px;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.5;
+  opacity: 0.42;
   background: repeating-linear-gradient(
     135deg,
-    var(--on-accent-hatch) 0px,
-    var(--on-accent-hatch) 4px,
+    var(--color-borderDim1) 0px,
+    var(--color-borderDim1) 4px,
     transparent 4px,
     transparent 11px
   );
@@ -71,8 +137,8 @@
   height: 120px;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.35;
-  background-image: radial-gradient(rgba(7, 8, 9, 0.6) 1px, transparent 1px);
+  opacity: 0.5;
+  background-image: radial-gradient(var(--color-borderDim1) 1px, transparent 1px);
   background-size: 12px 12px;
 }
 
@@ -88,30 +154,8 @@
   width: 86px;
 }
 
-.bar { height: 3px; background: rgba(7, 8, 9, 0.18); }
-.barStrong { height: 3px; background: rgba(7, 8, 9, 0.4); }
-
-.yearCol {
-  position: relative;
-  z-index: 1;
-  padding-right: 28px;
-  text-align: right;
-}
-
-.year {
-  font-family: var(--font-display), Impact, sans-serif;
-  font-size: clamp(46px, 5.6vw, 88px);
-  line-height: 0.84;
-  letter-spacing: -0.035em;
-  color: var(--on-accent-year);
-}
-
-.tag {
-  margin-top: var(--gap-10);
-  font-size: var(--fs-micro);
-  letter-spacing: var(--track-org);
-  color: rgba(7, 8, 9, 0.55);
-}
+.bar { height: 3px; background: var(--color-borderDim1); }
+.barStrong { height: 3px; background: var(--color-textGhost); }
 
 .rail {
   position: relative;
@@ -120,16 +164,7 @@
   justify-content: center;
 }
 
-.railLine { width: 1px; height: 100%; background: rgba(7, 8, 9, 0.16); }
-
-.railProgress {
-  position: absolute;
-  top: 0;
-  width: 1px;
-  height: 100%;
-  background: linear-gradient(180deg, var(--color-bg), rgba(7, 8, 9, 0));
-  transform-origin: 0 0;
-}
+.railLine { width: 1px; height: 100%; background: var(--color-border); }
 
 .railDot {
   position: absolute;
@@ -139,39 +174,43 @@
   height: 11px;
   /* Exception to border-radius: 0 — a timeline node, like the status dots. */
   border-radius: 50%;
-  background: transparent;
-  border: 1px solid var(--on-accent-year);
+  background: var(--color-bg);
+  border: 1px solid var(--color-textGhost);
+  transition: background-color 0.24s steps(2), border-color 0.24s steps(2);
 }
 
 .body { position: relative; z-index: 1; padding-left: 36px; }
 
 .postHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--gap-10);
   margin-bottom: var(--gap-16);
   font-size: var(--fs-micro);
   letter-spacing: var(--track-label);
-  color: rgba(7, 8, 9, 0.5);
+  color: var(--color-textDim);
 }
 
-.postNumber { color: var(--color-bg); font-weight: 700; }
-.postRule { width: 34px; height: 1px; background: rgba(7, 8, 9, 0.25); }
+.postNumber { color: var(--color-textPrimary); font-weight: 700; }
+.postYear { color: var(--color-textMuted); }
+.postRule { width: 34px; height: 1px; background: var(--color-textGhost); }
 
 .role {
   font-family: var(--font-display), Impact, sans-serif;
   font-size: clamp(21px, 2.5vw, 36px);
   line-height: 1.06;
   letter-spacing: -0.02em;
-  color: var(--color-bg);
+  color: var(--color-textMuted);
   margin-bottom: 11px;
   text-wrap: balance;
+  transition: color 0.24s steps(2);
 }
 
 .org {
   font-size: var(--fs-body-sm);
   letter-spacing: var(--track-org);
-  color: var(--on-accent-label);
+  color: var(--color-textDim);
   margin-bottom: 20px;
 }
 
@@ -180,19 +219,80 @@
   max-width: 60ch;
   font-size: 14px;
   line-height: 1.8;
-  color: rgba(7, 8, 9, 0.78);
+  color: var(--color-textMuted);
   text-wrap: pretty;
 }
 
-@media (max-width: 900px) {
-  .post { grid-template-columns: minmax(110px, 150px) 20px minmax(0, 1fr); }
-  .body { padding-left: 22px; }
-  .yearCol { padding-right: 18px; }
+/* The post being read: its node fills and its role comes up to full weight. */
+.post[data-active='true'] .railDot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
+.post[data-active='true'] .role { color: var(--color-textPrimary); }
+
+/*
+ * Still running. The status carries the accent and a pulsing dot — the same
+ * live signal the masthead uses — because these two are the only posts on the
+ * page that are not history.
+ */
+.post[data-status='ACTIVE'] .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-accent);
+}
+
+.post[data-status='ACTIVE'] .status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  /* Exception to border-radius: 0 — a status dot. */
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: live 1.1s steps(2) infinite;
+}
+
+@keyframes live {
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stickyMeta,
+  .post[data-status='ACTIVE'] .status::before { animation: none; }
+  .railDot,
+  .role { transition: none; }
+}
+
+@media (max-width: 900px) {
+  .track { grid-template-columns: minmax(110px, 150px) minmax(0, 1fr); }
+  .yearCol { padding-right: 18px; }
+  .body { padding-left: 22px; }
+}
+
+/*
+ * Too narrow for a column beside the posts. The year becomes a bar that sticks
+ * under the masthead instead, above the posts it indexes.
+ */
 @media (max-width: 700px) {
   .section { margin-left: 0; }
   .inner { padding: 70px var(--gap-22) var(--gap-22); }
+  .track { grid-template-columns: minmax(0, 1fr); }
+  .yearCol {
+    position: sticky;
+    top: 38px;
+    z-index: 2;
+    padding: var(--gap-10) 0;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .sticky {
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--gap-16);
+  }
+  .year { width: 104px; }
   .post { min-height: auto; padding: var(--gap-40) 0; }
   .hatch, .dots, .bars { display: none; }
 }

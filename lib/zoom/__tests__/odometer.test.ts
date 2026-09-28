@@ -69,3 +69,23 @@ describe('roll constants', () => {
     expect(ROLL_DURATION_S).toBeGreaterThan(0);
   });
 });
+
+describe('nextDigitState, discrete', () => {
+  // The s05 sticky year changes once per post, in jumps like 2020 -> 2022.
+  // Nothing is scrubbing it, so there are no intermediates to drop.
+
+  it('rolls a jump of more than one step', () => {
+    expect(nextDigitState(idle(0), 2, 'discrete')).toEqual({ value: 2, rolling: true, from: 0 });
+  });
+
+  it('rolls again after an earlier roll, rather than landing instantly', () => {
+    const rolled: DigitState = { value: 2, rolling: true, from: 0 };
+    expect(nextDigitState(rolled, 3, 'discrete')).toEqual({ value: 3, rolling: true, from: 2 });
+  });
+
+  it('settles a digit that did not change, so it does not roll a second time', () => {
+    const rolled: DigitState = { value: 2, rolling: true, from: 0 };
+    expect(nextDigitState(rolled, 2, 'discrete')).toEqual(idle(2));
+  });
+});
+
