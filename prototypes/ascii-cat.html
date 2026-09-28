@@ -172,6 +172,12 @@
   .tabs { grid-column: 1 / -1; display: flex; gap: 6px; }
   .tabs button { min-width: 110px; text-align: center; }
 
+  .lab { grid-column: 1 / -1; display: grid; gap: 10px; border: 1px solid var(--border); padding: 14px 16px; background: var(--bg-alt); }
+  .lab .caption { margin: 0; }
+  .lab .tabs button { min-width: 90px; }
+  .labhint { color: var(--text); line-height: 1.6; max-width: 80ch; }
+  .labout { color: var(--muted); font: inherit; line-height: 1.6; min-height: 4.8em; white-space: pre-wrap; }
+
   pre.ascii {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     /* Greyscale smoothing. Sub-pixel (ClearType) anti-aliasing fringes each
@@ -299,6 +305,13 @@
       <button role="tab" data-species="husky" aria-pressed="false">HUSKY</button>
     </div>
 
+    <div class="lab">
+      <div class="caption">INTERACTION LAB — each tab runs one interaction alone, on a calm pet</div>
+      <div class="tabs" id="labTabs" role="tablist" aria-label="Interaction"></div>
+      <p class="labhint" id="labHint"></p>
+      <pre class="labout" id="labOut"></pre>
+    </div>
+
     <section>
       <div class="caption">AT DASHBOARD SIZE</div>
       <div class="widget">
@@ -353,9 +366,13 @@ const MOODS = {
   hyper:  { eye: 1.1,  pupil: 1,    drop: -2, tailAmp: 0.6,  tailSpeed: 6,   breathRate: 3.2, breathAmp: 0.03,  jitter: 1,    happy: 0, dizzy: 0, earsBack: 0 },
   happy:  { eye: 1,    pupil: 0.5,  drop: 0,  tailAmp: 0.5,  tailSpeed: 2.6, breathRate: 1.6, breathAmp: 0.035, jitter: 0.12, happy: 1, dizzy: 0, earsBack: 0 },
   dizzy:  { eye: 1,    pupil: 0.5,  drop: 1,  tailAmp: 0.2,  tailSpeed: 1,   breathRate: 1.2, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 1, earsBack: 0.5 },
+  // Being stroked: eyes shut, head sunk into the hand, ears eased back.
+  petted: { eye: 0,    pupil: 0.4,  drop: 1.5, tailAmp: 0.25, tailSpeed: 1.1, breathRate: 1.0, breathAmp: 0.045, jitter: 0,   happy: 0, dizzy: 0, earsBack: 0.35 },
+  // Just after: wide eyes, big pupils, head up — "why did you stop?"
+  lookup: { eye: 1.12, pupil: 0.85, drop: -1, tailAmp: 0.45, tailSpeed: 2.2, breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
 };
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY' };
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS' };
 
 class Sim {
   constructor() {
@@ -381,12 +398,17 @@ class Sim {
 
     this.particles = [];
     this.nextParticle = 0;
+    this.nextThump = 0;
+    this.nextSound = 0;
+    // Which pet is showing; some sounds differ.
+    this.species = 'cat';
   }
 
   /** The mood that should be showing now. */
   mood() {
     if (this.transient && this.t < this.transient.until) return this.transient.mood;
     if (this.forced !== 'auto') return this.forced;
+    if (this.neutral) return 'idle';
     const night = this.data.time === 'night' || (this.data.time === 'live' && mytHour() < 7);
     if (night) return 'sleep';
     if (this.data.coffee < 20) return 'grumpy';
@@ -460,15 +482,32 @@ class Sim {
 
   /** Particles live in the cat's own design space; each view maps them to cells. */
   emit(mood) {
+    // The husky's tail thumps the floor while it is petted, on its own beat.
+    if (mood === 'petted' && this.species === 'husky' && this.t >= this.nextThump) {
+      this.particles.push({ text: 'thmp', x: 74, y: 93, vx: 0, vy: -2, life: 0.45, cls: 's' });
+      this.nextThump = this.t + rand(0.8, 1.2);
+    }
+    // Petted, the sound it makes, on its own slower beat: the cat purrs, the
+    // husky grumbles — the rumbly, contented "talk" huskies do — typed out a
+    // letter at a time beside the head.
+    if (mood === 'petted' && this.t >= this.nextSound) {
+      const husky = this.species === 'husky';
+      const text = husky ? (Math.random() < 0.5 ? 'mrrrh~' : 'mmrrr~') : Math.random() < 0.5 ? 'prrr' : 'prrrr';
+      this.particles.push({ text, x: husky ? 77 : 66, y: husky ? 20 : 34, vx: 1.5, vy: -3, life: 2.4, life0: 2.4, cls: 's', typed: 7 });
+      this.nextSound = this.t + 2.6;
+    }
     if (this.t < this.nextParticle) return;
-    const spawn = (text, x, y, vx, vy, life, cls, gap) => {
-      this.particles.push({ text, x, y, vx, vy, life, cls });
+    const spawn = (text, x, y, vx, vy, life, cls, gap, typed = 0) => {
+      // `typed`: characters a second, when the text types itself out.
+      this.particles.push({ text, x, y, vx, vy, life, life0: life, cls, typed });
       this.nextParticle = this.t + gap;
     };
     if (mood === 'sleep') spawn(Math.random() < 0.5 ? 'z' : 'Z', 66, 26, rand(3, 6), -7, 3, 's', 1.1);
     else if (mood === 'happy') spawn('<3', rand(30, 70), 22, rand(-4, 4), -12, 1.6, 'a', 0.35);
     else if (mood === 'hyper') spawn(Math.random() < 0.5 ? '!' : '*', rand(28, 72), 20, rand(-10, 10), -14, 0.8, 'l', 0.25);
     else if (mood === 'grumpy') spawn('...', 70, 28, 2, -3, 2, 's', 2.2);
+    // Petted: '~' contentment rising off the head.
+    else if (mood === 'petted') spawn('~', rand(40, 62), 24, rand(-3, 3), -6, 1.4, 's', 0.45);
     else if (mood === 'dizzy') {
       const a = this.t * 5;
       spawn('*', 50 + Math.cos(a) * 26, 18 + Math.sin(a) * 6, 0, 0, 0.18, 'a', 0.06);
@@ -1426,7 +1465,8 @@ class AsciiView {
       const c = Math.round((ox + q.x * u) / CELL_W);
       const r = Math.round((oy + q.y * u) / CELL_H);
       if (r < 0 || r >= rows) continue;
-      for (let j = 0; j < q.text.length; j++) {
+      const shown = q.typed ? Math.min(q.text.length, Math.floor((q.life0 - q.life) * q.typed) + 1) : q.text.length;
+      for (let j = 0; j < shown; j++) {
         const cc = c + j;
         if (cc < 0 || cc >= cols) continue;
         grid[r * cols + cc] = q.text[j];
@@ -1620,6 +1660,9 @@ const views = [small, big];
 for (const tab of document.querySelectorAll('[data-species]')) {
   tab.addEventListener('click', () => {
     opts.species = tab.dataset.species;
+    sim.species = opts.species;
+    // A purr left floating from the other pet would be the wrong sound.
+    sim.particles = [];
     for (const other of document.querySelectorAll('[data-species]')) {
       other.setAttribute('aria-pressed', String(other === tab));
     }
@@ -1798,6 +1841,41 @@ $('color').addEventListener('change', (e) => { opts.color = e.target.checked; })
 $('debug').addEventListener('change', (e) => { $('debugWrap').classList.toggle('on', e.target.checked); });
 $('reduced').addEventListener('change', (e) => { opts.reduced = e.target.checked; });
 
+/*
+ * The interaction lab. Each tab turns on one interaction alone and keeps the
+ * pet calm underneath (no night, no coffee moods), so what happens is that
+ * interaction and nothing else; ALL runs everything together. Each
+ * interaction can print a live readout of what its detector sees.
+ */
+const LAB = {
+  all: { label: 'ALL', hint: 'Everything on at once, over the usual moods.' },
+  tap: { label: 'TAP', hint: 'Tap or click the pet: it purrs.' },
+  dizzy: { label: 'DIZZY', hint: 'Circle the cursor round a pet three times, the same way, within 8 seconds: it gets dizzy.' },
+  stroke: {
+    label: 'STROKE',
+    hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
+  },
+};
+let lab = 'all';
+const on = (key) => lab === 'all' || lab === key;
+for (const [key, entry] of Object.entries(LAB)) {
+  const b = document.createElement('button');
+  b.textContent = entry.label;
+  b.dataset.lab = key;
+  b.setAttribute('role', 'tab');
+  b.setAttribute('aria-pressed', String(key === lab));
+  b.addEventListener('click', () => {
+    lab = key;
+    for (const other of $('labTabs').children) other.setAttribute('aria-pressed', String(other === b));
+    $('labHint').textContent = entry.hint;
+    sim.neutral = key !== 'all';
+    sim.transient = null;
+    entry.reset?.();
+  });
+  $('labTabs').append(b);
+}
+$('labHint').textContent = LAB[lab].hint;
+
 // Gaze follows the cursor, measured from the enlarged view's centre.
 window.addEventListener('mousemove', (e) => {
   const box = $('big').getBoundingClientRect();
@@ -1811,7 +1889,7 @@ window.addEventListener('mousemove', (e) => {
 // browser drops a click whose press target was removed.
 for (const v of views) {
   v.pre.addEventListener('pointerdown', (e) => {
-    if (!e.isPrimary || e.button !== 0) return;
+    if (!e.isPrimary || e.button !== 0 || !on('tap')) return;
     sim.react('happy', 2.2);
   });
 }
@@ -1831,7 +1909,7 @@ for (const v of views) {
 const CIRCLE = { laps: 3, windowMs: 8000, inner: 0.1, outer: 2.2, maxStep: 2.4 };
 const circles = new Map(views.map((v) => [v, { angle: null, turns: [] }]));
 window.addEventListener('pointermove', (e) => {
-  if (!e.isPrimary) return;
+  if (!e.isPrimary || !on('dizzy')) return;
   const now = performance.now();
   for (const v of views) {
     const c = circles.get(v);
@@ -1859,6 +1937,86 @@ window.addEventListener('pointermove', (e) => {
     }
   }
 });
+
+LAB.dizzy.readout = () => views
+  .map((v) => {
+    const net = circles.get(v).turns.reduce((sum, [, d]) => sum + d, 0) / (2 * Math.PI);
+    return `${v.key === 'big' ? 'ENLARGED ' : 'DASHBOARD'}  laps ${net >= 0 ? '+' : ''}${net.toFixed(2)} / ${CIRCLE.laps}`;
+  })
+  .join('\n');
+LAB.dizzy.reset = () => { for (const c of circles.values()) c.turns = []; };
+
+/*
+ * Stroke the head: slow left-right passes over it, pointer up. A pass counts
+ * as a stroke when it turns back after covering enough of the head, and was
+ * slow and mostly sideways — so circling (dizzy) or cutting across the pet
+ * does not pet it. A few strokes in quick succession start the petting, and
+ * each stroke after keeps it going; when they stop, it looks up.
+ *
+ * The head is a box in the upper-middle of each view, as fractions of it.
+ */
+const STROKE = {
+  zone: { x0: 0.18, x1: 0.82, y0: 0.08, y1: 0.6 },
+  minLength: 0.08,   // of the view's width
+  maxSpeed: 1.6,     // view widths a second
+  maxSteep: 0.6,     // vertical over horizontal travel
+  needed: 3,         // strokes...
+  windowMs: 2500,    // ...within this
+  hold: 1.6,         // seconds each stroke keeps the petting going
+};
+const strokeState = () => ({ dir: 0, from: 0, far: 0, t0: 0, sx: 0, sy: 0, last: null, strokes: [], why: '' });
+const strokes = new Map(views.map((v) => [v, strokeState()]));
+let petting = false;
+window.addEventListener('pointermove', (e) => {
+  if (!e.isPrimary || !on('stroke') || e.buttons) return;
+  const now = performance.now();
+  for (const v of views) {
+    const st = strokes.get(v);
+    const box = v.pre.getBoundingClientRect();
+    const fx = (e.clientX - box.left) / box.width;
+    const fy = (e.clientY - box.top) / box.height;
+    const z = STROKE.zone;
+    st.inZone = fx >= z.x0 && fx <= z.x1 && fy >= z.y0 && fy <= z.y1;
+    if (!st.inZone) { Object.assign(st, { dir: 0, last: null }); continue; }
+    const x = e.clientX;
+    const y = e.clientY;
+    if (st.last) {
+      const dx = x - st.last.x;
+      st.sx += Math.abs(dx);
+      st.sy += Math.abs(y - st.last.y);
+      const sign = Math.sign(dx);
+      if (sign && !st.dir) Object.assign(st, { dir: sign, from: st.last.x, far: x, t0: now });
+      else if (sign === st.dir) st.far = x;
+      else if (sign && Math.abs(x - st.far) > 3) {
+        // Turned back: judge the pass that just ended.
+        const length = Math.abs(st.far - st.from) / box.width;
+        const speed = length / Math.max(0.05, (now - st.t0) / 1000);
+        const steep = st.sy / Math.max(1, st.sx);
+        st.why = length < STROKE.minLength ? 'too short' : speed > STROKE.maxSpeed ? 'too fast' : steep > STROKE.maxSteep ? 'too up-and-down' : '';
+        if (!st.why) {
+          st.strokes.push(now);
+          st.strokes = st.strokes.filter((t) => now - t < STROKE.windowMs);
+          if (petting || st.strokes.length >= STROKE.needed) {
+            petting = true;
+            sim.react('petted', STROKE.hold);
+          }
+        }
+        Object.assign(st, { dir: sign, from: st.far, far: x, t0: now, sx: 0, sy: 0 });
+      }
+    }
+    st.last = { x, y };
+  }
+});
+LAB.stroke.readout = () => {
+  const lines = views.map((v) => {
+    const st = strokes.get(v);
+    const n = st.strokes.filter((t) => performance.now() - t < STROKE.windowMs).length;
+    return `${v.key === 'big' ? 'ENLARGED ' : 'DASHBOARD'}  ${st.inZone ? 'on the head' : 'off the head'}   strokes ${n} / ${STROKE.needed}${st.why ? `   last pass: ${st.why}` : ''}`;
+  });
+  lines.push(`state      ${petting ? 'PETTING' : sim.mood() === 'lookup' ? 'LOOKING UP' : '—'}`);
+  return lines.join('\n');
+};
+LAB.stroke.reset = () => { for (const v of views) strokes.set(v, strokeState()); petting = false; };
 
 // The loop: the pose updates every frame; the ASCII prints at the chosen fps.
 // Paused while the tab is hidden.
@@ -1889,6 +2047,12 @@ function tick(now) {
         d.getContext('2d').drawImage(src, 0, 0);
       }
     }
+    // Petting ends when the strokes stop; then it looks up at you.
+    if (petting && sim.mood() !== 'petted') {
+      petting = false;
+      sim.react('lookup', 1.4);
+    }
+    $('labOut').textContent = LAB[lab].readout?.() ?? '';
     const mood = sim.mood();
     $('mood').textContent = MOOD_LABEL[mood];
     $('lvl').textContent = `LVL ${String(level(Number($('xp').value))).padStart(2, '0')} · ${$('xp').value} XP`;
