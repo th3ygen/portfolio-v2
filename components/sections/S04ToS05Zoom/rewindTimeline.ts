@@ -1,7 +1,7 @@
 import { gsap } from '@/components/motion/gsap';
 import { EASE } from '@/components/motion/tokens';
 import { depthAt, scaleAt } from '@/lib/zoom/camera';
-import { REWIND_SWEEP, SPIN_UP, rewindLabel, zeroHour } from '@/lib/zoom/clock';
+import { REWIND_SWEEP, rewindLabel, zeroHour } from '@/lib/zoom/clock';
 import { FACE_R, MARK_DOT_R, RIM_R, RING_R, YEAR_STEP_DEG, markAngle } from './RewindWorld';
 
 /** Where the clock leaves the camera once assembled: the whole dial, a touch closer. */
@@ -12,16 +12,26 @@ const DEPTH_REWOUND = depthAt(2.4);
 /** The summary building in as the page arrives on it. */
 const INTRO_S = 1;
 
-/** The summary's data flying into the clock. */
-const ASSEMBLE_S = 1.9;
+/** How long each of the summary's pieces takes to fly into the clock. */
+const BAR_FLIGHT_S = 0.7;
+/**
+ * The clock sits built, still, for this long after the last piece lands and
+ * before it starts to turn: a beat to take it in as a clock. It used to be
+ * about twice this, which read as the page stalling; with none at all the
+ * assembly and the rewind ran together into one blur.
+ */
+const ASSEMBLED_HOLD_S = 0.35;
 /**
  * The rewind: one long eased turn of the ring, six years back, with the hands
  * and the camera riding the same curve. Smooth, not clicked — the ring is a
  * dial being wound back, not a counter stepping.
  */
-const REWIND_S = 2.8;
-/** Eased at both ends: the rewind gathers speed and settles. */
-const REWIND_EASE = 'power2.inOut';
+const REWIND_S = 2.4;
+/**
+ * Eased at both ends, but gently: it picks up straight out of the assembly
+ * rather than creeping off it, and still settles on 2020.
+ */
+const REWIND_EASE = 'power1.inOut';
 /** The clock holds on 2020 in the window before it rests. */
 const REWIND_HOLD_S = 0.2;
 /** A year's opacity on the ring, away from the window. */
@@ -279,12 +289,12 @@ export function buildRewind({ root, scaler, startYear, endYear }: Build) {
   // into the hub. Then the hands grow out of the hub.
   const a = t0;
   master
-    .fromTo(q('[data-w-chrome]'), { opacity: 1 }, { opacity: 0, duration: 0.45, ease: EASE.exitSoft }, a)
+    .fromTo(q('[data-w-chrome]'), { opacity: 1 }, { opacity: 0, duration: 0.3, ease: EASE.exitSoft }, a)
     .fromTo(q('[data-rewind-meta]'), { opacity: 1 }, { opacity: 0, duration: 0.4, ease: EASE.exitSoft }, a)
     .fromTo(q('[data-rewind-grid]'), { opacity: 0.5 }, { opacity: 0.18, duration: 1, ease: EASE.exitSoft }, a)
-    .fromTo(q('[data-uptime]'), { scaleX: 1 }, { scaleX: 0.02, duration: 0.8, ease: EASE.travel, transformOrigin: '50% 50%' }, a + 0.05)
-    .fromTo(q('[data-uptime]'), { opacity: 1 }, { opacity: 0, duration: 0.25, ease: EASE.exitSoft }, a + 0.7)
-    .fromTo(q('[data-hub]'), { opacity: 0 }, { opacity: 1, duration: 0.3, ease: EASE.enterSoft }, a + 0.7);
+    .fromTo(q('[data-uptime]'), { scaleX: 1 }, { scaleX: 0.02, duration: 0.55, ease: EASE.travel, transformOrigin: '50% 50%' }, a)
+    .fromTo(q('[data-uptime]'), { opacity: 1 }, { opacity: 0, duration: 0.2, ease: EASE.exitSoft }, a + 0.45)
+    .fromTo(q('[data-hub]'), { opacity: 0 }, { opacity: 1, duration: 0.25, ease: EASE.enterSoft }, a + 0.45);
 
   // The gauge → the rim.
   const gauge = q('[data-w-gauge]')[0] as HTMLElement | undefined;
@@ -296,81 +306,83 @@ export function buildRewind({ root, scaler, startYear, endYear }: Build) {
     // Counter-scaled by hand: vector-effect does not see a CSS transform on
     // the HTML around the SVG.
     const strokes = gauge.querySelectorAll<SVGCircleElement>('circle');
-    fly(gauge, () => onScreen(0, 0), () => ({ w: ring(), h: ring() }), 1, a + 0.1, () => {
+    fly(gauge, () => onScreen(0, 0), () => ({ w: ring(), h: ring() }), 0.75, a, () => {
       const scale = Number(gsap.getProperty(gauge, 'scaleX')) || 1;
       for (const stroke of strokes) stroke.style.strokeWidth = String(GAUGE_STROKE / scale);
     });
-    master.fromTo(gauge, { opacity: 1 }, { opacity: 0, duration: 0.3, ease: EASE.exitSoft }, a + 0.95);
+    master.fromTo(gauge, { opacity: 1 }, { opacity: 0, duration: 0.25, ease: EASE.exitSoft }, a + 0.65);
   }
-  master.fromTo(q('[data-rim]'), { opacity: 0 }, { opacity: 1, duration: 0.35, ease: EASE.enterSoft }, a + 0.9);
+  master.fromTo(q('[data-rim]'), { opacity: 0 }, { opacity: 1, duration: 0.3, ease: EASE.enterSoft }, a + 0.6);
 
   // The project cells → ticks, spread round the face.
   const cells = q('[data-w-cell]') as HTMLElement[];
   cells.forEach((cell, i) => {
     const tick = Math.round((i * 60) / cells.length) * 6;
-    const at = a + 0.15 + i * 0.025;
-    fly(cell, () => polar(FACE_R - 5, tick), () => ({ w: TICK_CELL * px(), h: TICK_CELL * px() }), 0.9, at);
-    master.fromTo(cell, { opacity: 1 }, { opacity: 0, duration: 0.3, ease: EASE.exitSoft }, at + 0.75);
+    const at = a + 0.05 + i * 0.012;
+    fly(cell, () => polar(FACE_R - 5, tick), () => ({ w: TICK_CELL * px(), h: TICK_CELL * px() }), 0.7, at);
+    master.fromTo(cell, { opacity: 1 }, { opacity: 0, duration: 0.25, ease: EASE.exitSoft }, at + 0.55);
   });
 
   // A sweep turns once from twelve and the rest of the face fills in behind it.
   const ticks = q('[data-tick]');
-  const sweepAt = a + 0.85;
+  const sweepAt = a + 0.5;
   master
     .fromTo(q('[data-sweep]'), { opacity: 0 }, { opacity: 1, duration: 0.15, ease: EASE.enterSoft }, sweepAt)
     .fromTo(
       q('[data-sweep]'),
       { rotate: 0, ...ORIGIN },
-      { rotate: 360, duration: 0.9, ease: EASE.travel, ...ORIGIN },
+      { rotate: 360, duration: 0.7, ease: EASE.travel, ...ORIGIN },
       sweepAt,
     )
-    .fromTo(q('[data-sweep]'), { opacity: 1 }, { opacity: 0, duration: 0.2, ease: EASE.exitSoft }, sweepAt + 0.75)
+    .fromTo(q('[data-sweep]'), { opacity: 1 }, { opacity: 0, duration: 0.2, ease: EASE.exitSoft }, sweepAt + 0.55)
     .fromTo(
       ticks,
       { opacity: 0 },
-      { opacity: 1, duration: 0.3, ease: EASE.enterSoft, stagger: 0.9 / ticks.length },
+      { opacity: 1, duration: 0.25, ease: EASE.enterSoft, stagger: 0.7 / ticks.length },
       sweepAt,
     );
 
-  // Each year's bar → its year on the ring, oldest first.
+  // Each year's bar → its year on the ring, oldest first. The last to land
+  // closes the assembly.
   const dot = () => 2 * MARK_DOT_R * px();
+  let landed = a;
   for (const bar of q('[data-w-bar]') as HTMLElement[]) {
     const year = Number(bar.dataset.wBar);
-    const at = a + 0.2 + (year - endYear) * 0.05;
-    fly(bar, () => polar(RING_R, markAngle(year, startYear)), () => ({ w: dot(), h: dot() }), 1, at);
+    const at = a + 0.05 + (year - endYear) * 0.025;
+    fly(bar, () => polar(RING_R, markAngle(year, startYear)), () => ({ w: dot(), h: dot() }), BAR_FLIGHT_S, at);
+    landed = Math.max(landed, at + BAR_FLIGHT_S);
     master
-      .fromTo(bar, { opacity: 1 }, { opacity: 0, duration: 0.25, ease: EASE.exitSoft }, at + 0.85)
+      .fromTo(bar, { opacity: 1 }, { opacity: 0, duration: 0.2, ease: EASE.exitSoft }, at + 0.5)
       .fromTo(
         q(`[data-year-mark="${year}"] [data-mark-body]`),
         { opacity: 0 },
-        { opacity: 1, duration: 0.35, ease: EASE.enterSoft },
-        at + 0.8,
+        { opacity: 1, duration: 0.3, ease: EASE.enterSoft },
+        at + 0.45,
       );
   }
-  master.fromTo(q('[data-slot]'), { opacity: 0 }, { opacity: 1, duration: 0.4, ease: EASE.enterSoft, stagger: 0.05 }, a + 1.1);
+  master.fromTo(q('[data-slot]'), { opacity: 0 }, { opacity: 1, duration: 0.3, ease: EASE.enterSoft, stagger: 0.04 }, a + 0.7);
 
   // The running processes → the hub.
   for (const proc of q('[data-w-proc]') as HTMLElement[]) {
-    fly(proc, () => onScreen(0, 0), () => ({ w: HUB * px(), h: HUB * px() }), 0.8, a + 0.1);
-    master.fromTo(proc, { opacity: 1 }, { opacity: 0, duration: 0.2, ease: EASE.exitSoft }, a + 0.75);
+    fly(proc, () => onScreen(0, 0), () => ({ w: HUB * px(), h: HUB * px() }), 0.55, a);
+    master.fromTo(proc, { opacity: 1 }, { opacity: 0, duration: 0.15, ease: EASE.exitSoft }, a + 0.45);
   }
 
-  // The hands grow out of the hub and begin, gently, to turn back.
+  // The hands grow out of the hub as the last pieces land, and the rewind
+  // turns them from there — no spin-up of their own to wait through.
   master.fromTo(
     q('[data-hand-line]'),
     { scaleY: 0, ...ORIGIN },
-    { scaleY: 1, duration: 0.6, ease: EASE.enter, stagger: 0.08, ...ORIGIN },
-    a + 0.85,
+    { scaleY: 1, duration: 0.5, ease: EASE.enter, stagger: 0.06, ...ORIGIN },
+    a + 0.5,
   );
-  hand('h', 0, SPIN_UP.hour, 1, EASE.enterSoft, a + 0.9);
-  hand('m', 0, SPIN_UP.minute, 1, EASE.enterSoft, a + 0.9);
-  hand('s', 0, SPIN_UP.second, 1, EASE.enterSoft, a + 0.9);
 
   master
-    .fromTo(q('[data-window]'), { opacity: 0 }, { opacity: 1, duration: 0.4, ease: EASE.enterSoft }, a + 1.3)
-    .fromTo(q('[data-clock-label]'), { opacity: 0 }, { opacity: 1, duration: 0.4, ease: EASE.enterSoft }, a + 1.4);
+    .fromTo(q('[data-window]'), { opacity: 0 }, { opacity: 1, duration: 0.35, ease: EASE.enterSoft }, a + 0.75)
+    .fromTo(q('[data-clock-label]'), { opacity: 0 }, { opacity: 1, duration: 0.35, ease: EASE.enterSoft }, a + 0.85);
 
-  push({ depth: 0, focusY: 0 }, { depth: DEPTH_ASSEMBLED, focusY: 0 }, ASSEMBLE_S, EASE.travel, a);
+  // The camera settles as the last piece lands, so the hold after it is still.
+  push({ depth: 0, focusY: 0 }, { depth: DEPTH_ASSEMBLED, focusY: 0 }, landed - a, EASE.travel, a);
 
   // ── …and winds back to 2020 ──────────────────────────────────────────────
   //
@@ -378,7 +390,7 @@ export function buildRewind({ root, scaler, startYear, endYear }: Build) {
   // on the same curve: the camera closes in on the window and pans up to it
   // as the years come round, so by the time 2020 is in the window, the window
   // is the frame.
-  const b = a + ASSEMBLE_S;
+  const b = landed + ASSEMBLED_HOLD_S;
   const ring = { rotation: 0 };
   master.fromTo(
     ring,
@@ -394,9 +406,9 @@ export function buildRewind({ root, scaler, startYear, endYear }: Build) {
     },
     b,
   );
-  hand('h', SPIN_UP.hour, SPIN_UP.hour + REWIND_SWEEP.hour, REWIND_S, REWIND_EASE, b);
-  hand('m', SPIN_UP.minute, SPIN_UP.minute + REWIND_SWEEP.minute, REWIND_S, REWIND_EASE, b);
-  hand('s', SPIN_UP.second, SPIN_UP.second + REWIND_SWEEP.second, REWIND_S, REWIND_EASE, b);
+  hand('h', 0, REWIND_SWEEP.hour, REWIND_S, REWIND_EASE, b);
+  hand('m', 0, REWIND_SWEEP.minute, REWIND_S, REWIND_EASE, b);
+  hand('s', 0, REWIND_SWEEP.second, REWIND_S, REWIND_EASE, b);
   push(
     { depth: DEPTH_ASSEMBLED, focusY: 0 },
     { depth: DEPTH_REWOUND, focusY: -RING_R },
@@ -413,9 +425,9 @@ export function buildRewind({ root, scaler, startYear, endYear }: Build) {
   // dot is the only lit thing, and every hand turns round to twelve. Zero
   // hour. Then the camera goes through the dot.
   const handsAt = {
-    h: SPIN_UP.hour + REWIND_SWEEP.hour,
-    m: SPIN_UP.minute + REWIND_SWEEP.minute,
-    s: SPIN_UP.second + REWIND_SWEEP.second,
+    h: REWIND_SWEEP.hour,
+    m: REWIND_SWEEP.minute,
+    s: REWIND_SWEEP.second,
   };
   const corners = q('[data-lock-corner]');
   const sx = (el: Element) => Number(el.getAttribute('data-sx'));

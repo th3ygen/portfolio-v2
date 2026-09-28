@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { rewindLabel, zeroHour, REWIND_SWEEP, SPIN_UP } from '../clock';
+import { rewindLabel, zeroHour, REWIND_SWEEP } from '../clock';
 
 describe('hand sweeps', () => {
   it('only ever turn counter-clockwise', () => {
-    for (const angle of [...Object.values(SPIN_UP), ...Object.values(REWIND_SWEEP)]) {
+    for (const angle of Object.values(REWIND_SWEEP)) {
       expect(angle).toBeLessThan(0);
     }
   });
@@ -11,8 +11,6 @@ describe('hand sweeps', () => {
   it('turn the second hand fastest and the hour hand slowest', () => {
     expect(Math.abs(REWIND_SWEEP.second)).toBeGreaterThan(Math.abs(REWIND_SWEEP.minute));
     expect(Math.abs(REWIND_SWEEP.minute)).toBeGreaterThan(Math.abs(REWIND_SWEEP.hour));
-    expect(Math.abs(SPIN_UP.second)).toBeGreaterThan(Math.abs(SPIN_UP.minute));
-    expect(Math.abs(SPIN_UP.minute)).toBeGreaterThan(Math.abs(SPIN_UP.hour));
   });
 
   it('keep the rewind to a pace the eye can follow', () => {

@@ -2,13 +2,10 @@
  * The brutalist analog clock behind the s04 → s05 rewind.
  *
  * Hands only ever turn counter-clockwise, matching the years going back, and
- * never whip: a gentle spin-up as the clock assembles, one long eased sweep
- * across the whole rewind, and a turn round to twelve — zero hour — as the
- * camera locks onto the dot.
+ * never whip: they grow out of the hub as the clock assembles, make one long
+ * eased sweep across the whole rewind, and turn round to twelve — zero hour —
+ * as the camera locks onto the dot.
  */
-
-/** Where the spin-up leaves each hand. Negative is counter-clockwise. */
-export const SPIN_UP = { hour: -8, minute: -60, second: -180 } as const;
 
 /**
  * How far each hand turns across the whole rewind. Two turns of the minute

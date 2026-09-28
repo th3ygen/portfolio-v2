@@ -172,13 +172,13 @@ Each widget is split into **chrome** (frame, headings, labels, numbers; `data-w-
 **The timeline** (`rewindTimeline.ts`) is one paused timeline, played between stops by the gate. Every tween is a `fromTo` with both ends stated, and every readout (camera, ring, label) is written in an `onUpdate` from its own tween's value, never in a `call`. That is what makes it reversible. Nothing before the dive steps: the clock moves on eased curves throughout.
 
 1. **Summary** (`1s`). The widgets rise in, the gauge's segments light in turn, the bars grow, the project cells fill and the figures count up to what the markup already prints.
-2. **Clock** (`1.9s` assemble + `2.8s` rewind + `.2s` hold). The data flies into place on `power3.inOut` while the chrome fades:
+2. **Clock** (about `3.7s` from the scroll to 2020, then a `.2s` hold). The data flies into place on `power3.inOut` (`.55`–`.75s` flights) while the chrome fades:
    - the **gauge** swells into the **rim**, its stroke counter-scaled so it stays a line;
    - the **project cells** spread out to become **ticks**, and a sweep turns once and fills in the rest of the face;
    - each year's **bar** lands on its **year on the ring**, oldest first;
    - the **running processes** fall into the centre, where UPTIME folds down into the **hub**, and the hands grow out of it.
 
-   Then one continuous turn winds the ring back six slots (`power2.inOut`). The hands sweep back on the same curve: two minute-hand turns across the whole rewind, not six whips. The camera closes in and pans up toward the window at the same time. Each year brightens continuously as it comes round into the window. By the time 2020 is in the window, the window is the centre of the frame at `2.4×`.
+   The last piece lands at `.9s`, the clock **holds, built and still, for `.35s`**, and then one continuous turn winds the ring back six slots (`2.4s`, `power1.inOut`). The hands grow out of the hub straight into the sweep (no spin-up of their own) and turn back on the same curve: two minute-hand turns across the whole rewind, not six whips. The camera closes in and pans up toward the window at the same time. Each year brightens continuously as it comes round into the window. By the time 2020 is in the window, the window is the centre of the frame at `2.4×`.
 3. **DIVE** (`.5s` lock + `1.5s` dive + `.35s` hold). Four brackets snap in around 2020's dot (`steps(3)`), its digits and `SINCE` dim to `.22` so the dot is the only lit thing, and every hand turns round to twelve: zero hour. Then the camera dives (`power3.in` on depth; the one move on the page that is still accelerating when it ends). The dial fades as it swells past the lens, warp streaks shoot out from the dot in screen space, and from 60% of the dive the dot **opens**. A disc of page ground widens inside it to its full radius, so the green becomes a ring whose band sweeps out past the frame. It lands inside the dot on `--color-bg`. There is no flood.
 
 Under reduced motion there is no hold and no clock: the stage shows the summary, built and still.
