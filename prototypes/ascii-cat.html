@@ -1,0 +1,1606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASCII Pets — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!--
+  ASCII pets — a standalone prototype for the UPTIME dashboard pet. Two
+  species share one simulation and one renderer: a cat and a husky, on tabs.
+
+  The pets are low-poly: every part is a polygon or a straight segment, because
+  curves sampled into characters come out as ragged staircases.
+
+  How a frame is made:
+    1. A pose simulation (Sim) runs every frame: breathing, blinking, ear
+       flicks, tail sway, gaze and mood.
+    2. Each view (AsciiView) draws the cat from the pose onto three hidden
+       canvases:
+         - TONE: which toon band each point is in — lit, or in shadow — on
+           the red channel, and which coat — base or dark markings — on the
+           green. Hard bands, no gradients: the shadow is the shape minus a
+           copy of itself nudged toward the light, so it is a crisp crescent
+           on the far side.
+         - LINES: every outline and feature line, drawn as straight segments,
+           each coloured by its own direction (| - / \). A cell a line passes
+           through prints the glyph of that line's direction — the direction
+           is known, not guessed from pixels, so outlines stay one clean
+           character thick.
+         - ACCENT: lines that print in the accent colour.
+       Eyes are not drawn at all: each is stamped as a hand-made glyph sprite
+       (see EYES), because an eye is only a few cells across and a sampled
+       polygon that small comes out ragged.
+    3. Each character cell prints, in priority order: an eye stamp, a line
+       glyph, the shadow band, the lit band, or nothing.
+    4. Particles (z, <3, !, *) are printed straight into the grid.
+
+  Nothing here depends on the site. Serve the folder, or open the file.
+-->
+<style>
+  :root {
+    --bg: #070809;
+    --bg-alt: #0a0c0d;
+    --border: #1b2022;
+    --border-dim: #14181a;
+    --text: #e8ecea;
+    --muted: #7c8583;
+    --dim: #727a78;
+    --faint: #38403f;
+    --ink-dark: #2a3030;
+    --accent: #c6f21a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  /* ── Controls ─────────────────────────────────────────────────────────── */
+
+  .panel {
+    border-right: 1px solid var(--border);
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+  }
+
+  .panel h1 { font-size: 11px; letter-spacing: 0.24em; color: var(--accent); }
+
+  .group { display: flex; flex-direction: column; gap: 10px; }
+  .group > .label {
+    color: var(--dim);
+    letter-spacing: 0.2em;
+    font-size: 9px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-dim);
+  }
+
+  .modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+
+  button {
+    font: inherit;
+    letter-spacing: inherit;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    padding: 7px 8px;
+    cursor: pointer;
+    text-align: left;
+  }
+  button:hover { color: var(--text); border-color: var(--faint); }
+  button[aria-pressed='true'] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+
+  .row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 38px; align-items: center; gap: 8px; }
+  .row span:last-child { text-align: right; color: var(--muted); }
+  .row label { color: var(--muted); }
+  input[type='range'] { width: 100%; accent-color: var(--accent); }
+
+  .check { display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
+  input[type='checkbox'] { accent-color: var(--accent); }
+
+  select, input[type='number'] {
+    font: inherit;
+    color: var(--text);
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    padding: 4px 6px;
+    width: 100%;
+  }
+
+  .hint { color: var(--faint); line-height: 1.6; }
+
+  /* ── Stage ────────────────────────────────────────────────────────────── */
+
+  .stage {
+    padding: 32px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 32px;
+    align-content: start;
+  }
+
+  .caption { color: var(--dim); font-size: 9px; letter-spacing: 0.2em; margin-bottom: 10px; }
+
+  /* The widget, at the size it would be in the dashboard. */
+  .widget {
+    position: relative;
+    width: 270px;
+    padding: 14px 16px 16px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+  }
+  .widget header, .widget footer { display: flex; justify-content: space-between; gap: 10px; }
+  .widget header {
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-dim);
+    color: var(--muted);
+  }
+  .widget footer { margin-top: 10px; }
+  .live { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
+  .live::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: live 1.1s steps(2) infinite;
+  }
+  @keyframes live { 50% { opacity: 0.25; } }
+
+  .big { border: 1px solid var(--border); background: var(--bg-alt); padding: 20px; justify-self: start; }
+
+  .tabs { grid-column: 1 / -1; display: flex; gap: 6px; }
+  .tabs button { min-width: 110px; text-align: center; }
+
+  pre.ascii {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    /* Greyscale smoothing. Sub-pixel (ClearType) anti-aliasing fringes each
+       character blue and orange, which in a field of glyphs reads as colour
+       noise. A composited layer is what makes Chrome drop to greyscale. */
+    -webkit-font-smoothing: antialiased;
+    will-change: transform;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: pre;
+    color: var(--faint);
+    cursor: pointer;
+    user-select: none;
+  }
+  pre.ascii .s { color: var(--muted); }
+  pre.ascii .l { color: var(--text); }
+  pre.ascii .a { color: var(--accent); }
+  /*
+   * Quadrant cells: one character wide, one line tall, painted as a 2 x 2
+   * grid of sub-pixels. The 16 patterns are generated at startup (see
+   * QUADRANTS). Painted rather than typed because the web build of JetBrains
+   * Mono has no block glyphs — the browser falls back to a font whose blocks
+   * are half as wide again, and the grid tears.
+   */
+  pre.ascii .q {
+    display: inline-block;
+    vertical-align: top;
+    /* One pixel over into the next cell each way, taken back by the margin, so
+       the rounding between cells never leaves a hairline seam through an eye. */
+    width: calc(1ch + 1px);
+    height: calc(1em + 1px);
+    margin: 0 -1px -1px 0;
+    --qc: var(--accent);
+    --gc: var(--text);
+  }
+  pre.ascii .q.l { --qc: var(--text); --gc: var(--text); }
+  /* Features: a dark nose and mouth, with a shine on the nose. */
+  pre.ascii .q.m { --qc: var(--muted); --gc: var(--text); }
+  pre.ascii .q.k { --qc: var(--ink-dark); }
+  pre.mono .q { --qc: var(--muted); --gc: var(--text); }
+  pre.mono .q.k { --qc: var(--ink-dark); }
+  pre.mono { color: var(--muted); }
+  pre.mono span { color: inherit !important; }
+
+  .debug { grid-column: 1 / -1; display: none; gap: 16px; flex-wrap: wrap; }
+  .debug.on { display: flex; }
+  .debug canvas { border: 1px solid var(--border); image-rendering: pixelated; width: 288px; background: #000; }
+</style>
+</head>
+<body>
+  <aside class="panel">
+    <h1>ASCII PETS · PROTO</h1>
+
+    <div class="group">
+      <div class="label">MODE</div>
+      <div class="modes" id="modes"></div>
+      <p class="hint">AUTO picks from the data below: night sleeps, low coffee is grumpy, high coffee is hyper. Click the cat to make it purr; three quick clicks make it dizzy.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">DATA (mocked)</div>
+      <div class="row"><label for="coffee">COFFEE</label><input id="coffee" type="range" min="0" max="100" value="45"><span id="coffeeOut"></span></div>
+      <div class="row"><label for="time">TIME</label><select id="time"><option value="live">LIVE MYT</option><option value="day">FORCE DAY</option><option value="night">FORCE NIGHT</option></select><span></span></div>
+      <div class="row"><label for="xp">XP</label><input id="xp" type="number" min="0" step="50" value="1284"><span id="lvlOut"></span></div>
+    </div>
+
+    <div class="group">
+      <div class="label">RENDER</div>
+      <div class="row"><label for="fps">FPS</label><input id="fps" type="range" min="6" max="60" value="24"><span id="fpsOut"></span></div>
+      <div class="row"><label for="cols">BIG COLS</label><input id="cols" type="range" min="24" max="120" value="72"><span id="colsOut"></span></div>
+      <div class="row"><label for="font">BIG FONT</label><input id="font" type="range" min="4" max="16" value="9"><span id="fontOut"></span></div>
+      <div class="row"><label for="lineW">LINE WIDTH</label><input id="lineW" type="range" min="20" max="120" value="70"><span id="lineWOut"></span></div>
+      <div class="row"><label for="lineThr">LINE THR</label><input id="lineThr" type="range" min="5" max="60" value="22"><span id="lineThrOut"></span></div>
+      <div class="row"><label for="shadowD">SHADOW</label><input id="shadowD" type="range" min="0" max="14" step="0.5" value="7"><span id="shadowDOut"></span></div>
+      <div class="row"><label for="tone">TONES</label><select id="tone"></select><span></span></div>
+      <div class="row"><label for="darkW">MOUTH</label><input id="darkW" type="range" min="30" max="200" value="100"><span id="darkWOut"></span></div>
+      <div class="row"><label for="mouthInk">MOUTH INK</label><select id="mouthInk">
+        <option value="#2a3030" selected>INK</option>
+        <option value="#070809">BLACK</option>
+        <option value="#38403f">FAINT</option>
+        <option value="#7c8583">GREY</option>
+        <option value="#e8ecea">WHITE</option>
+      </select><span></span></div>
+      <div class="row"><label for="eyeScale">EYE SIZE</label><input id="eyeScale" type="range" min="50" max="160" value="100"><span id="eyeScaleOut"></span></div>
+      <div class="row"><label for="irisScale">IRIS</label><input id="irisScale" type="range" min="30" max="110" value="100"><span id="irisScaleOut"></span></div>
+      <div class="row"><label for="eyes">EYE SHADER</label><select id="eyes">
+        <option value="blocks">BLOCKS ▚</option>
+        <option value="sprites">SPRITES</option>
+      </select><span></span></div>
+      <label class="check"><input id="color" type="checkbox" checked> COLOUR</label>
+      <label class="check"><input id="debug" type="checkbox"> SHOW SOURCE CANVASES</label>
+      <label class="check"><input id="reduced" type="checkbox"> REDUCED MOTION (static)</label>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="tabs" role="tablist" aria-label="Pet">
+      <button role="tab" data-species="cat" aria-pressed="true">CAT</button>
+      <button role="tab" data-species="husky" aria-pressed="false">HUSKY</button>
+    </div>
+
+    <section>
+      <div class="caption">AT DASHBOARD SIZE</div>
+      <div class="widget">
+        <header><span>PET.EXE</span><span class="live" id="alive">ALIVE</span></header>
+        <pre class="ascii" id="small" style="font-size:7px"></pre>
+        <footer><span id="lvl">LVL 07</span><span id="mood">CONTENT</span></footer>
+      </div>
+    </section>
+
+    <section>
+      <div class="caption">ENLARGED — MOVE THE CURSOR, CLICK THE CAT</div>
+      <div class="big"><pre class="ascii" id="big"></pre></div>
+    </section>
+
+    <section class="debug" id="debugWrap">
+      <div><div class="caption">TONE</div><canvas id="dbgTone"></canvas></div>
+      <div><div class="caption">LINES (colour = direction)</div><canvas id="dbgLines"></canvas></div>
+      <div><div class="caption">ACCENT</div><canvas id="dbgAccent"></canvas></div>
+    </section>
+  </main>
+
+<script>
+'use strict';
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Utilities
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+/** Frame-rate independent approach toward a target. `rate` is roughly 1/seconds. */
+const approach = (v, target, rate, dt) => v + (target - v) * (1 - Math.exp(-rate * dt));
+const rand = (a, b) => a + Math.random() * (b - a);
+
+/** The time in Malaysia (GMT+8), whatever the viewer's own zone. */
+function mytHour() {
+  const now = new Date();
+  return (now.getUTCHours() + 8 + now.getUTCMinutes() / 60) % 24;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * The simulation: one shared pose, drawn by every view
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Per-mood targets. Every pose value eases toward these, so switching mood is a
+ * blend, never a cut.
+ */
+const MOODS = {
+  idle:   { eye: 1,    pupil: 0.35, drop: 0,  tailAmp: 0.35, tailSpeed: 1.6, breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
+  sleep:  { eye: 0,    pupil: 0.3,  drop: 7,  tailAmp: 0.06, tailSpeed: 0.5, breathRate: 0.7, breathAmp: 0.06,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0.3 },
+  grumpy: { eye: 0.42, pupil: 0.15, drop: 2,  tailAmp: 0.55, tailSpeed: 3.2, breathRate: 1.0, breathAmp: 0.025, jitter: 0,    happy: 0, dizzy: 0, earsBack: 1 },
+  hyper:  { eye: 1.1,  pupil: 1,    drop: -2, tailAmp: 0.6,  tailSpeed: 6,   breathRate: 3.2, breathAmp: 0.03,  jitter: 1,    happy: 0, dizzy: 0, earsBack: 0 },
+  happy:  { eye: 1,    pupil: 0.5,  drop: 0,  tailAmp: 0.5,  tailSpeed: 2.6, breathRate: 1.6, breathAmp: 0.035, jitter: 0.12, happy: 1, dizzy: 0, earsBack: 0 },
+  dizzy:  { eye: 1,    pupil: 0.5,  drop: 1,  tailAmp: 0.2,  tailSpeed: 1,   breathRate: 1.2, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 1, earsBack: 0.5 },
+};
+
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY' };
+
+class Sim {
+  constructor() {
+    this.t = 0;
+    this.forced = 'auto';      // 'auto' or a mood key
+    this.transient = null;     // { mood, until } — a click reaction on top of everything
+    this.data = { coffee: 45, time: 'live' };
+
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0 };
+
+    this.nextBlink = rand(1.5, 4);
+    this.blinkAt = -10;
+    this.slowBlink = false;
+    this.nextTwitch = rand(3, 7);
+    this.twitchL = 0;
+    this.twitchR = 0;
+
+    // Where the cat wants to look, -1..1 on each axis.
+    this.gaze = { x: 0, y: 0 };
+    this.cursorAt = -10;       // last time the cursor moved
+    this.nextWander = 0;
+    this.wander = { x: 0, y: 0 };
+
+    this.particles = [];
+    this.nextParticle = 0;
+  }
+
+  /** The mood that should be showing now. */
+  mood() {
+    if (this.transient && this.t < this.transient.until) return this.transient.mood;
+    if (this.forced !== 'auto') return this.forced;
+    const night = this.data.time === 'night' || (this.data.time === 'live' && mytHour() < 7);
+    if (night) return 'sleep';
+    if (this.data.coffee < 20) return 'grumpy';
+    if (this.data.coffee > 85) return 'hyper';
+    return 'idle';
+  }
+
+  react(mood, seconds) { this.transient = { mood, until: this.t + seconds }; }
+
+  /** The cursor, relative to the centre of a view, in units of that view's half-size. */
+  look(x, y) {
+    this.gaze.x = clamp(x, -1, 1);
+    this.gaze.y = clamp(y, -1, 1);
+    this.cursorAt = this.t;
+  }
+
+  step(dt) {
+    this.t += dt;
+    const mood = this.mood();
+    const target = MOODS[mood];
+    const p = this.pose;
+
+    for (const key of Object.keys(target)) p[key] = approach(p[key], target[key], key === 'jitter' ? 12 : 5, dt);
+
+    // Breathing and tail are continuous oscillators; their speed follows the mood.
+    p.breath = Math.sin(this.t * p.breathRate * Math.PI) * p.breathAmp;
+    p.tail = Math.sin(this.t * p.tailSpeed) * p.tailAmp + Math.sin(this.t * p.tailSpeed * 0.37) * p.tailAmp * 0.4;
+    p.wobble = p.dizzy * Math.sin(this.t * 7) * 0.22;
+    p.jx = p.jitter * rand(-1.3, 1.3);
+    p.jy = p.jitter * rand(-0.8, 0.8);
+
+    // Blinking; now and then a slow blink — the cat's "I trust you".
+    if (this.t > this.nextBlink) {
+      this.blinkAt = this.t;
+      this.slowBlink = Math.random() < 0.2;
+      this.nextBlink = this.t + rand(2, 5.5);
+    }
+    const bt = (this.t - this.blinkAt) / (this.slowBlink ? 2.4 : 1);
+    p.blink = bt < 0.07 ? 1 - bt / 0.07 : bt < 0.2 ? (bt - 0.07) / 0.13 : 1;
+    if (this.slowBlink && bt >= 0.07 && bt < 0.25) p.blink = 0.15;
+
+    // Ear flicks: a twitch that dies away.
+    if (this.t > this.nextTwitch) {
+      if (Math.random() < 0.5) this.twitchL = 1; else this.twitchR = 1;
+      this.nextTwitch = this.t + rand(2.5, 8);
+    }
+    this.twitchL = approach(this.twitchL, 0, 6, dt);
+    this.twitchR = approach(this.twitchR, 0, 6, dt);
+    p.earL = this.twitchL * Math.sin(this.t * 55);
+    p.earR = this.twitchR * Math.sin(this.t * 55);
+
+    // Gaze: the cursor when it is about, otherwise an idle wander.
+    let gx = this.gaze.x;
+    let gy = this.gaze.y;
+    if (this.t - this.cursorAt > 2.5) {
+      if (this.t > this.nextWander) {
+        this.wander = { x: rand(-0.8, 0.8), y: rand(-0.5, 0.5) };
+        this.nextWander = this.t + rand(1.5, 4);
+      }
+      gx = this.wander.x;
+      gy = this.wander.y;
+    }
+    if (mood === 'sleep') { gx = 0; gy = 0.3; }
+    p.lookX = approach(p.lookX, gx, mood === 'hyper' ? 20 : 9, dt);
+    p.lookY = approach(p.lookY, gy, mood === 'hyper' ? 20 : 9, dt);
+
+    this.emit(mood);
+    for (const q of this.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; }
+    this.particles = this.particles.filter((q) => q.life > 0);
+  }
+
+  /** Particles live in the cat's own design space; each view maps them to cells. */
+  emit(mood) {
+    if (this.t < this.nextParticle) return;
+    const spawn = (text, x, y, vx, vy, life, cls, gap) => {
+      this.particles.push({ text, x, y, vx, vy, life, cls });
+      this.nextParticle = this.t + gap;
+    };
+    if (mood === 'sleep') spawn(Math.random() < 0.5 ? 'z' : 'Z', 66, 26, rand(3, 6), -7, 3, 's', 1.1);
+    else if (mood === 'happy') spawn('<3', rand(30, 70), 22, rand(-4, 4), -12, 1.6, 'a', 0.35);
+    else if (mood === 'hyper') spawn(Math.random() < 0.5 ? '!' : '*', rand(28, 72), 20, rand(-10, 10), -14, 0.8, 'l', 0.25);
+    else if (mood === 'grumpy') spawn('...', 70, 28, 2, -3, 2, 's', 2.2);
+    else if (mood === 'dizzy') {
+      const a = this.t * 5;
+      spawn('*', 50 + Math.cos(a) * 26, 18 + Math.sin(a) * 6, 0, 0, 0.18, 'a', 0.06);
+    }
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * The pen: polygons, toon shading and directed line segments
+ *
+ * The cat is authored in a 100 x 100 design box. `pen` holds the three canvas
+ * contexts, all under the same transform, and draws each part onto all three
+ * consistently.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Toon bands, as the red channel of the TONE canvas. */
+const LIT = 110;
+const SHADE = 235;
+/** Coat, as the green channel: 0 is the base coat, this is dark markings. */
+const MARKED = 255;
+
+/**
+ * Line direction classes, as colours on the LINES canvas. The sampler counts
+ * each colour per cell and prints the glyph of whichever covers it most.
+ */
+const DIR = {
+  v: { color: '#ff0000', glyph: '|' },
+  h: { color: '#00ff00', glyph: '-' },
+  s: { color: '#0000ff', glyph: '/' },   // slash: up to the right
+  b: { color: '#ffff00', glyph: '\\' },  // backslash: down to the right
+};
+
+/**
+ * The direction class of a segment as it lands on screen. The slope bands
+ * account for the cell being taller than wide: a '/' glyph in a 0.6 : 1 cell
+ * leans at about 59 degrees, so "diagonal" is wider than 45 +/- 22.5.
+ */
+function dirOf(dx, dy) {
+  let a = (Math.atan2(-dy, dx) * 180) / Math.PI;
+  if (a < 0) a += 180;
+  if (a < 22 || a >= 158) return 'h';
+  if (a >= 70 && a < 110) return 'v';
+  return a < 90 ? 's' : 'b';
+}
+
+function poly(points) {
+  const p = new Path2D();
+  points.forEach(([x, y], i) => (i ? p.lineTo(x, y) : p.moveTo(x, y)));
+  p.closePath();
+  return p;
+}
+
+class Pen {
+  constructor(tone, lines, accent, feature, opts) {
+    this.tone = tone;
+    this.lines = lines;
+    this.accent = accent;
+    this.feature = feature;
+    this.opts = opts;
+    this.eyes = [];
+  }
+
+  /** Run `fn` with every canvas under the same extra transform. */
+  group(fn, { x = 0, y = 0, rot = 0 } = {}) {
+    const all = [this.tone, this.lines, this.accent, this.feature];
+    for (const c of all) { c.save(); c.translate(x, y); c.rotate(rot); }
+    fn();
+    for (const c of all) c.restore();
+  }
+
+  /**
+   * A small solid feature — the nose, the mouth line — printed in quadrant
+   * cells like the eyes, not sampled into glyphs. A mouth is a few cells
+   * across, and as line art it came out as a tangle of slashes. A 'shine'
+   * blob is the highlight on a wet nose, drawn over the dark.
+   */
+  blob(points, kind = 'dark') {
+    const path = poly(points);
+    this.feature.fillStyle = kind === 'shine' ? '#00ff00' : '#ff0000';
+    this.feature.fill(path);
+    this.lines.fillStyle = '#000';
+    this.lines.fill(path);
+  }
+
+  /**
+   * A solid toon-shaded shape: the shadow band over the whole shape, then the
+   * lit band over the shape nudged toward the light — clipped to the shape, so
+   * what stays in shadow is a hard crescent on the side away from the light.
+   * The shape also erases any line behind it, so outlines of parts it covers
+   * do not print through.
+   */
+  solid(points, { shadow = 1, outline = true, band = null, coat = 'base' } = {}) {
+    const path = poly(points);
+    const d = this.opts.shadowD * shadow;
+    const t = this.tone;
+    const g = coat === 'mark' ? MARKED : 0;
+    t.fillStyle = `rgb(${band ?? SHADE},${g},0)`;
+    t.fill(path);
+    if (band === null && d > 0) {
+      t.save();
+      t.clip(path);
+      t.translate(-d, -d * 0.8);
+      t.fillStyle = `rgb(${LIT},${g},0)`;
+      t.fill(path);
+      t.restore();
+    }
+    this.lines.fillStyle = '#000';
+    this.lines.fill(path);
+    if (outline) this.stroke(points, true);
+  }
+
+  /**
+   * Straight segments, each classified by the direction it has on screen and
+   * drawn in that direction's colour. Stroked in screen pixels so the line is
+   * the same width everywhere, about one character cell.
+   */
+  stroke(points, closed = false, { accent = false, dark = false } = {}) {
+    const m = this.lines.getTransform();
+    const scr = points.map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+    const pairs = [];
+    for (let i = 0; i < scr.length - 1; i++) pairs.push([scr[i], scr[i + 1]]);
+    if (closed) pairs.push([scr[scr.length - 1], scr[0]]);
+
+    // A dark line is not line art: it is a band a cell thick, carved out of
+    // the fur in quadrant cells (see the sampler). As a glyph in the dim ink
+    // it was one pixel thin and barely stood off the fur.
+    if (dark) {
+      const f = this.feature;
+      f.save();
+      f.setTransform(1, 0, 0, 1, 0, 0);
+      f.lineWidth = CELL_W * this.opts.darkW;
+      f.lineCap = 'square';
+      f.lineJoin = 'miter';
+      f.strokeStyle = '#0000ff';
+      f.beginPath();
+      scr.forEach(([x, y], i) => (i ? f.lineTo(x, y) : f.moveTo(x, y)));
+      if (closed) f.closePath();
+      f.stroke();
+      f.restore();
+      return;
+    }
+    const marks = [this.lines, ...(accent ? [this.accent] : [])];
+    for (const c of marks) {
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.lineWidth = this.opts.lineW;
+      c.lineCap = 'butt';
+      for (const [[x1, y1], [x2, y2]] of pairs) {
+        c.strokeStyle = c === this.lines ? DIR[dirOf(x2 - x1, y2 - y1)].color : '#0000ff';
+        c.beginPath();
+        c.moveTo(x1, y1);
+        c.lineTo(x2, y2);
+        c.stroke();
+      }
+      c.restore();
+    }
+  }
+
+  /**
+   * An eye, in one of two shaders.
+   *
+   * BLOCKS: the eye is painted — an almond iris, a slit pupil that dilates
+   * and follows the gaze, and a glint — onto the ACCENT canvas, and the view
+   * prints it in quadrant cells at twice the grid's resolution each way. The
+   * shut, happy and dizzy eyes are line strokes like the rest of the face.
+   *
+   * SPRITES: the eye is recorded, not drawn, and the view stamps a hand-made
+   * glyph sprite for it (see EYES).
+   *
+   * `cls` is the iris colour: 'a' accent, 'l' ice-white. `pupil` is the
+   * pupil's shape: a cat's vertical 'slit', or a dog's 'round'.
+   *
+   * Two sizes, both scaled by the EYE SIZE and IRIS controls: the opening —
+   * an almond cut into the fur, which prints dark — and the iris inside it.
+   * At an iris of 100% the iris fills the opening; smaller, a dark rim shows
+   * round the colour.
+   */
+  eye(x, y, drawnWidth, p, { cls = 'a', pupil = 'slit' } = {}) {
+    const width = drawnWidth * this.opts.eyeScale;
+    const state = eyeState(p);
+    if (this.opts.eyes === 'sprites') {
+      const m = this.lines.getTransform();
+      this.eyes.push({
+        x: m.a * x + m.c * y + m.e,
+        y: m.b * x + m.d * y + m.f,
+        width: width * Math.hypot(m.a, m.b),
+        state,
+        look: p.lookX,
+        dilated: p.pupil > 0.7,
+        cls,
+      });
+      return;
+    }
+
+    const rx = width / 2;
+    const accentLine = { accent: cls === 'a' };
+    if (state === 'closed') {
+      this.stroke([[x - rx * 0.8, y + 0.5], [x + rx * 0.8, y + 0.5]]);
+      return;
+    }
+    if (state === 'happy') {
+      this.stroke([[x - rx * 0.8, y + 2], [x, y - 2.5], [x + rx * 0.8, y + 2]], false, accentLine);
+      return;
+    }
+    if (state === 'dizzy') {
+      this.stroke([[x - 3.5, y - 3], [x + 3.5, y + 3]], false, accentLine);
+      this.stroke([[x - 3.5, y + 3], [x + 3.5, y - 3]], false, accentLine);
+      return;
+    }
+
+    const open = clamp(p.eye * p.blink, 0.3, 1.15);
+    const h = 4.8 * open * (width / 12.5);
+    const almond = (sx, sy) =>
+      poly([[x - sx, y], [x - sx * 0.5, y - sy], [x + sx * 0.5, y - sy], [x + sx, y], [x + sx * 0.5, y + sy], [x - sx * 0.5, y + sy]]);
+
+    // The opening: red at a quarter strength marks "eye, but not iris". It
+    // prints dark, and nothing behind it prints through.
+    const opening = almond(rx, h);
+    const a = this.accent;
+    a.fillStyle = '#400000';
+    a.fill(opening);
+    this.lines.fillStyle = '#000';
+    this.lines.fill(opening);
+
+    // The iris, inside the opening.
+    const k = this.opts.irisScale;
+    const iris = almond(rx * k, h * k);
+    a.save();
+    a.clip(opening);
+    a.fillStyle = cls === 'a' ? '#ff0000' : '#a00000';
+    a.fill(iris);
+    a.restore();
+
+    // Pupil, carved out of the iris: a vertical slit for a cat, a round (well,
+    // square — no curves) pupil for a dog. Both dilate, follow the gaze, and
+    // scale with the iris.
+    const px = x + p.lookX * rx * k * 0.42;
+    const py = y + p.lookY * h * k * 0.25;
+    a.save();
+    a.clip(iris);
+    a.fillStyle = '#00ff00';
+    if (pupil === 'round') {
+      const pr = (1.3 + p.pupil * 1.1) * (width / 12.5) * k;
+      a.fillRect(px - pr, py - pr * 1.2, pr * 2, pr * 2.4);
+    } else {
+      const pw = (0.7 + p.pupil * 1.9) * k;
+      a.fillRect(px - pw, py - h * k * 0.85, pw * 2, h * k * 1.7);
+    }
+    a.restore();
+
+    // Glint: a square of light high on the iris, on the side facing the light.
+    this.tone.fillStyle = `rgb(0,0,255)`;
+    this.tone.save();
+    this.tone.globalCompositeOperation = 'lighter';
+    this.tone.fillRect(x - rx * k * 0.42 + p.lookX * 0.8, y - h * k * 0.5, 2.6 * k, 2.4 * k);
+    this.tone.restore();
+
+    // Grumpy: a flat lid across the top of the eye.
+    if (state === 'half') {
+      a.save();
+      a.fillStyle = '#000';
+      a.fillRect(x - rx - 1, y - h - 2, width + 2, h * 0.9 + 2);
+      a.restore();
+      this.stroke([[x - rx, y - h * 0.1], [x + rx, y - h * 0.1]]);
+    }
+  }
+}
+
+/** The eye state a pose calls for. */
+function eyeState(p) {
+  const open = clamp(p.eye * p.blink, 0, 1.15);
+  if (p.dizzy > 0.5) return 'dizzy';
+  if (p.happy > 0.5) return 'happy';
+  if (open < 0.14) return 'closed';
+  if (open < 0.6) return 'half';
+  return 'open';
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * The cat, low-poly
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** A strip of width `w` along a polyline: a limb with angular joints. */
+function strip(centre, w) {
+  const left = [];
+  const right = [];
+  centre.forEach(([x, y], i) => {
+    const [ax, ay] = centre[Math.max(0, i - 1)];
+    const [bx, by] = centre[Math.min(centre.length - 1, i + 1)];
+    let nx = -(by - ay);
+    let ny = bx - ax;
+    const len = Math.hypot(nx, ny) || 1;
+    nx = (nx / len) * (w / 2);
+    ny = (ny / len) * (w / 2);
+    left.push([x + nx, y + ny]);
+    right.push([x - nx, y - ny]);
+  });
+  return [...left, ...right.reverse()];
+}
+
+function drawCat(pen, p) {
+  const breathe = 1 + p.breath;
+
+  // ── Tail, behind the body: a jointed strip, the tip swinging.
+  const s = p.tail;
+  pen.solid(strip([
+    [64, 91],
+    [80, 91],
+    [88, 82],
+    [88 + s * 6, 68],
+    [82 + s * 16, 57 - Math.abs(s) * 3],
+  ], 5.5), { shadow: 0.5 });
+
+  // ── Body, sitting: a faceted bell, breathing upward from the ground.
+  const by = (y) => 95 - (95 - y) * breathe;
+  pen.solid([
+    [29, 95],
+    [27, by(80)],
+    [33, by(67)],
+    [42, by(61)],
+    [58, by(61)],
+    [67, by(67)],
+    [73, by(80)],
+    [71, 95],
+  ], { shadow: 1.2 });
+
+  // Chest: an unshaded lit wedge, no outline.
+  pen.solid([[44, by(66)], [56, by(66)], [50, by(82)]], { outline: false, band: LIT });
+
+  // Front paws.
+  pen.solid([[35, 90], [46, 90], [47, 95], [34, 95]], { shadow: 0.4 });
+  pen.solid([[54, 90], [65, 90], [66, 95], [53, 95]], { shadow: 0.4 });
+
+  // ── Head: follows the gaze, tilts with it, drops when asleep.
+  const hx = 50 + p.lookX * 3.2 + p.jx;
+  const hy = 45 + p.lookY * 2 + p.drop + p.jy - p.breath * 12;
+  const tilt = p.lookX * 0.1 + p.wobble;
+
+  pen.group(() => {
+    // Ears, behind the head: pinned at their base, flattened back when grumpy.
+    const ear = (side, twitch) => {
+      pen.group(() => {
+        pen.solid([[-7, 5], [side * 1.5, -14 + p.earsBack * 5], [7, 5]], { shadow: 0.5 });
+        pen.solid([[-3.5, 3], [side * 1, -8 + p.earsBack * 4], [3.5, 3]], { outline: false, band: SHADE });
+      }, { x: side * 11, y: -11, rot: side * (0.2 + p.earsBack * 0.55) + twitch * 0.35 });
+    };
+    ear(-1, p.earL);
+    ear(1, p.earR);
+
+    // The head: a wide faceted skull, cheeks flaring at the sides.
+    pen.solid([
+      [-20, -3],
+      [-15, -13],
+      [-6, -16],
+      [6, -16],
+      [15, -13],
+      [20, -3],
+      [22, 5],
+      [14, 13],
+      [0, 16],
+      [-14, 13],
+      [-22, 5],
+    ], { shadow: 0.9 });
+
+    // ── Eyes.
+    for (const side of [-1, 1]) pen.eye(side * 8.5, -2, 12.5, p);
+
+    // ── Nose, mouth, whiskers: straight lines.
+    pen.stroke([[-2.5, 6], [0, 8.5], [2.5, 6]]);
+    pen.stroke([[-4.5, 10.5], [-2, 12], [0, 9.5], [2, 12], [4.5, 10.5]]);
+    for (const side of [-1, 1]) {
+      pen.stroke([[side * 9, 7], [side * 27, 4 + s * 1.5]]);
+      pen.stroke([[side * 9, 9.5], [side * 27, 11 + s * 1.5]]);
+    }
+  }, { x: hx, y: hy, rot: tilt });
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * The husky, low-poly, front-on
+ *
+ * A husky is known by its face pattern more than its outline — drawn here
+ * from a reference photo:
+ *   - a grey cap, parted by a thin white blaze down the middle;
+ *   - a white brow over each eye, boxed in by grey above and at the side;
+ *   - grey stripes either side of the blaze, down between the eyes;
+ *   - grey temples framing the face, and a grey line sweeping back from the
+ *     outer corner of each eye;
+ *   - white everywhere else: round the eyes, cheeks, muzzle and chin.
+ * So the coat does the work, not lines — the grey prints dense and the white
+ * nearly blank (see SPECIES.husky.tones), and there are few outlines inside
+ * the face to compete with the pattern.
+ *
+ * The muzzle is long, and front-on its length shows as depth: the far side of
+ * it is a plane in shadow, and the nose on its end is big and dark with a
+ * shine on it. Big upright ears, ice-blue eyes with round pupils, and a small
+ * closed mouth, open only when happy.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+function drawHusky(pen, p) {
+  const breathe = 1 + p.breath;
+  const by = (y) => 95 - (95 - y) * breathe;
+
+  // ── Tail: curled up behind the body on one side, wagging from its base.
+  pen.group(() => {
+    pen.solid(strip([
+      [0, 0],
+      [10, -3],
+      [15, -12],
+      [12, -22],
+      [5, -24],
+      [3, -18],
+    ], 7), { shadow: 0.5, coat: 'mark' });
+    pen.solid([[3, -18], [5, -24], [8, -23], [7, -17]], { outline: false, band: LIT });
+  }, { x: 66, y: 88, rot: p.tail * 0.35 });
+
+  // ── Body: dark saddle, broad in the shoulder.
+  pen.solid([
+    [28, 95],
+    [26, by(78)],
+    [31, by(63)],
+    [40, by(56)],
+    [60, by(56)],
+    [69, by(63)],
+    [74, by(78)],
+    [72, 95],
+  ], { shadow: 1.2, coat: 'mark' });
+
+  // White chest, a deep shield down between the legs.
+  pen.solid([[38, by(58)], [62, by(58)], [64, by(76)], [50, by(93)], [36, by(76)]], { shadow: 0.5, outline: false });
+
+  // Front legs, white.
+  pen.solid([[37, 79], [45, 79], [45, 95], [36, 95]], { shadow: 0.4 });
+  pen.solid([[55, 79], [63, 79], [64, 95], [55, 95]], { shadow: 0.4 });
+
+  // ── Head.
+  const hx = 50 + p.lookX * 3 + p.jx;
+  const hy = 38 + p.lookY * 2 + p.drop + p.jy - p.breath * 12;
+  const tilt = p.lookX * 0.1 + p.wobble;
+
+  pen.group(() => {
+    // Ears: big upright triangles, pale inside with a dark rim, a narrow
+    // crown between them.
+    const ear = (side, twitch) => {
+      pen.group(() => {
+        pen.solid([[-8, 6], [side * 1.5, -21 + p.earsBack * 9], [8, 6]], { shadow: 0.5, coat: 'mark' });
+        pen.solid([[-5.5, 4], [side * 1, -16 + p.earsBack * 7], [5.5, 4]], { outline: false, band: LIT });
+      }, { x: side * 11, y: -14, rot: side * (0.12 + p.earsBack * 0.6) + twitch * 0.3 });
+    };
+    ear(-1, p.earL);
+    ear(1, p.earR);
+
+    // The ruff: the fur of the cheeks and neck, in a V — widest at the
+    // cheeks, running straight in to a point under the chin. Its tufts are few
+    // and large and all point down and out along the sides of the V, like a
+    // sawtooth; small spikes in every direction read as a durian, not fur.
+    // Grey outside, white inside. Each side is listed top to bottom and
+    // mirrored for the other, so the V stays symmetrical.
+    const vee = (right) => [...right, ...right.slice(0, -1).reverse().map(([x, y]) => [-x, y])];
+    pen.solid(vee([
+      [18, -8],
+      [24, -1],
+      [28, 5],
+      [25, 9],
+      [27.5, 15.5],
+      [22, 16],
+      [23.5, 23.5],
+      [17, 23],
+      [16.5, 30.5],
+      [10, 30],
+      [6.5, 36.5],
+      [0, 41],
+    ]), { shadow: 0.8, coat: 'mark' });
+    pen.solid(vee([
+      [14, 5],
+      [19, 9],
+      [21.5, 14.5],
+      [17, 15.5],
+      [18.5, 22],
+      [13, 22],
+      [12.5, 28.5],
+      [7, 28.5],
+      [3.5, 34.5],
+      [0, 37],
+    ]), { shadow: 0.5, outline: false });
+
+    // The head, all in the grey coat to start: crown and temples. The cheeks
+    // are the ruff's now.
+    pen.solid([
+      [-14, -14],
+      [-6, -17],
+      [6, -17],
+      [14, -14],
+      [19, -6],
+      [21, 3],
+      [18, 12],
+      [10, 19],
+      [0, 21],
+      [-10, 19],
+      [-18, 12],
+      [-21, 3],
+      [-19, -6],
+    ], { shadow: 0.9, coat: 'mark' });
+
+    // The white face. It rises into a brow over each eye, stops short of the
+    // temples so the grey frames it, and dips between the eyes so the grey
+    // comes down there in two stripes either side of the blaze.
+    pen.solid([
+      [-14.5, -7],
+      [-11, -9.5],
+      [-6, -8],
+      [-3, -5],
+      [-1.3, -1.5],
+      [1.3, -1.5],
+      [3, -5],
+      [6, -8],
+      [11, -9.5],
+      [14.5, -7],
+      [14.5, -1],
+      [16, 6],
+      [19, 12],
+      [15, 18],
+      [6, 21],
+      [-6, 21],
+      [-15, 18],
+      [-19, 12],
+      [-16, 6],
+      [-14.5, -1],
+    ], { shadow: 0.6, outline: false });
+
+    // The blaze: a thin white stripe from the crown down to between the eyes.
+    pen.solid(strip([[0, -17], [0, -2]], 2.6), { outline: false, band: LIT });
+
+    // Eyeliner: a grey rim round each eye, and from its outer corner the
+    // eye-line sweeping back into the grey of the temple.
+    for (const side of [-1, 1]) {
+      const ex = side * 8;
+      pen.solid([
+        [ex - 6.2, -2],
+        [ex - 3, -5.6],
+        [ex + 3, -5.6],
+        [ex + 6.2, -2],
+        [ex + 3, 1.2],
+        [ex - 3, 1.2],
+      ], { outline: false, coat: 'mark', band: SHADE });
+      pen.solid(strip([[side * 13.5, -2.2], [side * 16.5, -3.8], [side * 19, -3.5]], 2), { outline: false, coat: 'mark', band: SHADE });
+    }
+
+    // Eyes: small almonds, round pupils, in the accent — the site's stand-in
+    // for a husky's ice blue.
+    pen.eye(-8, -2, 7.5, p, { cls: 'a', pupil: 'round' });
+    pen.eye(8, -2, 7.5, p, { cls: 'a', pupil: 'round' });
+
+    // No separate muzzle: the white face is the muzzle. Drawn as its own
+    // shaded shape it read as swelling rather than length — the shine on the
+    // nose gives the depth instead.
+
+    // The nose: low, about a seventh of the face across, with a shine that
+    // makes it a wet, rounded nose rather than a flat patch.
+    pen.blob([[-3.2, 10], [3.2, 10], [3.6, 12], [1.8, 13.8], [-1.8, 13.8], [-3.6, 12]]);
+    pen.blob([[-2.4, 10.5], [-0.6, 10.5], [-0.8, 11.5], [-2.4, 11.5]], 'shine');
+
+    // Mouth: a dark band a cell thick — a short line down from the nose into
+    // a wide grin curving up toward the cheeks.
+    pen.stroke([[0, 13.8], [0, 16]], false, { dark: true });
+    for (const side of [-1, 1]) {
+      pen.stroke([[0, 16], [side * 3.5, 17.2], [side * 7, 16.5], [side * 10, 14.2]], false, { dark: true });
+    }
+    if (p.happy > 0.5) {
+      pen.blob([[-4.5, 17], [4.5, 17], [3, 19.5], [-3, 19.5]]);
+    }
+  }, { x: hx, y: hy, rot: tilt });
+}
+
+const SPECIES = {
+  cat: { draw: drawCat, view: { x: 16, y: 10, w: 86, h: 89 }, name: 'CAT', tones: 'cat' },
+  husky: {
+    draw: drawHusky,
+    view: { x: 14, y: 0, w: 88, h: 99 },
+    name: 'HUSKY',
+    tones: 'husky',
+  },
+};
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Eyes: hand-made glyph sprites
+ *
+ * A sampled eye comes out ragged — it is only a few cells across, and its
+ * slanted sides land on cell boundaries as runs of one, two or three glyphs.
+ * So eyes are drawn by hand, in three sizes, and stamped at the eye's centre.
+ * '#' is the iris; the pupil '|' is placed over one of the '#' in the pupil
+ * row, as far along as the pet is looking. Spaces are transparent.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const EYES = {
+  L: {
+    open:   [' /###\\ ', '|#####|', ' \\###/ '],
+    half:   [' _____ ', '|#####|', ' \\___/ '],
+    closed: ['       ', ' ----- ', '       '],
+    happy:  ['       ', '  /^\\  ', ' /   \\ '],
+    dizzy:  [' \\   / ', '   X   ', ' /   \\ '],
+  },
+  M: {
+    open:   ['/###\\', '\\###/'],
+    half:   ['-----', '\\###/'],
+    closed: ['     ', '-----'],
+    happy:  [' /^\\ ', '/   \\'],
+    dizzy:  [' \\ / ', ' / \\ '],
+  },
+  S: {
+    open:   ['<#>'],
+    half:   ['-#-'],
+    closed: ['---'],
+    happy:  ['/^\\'],
+    dizzy:  [' x '],
+  },
+};
+
+/** Which sprite fits an eye this many cells wide. */
+const eyeSize = (cells) => (cells >= 7 ? 'L' : cells >= 4 ? 'M' : 'S');
+
+function stampEye(eye, grid, cls, cols, rows) {
+  const sprite = EYES[eyeSize(eye.width / CELL_W)][eye.state];
+  const h = sprite.length;
+  const w = sprite[0].length;
+  const top = Math.round(eye.y / CELL_H - h / 2);
+  const left = Math.round(eye.x / CELL_W - w / 2);
+
+  // The pupil: in the widest row of iris, over the '#' as far along as the pet
+  // is looking. Dilated, it takes the next '#' too.
+  let pupil = [];
+  const irisCount = (row) => [...row].filter((ch) => ch === '#').length;
+  let pr = -1;
+  sprite.forEach((row, i) => {
+    if (irisCount(row) > 0 && (pr < 0 || irisCount(row) > irisCount(sprite[pr]))) pr = i;
+  });
+  if (pr >= 0) {
+    const irises = [...sprite[pr]].map((ch, i) => (ch === '#' ? i : -1)).filter((i) => i >= 0);
+    const at = Math.round((clamp(eye.look, -1, 1) * 0.5 + 0.5) * (irises.length - 1));
+    pupil = [irises[at]];
+    if (eye.dilated && irises.length > 2) pupil.push(irises[Math.min(at + 1, irises.length - 1)]);
+  }
+
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      const ch = sprite[r][c];
+      if (ch === ' ') continue;
+      const gr = top + r;
+      const gc = left + c;
+      if (gr < 0 || gr >= rows || gc < 0 || gc >= cols) continue;
+      const i = gr * cols + gc;
+      const isPupil = r === pr && pupil.includes(c);
+      grid[i] = isPupil ? '|' : ch;
+      // An accent eye has a bright pupil; a white eye has a muted one.
+      cls[i] = isPupil ? (eye.cls === 'a' ? 'l' : 's') : eye.cls;
+    }
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * A view: one <pre>, its canvases, and the sampler
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** A monospace character is 0.6em wide; at line-height 1 a cell is 0.6 : 1. */
+const CELL_W = 6;
+const CELL_H = 10;
+
+/**
+ * Tone presets, per species: characters for the toon bands per coat, [lit,
+ * shadow], and optionally their colour classes (`cls`, same shape). `base` is
+ * the main coat — all of the cat, the husky's white — and `mark` is dark
+ * markings.
+ *
+ * Each species has its own list because the right way round differs. The cat
+ * is a dark cat: its fur prints sparse and dim. The husky's white fur has to
+ * print bright and dense, and its grey dim — the first attempt used the cat's
+ * inks, so the white face was as dark as the page and the grey cap the
+ * brightest thing on it, and every marking read in negative.
+ *
+ * No block glyphs (░ ▒ ▓): the web build of JetBrains Mono does not have them,
+ * and the fallback font's are wider than a cell, which tears the grid.
+ */
+const TONES = {
+  cat: {
+    hatch: { label: 'HATCH    %', base: [' ', '%'], mark: [':', '#'] },
+    dots: { label: 'DOTS  . :', base: ['.', ':'], mark: ['+', '*'] },
+    clean: { label: 'CLEAN    .', base: [' ', '.'], mark: [':', '='] },
+    dense: { label: 'DENSE . =', base: ['.', '='], mark: ['#', '%'] },
+  },
+  husky: {
+    dense: { label: 'DENSE # =', base: ['#', '='], mark: [':', '.'], cls: { base: ['l', 's'], mark: ['', ''] } },
+    fur: { label: 'FUR   % +', base: ['%', '+'], mark: [':', '.'], cls: { base: ['l', 's'], mark: ['', ''] } },
+    soft: { label: 'SOFT  * :', base: ['*', ':'], mark: ['.', ' '], cls: { base: ['l', 's'], mark: ['s', ''] } },
+    heavy: { label: 'HEAVY @ %', base: ['@', '%'], mark: ['=', '-'], cls: { base: ['l', 's'], mark: ['', ''] } },
+    light: { label: 'LIGHT + .', base: ['+', '.'], mark: ['.', ' '], cls: { base: ['l', 's'], mark: ['s', ''] } },
+  },
+};
+
+class AsciiView {
+  constructor(pre, cols, rows) {
+    this.pre = pre;
+    this.canvases = {
+      tone: document.createElement('canvas'),
+      lines: document.createElement('canvas'),
+      accent: document.createElement('canvas'),
+      feature: document.createElement('canvas'),
+    };
+    this.resize(cols, rows);
+  }
+
+  resize(cols, rows) {
+    this.cols = cols;
+    this.rows = rows;
+    this.ctx = {};
+    for (const [k, c] of Object.entries(this.canvases)) {
+      c.width = cols * CELL_W;
+      c.height = rows * CELL_H;
+      this.ctx[k] = c.getContext('2d', { willReadFrequently: true });
+    }
+  }
+
+  /**
+   * Design space to canvas pixels: the species' own bounds — ears to paws,
+   * body to tail tip, with room for particles — centred and fitted, so the pet
+   * fills its view.
+   */
+  frame(view) {
+    const W = this.canvases.tone.width;
+    const H = this.canvases.tone.height;
+    const u = Math.min(W / view.w, H / view.h);
+    return { u, ox: (W - view.w * u) / 2 - view.x * u, oy: (H - view.h * u) / 2 - view.y * u };
+  }
+
+  render(sim, opts) {
+    const W = this.canvases.tone.width;
+    const H = this.canvases.tone.height;
+    const species = SPECIES[opts.species];
+    const { u, ox, oy } = this.frame(species.view);
+
+    for (const c of Object.values(this.ctx)) {
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.fillStyle = '#000';
+      c.fillRect(0, 0, W, H);
+      c.setTransform(u, 0, 0, u, ox, oy);
+      // Hard edges: anti-aliased shape edges would smear the bands.
+      c.imageSmoothingEnabled = false;
+    }
+    const pen = new Pen(this.ctx.tone, this.ctx.lines, this.ctx.accent, this.ctx.feature, { ...opts, lineW: CELL_W * opts.lineW });
+    species.draw(pen, sim.pose);
+
+    const tone = this.ctx.tone.getImageData(0, 0, W, H).data;
+    const lines = this.ctx.lines.getImageData(0, 0, W, H).data;
+    const accent = this.ctx.accent.getImageData(0, 0, W, H).data;
+    const feature = this.ctx.feature.getImageData(0, 0, W, H).data;
+
+    const { cols, rows } = this;
+    const n = CELL_W * CELL_H;
+    const presets = TONES[species.tones];
+    const tones = presets[opts.tones[opts.species]] ?? Object.values(presets)[0];
+    const grid = new Array(cols * rows);
+    const cls = new Array(cols * rows);
+    // Line cells, before thinning: the winning direction, how much of the
+    // cell it covers, and whether it is on the baseline or accented.
+    const lineDir = new Array(cols * rows).fill(null);
+    const lineCov = new Float32Array(cols * rows);
+    const lineLow = new Uint8Array(cols * rows);
+    const lineAcc = new Uint8Array(cols * rows);
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const k = { v: 0, h: 0, s: 0, b: 0 };
+        let hY = 0;
+        let lit = 0;
+        let shade = 0;
+        let marked = 0;
+        let accentLine = 0;
+        // Eye, per quadrant: iris and pupil coverage, and the iris colour.
+        const qi = [0, 0, 0, 0];
+        const qp = [0, 0, 0, 0];
+        const qg = [0, 0, 0, 0];
+        let irisAccent = 0;
+        let irisWhite = 0;
+        let socket = 0;
+        let glint = 0;
+        // Features (nose, mouth), per quadrant: dark, and shine.
+        const qd = [0, 0, 0, 0];
+        const qs = [0, 0, 0, 0];
+        const qm = [0, 0, 0, 0];
+
+        for (let y = 0; y < CELL_H; y++) {
+          let i = ((r * CELL_H + y) * W + c * CELL_W) * 4;
+          for (let x = 0; x < CELL_W; x++, i += 4) {
+            const lr = lines[i] > 127;
+            const lg = lines[i + 1] > 127;
+            const lb = lines[i + 2] > 127;
+            if (lr && lg) k.b++;
+            else if (lr) k.v++;
+            else if (lg) { k.h++; hY += y; }
+            else if (lb) k.s++;
+
+            const t = tone[i];
+            if (t > (LIT + SHADE) / 2) shade++;
+            else if (t > LIT / 2) lit++;
+            if (tone[i + 1] > 127) marked++;
+            if (tone[i + 2] > 127) {
+              glint++;
+              qg[(y < CELL_H / 2 ? 0 : 2) + (x < CELL_W / 2 ? 0 : 1)]++;
+            }
+
+            if (feature[i] > 127) qd[(y < CELL_H / 2 ? 0 : 2) + (x < CELL_W / 2 ? 0 : 1)]++;
+            if (feature[i + 1] > 127) qs[(y < CELL_H / 2 ? 0 : 2) + (x < CELL_W / 2 ? 0 : 1)]++;
+            if (feature[i + 2] > 127) qm[(y < CELL_H / 2 ? 0 : 2) + (x < CELL_W / 2 ? 0 : 1)]++;
+
+            if (accent[i + 2] > 127) accentLine++;
+            // Red: 64 is the eye opening, 160 a white iris, 255 an accent one.
+            const ir = accent[i];
+            if (ir > 32) {
+              socket++;
+              if (ir > 100) {
+                const q = (y < CELL_H / 2 ? 0 : 2) + (x < CELL_W / 2 ? 0 : 1);
+                qi[q]++;
+                if (accent[i + 1] > 127) qp[q]++;
+                if (ir > 200) irisAccent++; else irisWhite++;
+              }
+            }
+          }
+        }
+
+        const idx = r * cols + c;
+        const lineTotal = k.v + k.h + k.s + k.b;
+        let ch = ' ';
+        let kind = '';
+
+        if (lineTotal / n > opts.lineThr) {
+          // The direction covering most of the cell wins. Printed after the
+          // thinning pass below; the tone underneath stays as a fallback.
+          let best = 'v';
+          for (const d of ['h', 's', 'b']) if (k[d] > k[best]) best = d;
+          lineDir[idx] = best;
+          lineCov[idx] = k[best] / n;
+          // A horizontal line in the lower part of the cell sits on the
+          // baseline: '_' rather than '-'.
+          lineLow[idx] = best === 'h' && hY / k.h > CELL_H * 0.62 ? 1 : 0;
+          lineAcc[idx] = accentLine / n > 0.15 ? 1 : 0;
+        }
+
+        const coatKey = marked / n > 0.5 ? 'mark' : 'base';
+        const coat = tones[coatKey];
+        const inks = tones.cls?.[coatKey] ?? (coatKey === 'mark' ? ['s', 's'] : ['', 's']);
+        if (shade / n > 0.45) {
+          ch = coat[1];
+          kind = inks[1];
+        } else if ((lit + shade) / n > 0.45) {
+          ch = coat[0];
+          kind = inks[0];
+        }
+
+        grid[idx] = ch;
+        cls[idx] = kind;
+
+        // Eye cells print as quadrants. Each sub-pixel is off (the dark of the
+        // opening, and the pupil), iris, or glint. They win over everything
+        // below.
+        const irisTotal = socket;
+        if (socket / n > 0.04) {
+          const qn = n / 4;
+          let pattern = '';
+          for (let q = 0; q < 4; q++) {
+            if (qg[q] / qn > 0.3 && qi[q] / qn > 0.1) pattern += '2';
+            else if (qi[q] / qn > 0.45 && qp[q] / qn < 0.4) pattern += '1';
+            else pattern += '0';
+          }
+          grid[idx] = { q: pattern };
+          cls[idx] = irisWhite > irisAccent ? 'l' : 'a';
+          lineDir[idx] = null;
+        }
+
+        // Feature cells, the same way: each sub-pixel dark, shine or off.
+        const featureTotal = qd[0] + qd[1] + qd[2] + qd[3] + qs[0] + qs[1] + qs[2] + qs[3];
+        if (featureTotal / n > 0.04 && irisTotal / n <= 0.04) {
+          const qn = n / 4;
+          let pattern = '';
+          for (let q = 0; q < 4; q++) pattern += qs[q] / qn > 0.4 ? '2' : qd[q] / qn > 0.4 ? '1' : '0';
+          grid[idx] = { q: pattern };
+          cls[idx] = 'm';
+          lineDir[idx] = null;
+        }
+
+        // Dark line cells (the mouth): solid quadrant blocks in the darkest
+        // ink, so the line reads as a dark band cut through the white fur. The
+        // nose's mid grey sat too close to the fur's average brightness, and
+        // carving the line out of solid white left ragged white chips.
+        const mouthTotal = qm[0] + qm[1] + qm[2] + qm[3];
+        if (mouthTotal / n > 0.12 && irisTotal / n <= 0.04 && featureTotal <= mouthTotal) {
+          const qn = n / 4;
+          let pattern = '';
+          for (let q = 0; q < 4; q++) pattern += qm[q] / qn > 0.35 ? '1' : '0';
+          grid[idx] = { q: pattern };
+          cls[idx] = 'k';
+          lineDir[idx] = null;
+        }
+      }
+    }
+
+    // Thinning. A line near a cell boundary covers both cells enough to
+    // print twice — '||', '\\'. Across its width, a line keeps only the cell
+    // it covers most: vertical and diagonal lines compare left and right
+    // neighbours (cells are narrow, so a diagonal spreads sideways),
+    // horizontal lines compare up and down. Ties go to the first cell.
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        const d = lineDir[idx];
+        if (!d) continue;
+        const across = d === 'h' ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]];
+        let keep = true;
+        for (const [dc, dr] of across) {
+          const nc = c + dc;
+          const nr = r + dr;
+          if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+          const j = nr * cols + nc;
+          if (lineDir[j] !== d) continue;
+          const first = dc < 0 || dr < 0;
+          if (lineCov[j] > lineCov[idx] || (first && lineCov[j] === lineCov[idx])) { keep = false; break; }
+        }
+        if (!keep) continue;
+        grid[idx] = d === 'h' && lineLow[idx] ? '_' : DIR[d].glyph;
+        cls[idx] = lineAcc[idx] ? 'a' : 'l';
+      }
+    }
+
+    // Eyes, stamped over everything but particles.
+    for (const eye of pen.eyes) stampEye(eye, grid, cls, cols, rows);
+
+    // Particles, printed into the grid.
+    for (const q of sim.particles) {
+      const c = Math.round((ox + q.x * u) / CELL_W);
+      const r = Math.round((oy + q.y * u) / CELL_H);
+      if (r < 0 || r >= rows) continue;
+      for (let j = 0; j < q.text.length; j++) {
+        const cc = c + j;
+        if (cc < 0 || cc >= cols) continue;
+        grid[r * cols + cc] = q.text[j];
+        cls[r * cols + cc] = q.cls;
+      }
+    }
+
+    // Emit as runs of one class, so the DOM is a handful of spans per row.
+    let html = '';
+    for (let r = 0; r < rows; r++) {
+      let run = '';
+      let runCls = null;
+      const flush = () => {
+        if (!run) return;
+        html += runCls && opts.color ? `<span class="${runCls}">${run}</span>` : run;
+        run = '';
+      };
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const g = grid[i];
+        if (typeof g === 'object') {
+          flush();
+          runCls = null;
+          html += `<i class="q q${g.q} ${cls[i] || 'a'}"></i>`;
+          continue;
+        }
+        const kind = cls[i] || null;
+        if (kind !== runCls) { flush(); runCls = kind; }
+        run += g === '<' ? '&lt;' : g === '>' ? '&gt;' : g === '&' ? '&amp;' : g;
+      }
+      flush();
+      html += '\n';
+    }
+    this.pre.innerHTML = html;
+    this.pre.classList.toggle('mono', !opts.color);
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Quadrant cells: every pattern of a 2 x 2 cell, as CSS backgrounds
+ *
+ * A pattern is four digits — top-left, top-right, bottom-left, bottom-right,
+ * the order the sampler counts in — each 0 (off), 1 (iris, the cell's --qc)
+ * or 2 (glint, --gc). 81 patterns, generated here rather than written out.
+ * Each lit quadrant is one gradient layer a quarter of the cell in size.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+(function quadrants() {
+  const at = ['0 0', '100% 0', '0 100%', '100% 100%'];
+  const colour = ['', 'var(--qc)', 'var(--gc)'];
+  let css = '';
+  for (let k = 0; k < 81; k++) {
+    const digits = [0, 1, 2, 3].map((q) => Math.floor(k / 3 ** (3 - q)) % 3);
+    const layers = digits
+      .map((d, q) => (d ? `linear-gradient(${colour[d]}, ${colour[d]}) ${at[q]} / 50% 50% no-repeat` : null))
+      .filter(Boolean);
+    if (layers.length) css += `pre.ascii .q${digits.join('')} { background: ${layers.join(', ')}; }\n`;
+  }
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.append(style);
+})();
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Wiring
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const $ = (id) => document.getElementById(id);
+const sim = new Sim();
+
+const opts = {
+  species: 'cat',
+  eyes: 'blocks',
+  fps: 24,
+  color: true,
+  lineW: 0.7,
+  // Dark line work (the mouth), in cells across.
+  darkW: 1,
+  lineThr: 0.22,
+  shadowD: 7,
+  // Eye opening and iris, as multiples of each species' drawn size.
+  eyeScale: 1,
+  irisScale: 1,
+  // The chosen preset, per species, so switching tabs keeps each pet's own.
+  tones: { cat: 'hatch', husky: 'dense' },
+  reduced: false,
+};
+
+/** Fill the TONES select with the current species' presets. */
+function fillTones() {
+  const select = $('tone');
+  const presets = TONES[SPECIES[opts.species].tones];
+  select.replaceChildren(
+    ...Object.entries(presets).map(([key, preset]) => new Option(preset.label, key, false, key === opts.tones[opts.species])),
+  );
+}
+
+// Rows follow from columns so the view has the species' proportions.
+const rowsFor = (cols) => {
+  const view = SPECIES[opts.species].view;
+  return Math.round((cols * CELL_W * view.h) / view.w / CELL_H);
+};
+
+const small = new AsciiView($('small'), 40, rowsFor(40));
+const big = new AsciiView($('big'), 72, rowsFor(72));
+const views = [small, big];
+
+// Species tabs. The simulation is shared, so a mood carries across.
+for (const tab of document.querySelectorAll('[data-species]')) {
+  tab.addEventListener('click', () => {
+    opts.species = tab.dataset.species;
+    for (const other of document.querySelectorAll('[data-species]')) {
+      other.setAttribute('aria-pressed', String(other === tab));
+    }
+    small.resize(40, rowsFor(40));
+    big.resize(Number($('cols').value), rowsFor(Number($('cols').value)));
+    fillTones();
+  });
+}
+fillTones();
+
+// Modes.
+for (const key of ['auto', 'idle', 'sleep', 'grumpy', 'hyper', 'happy', 'dizzy']) {
+  const b = document.createElement('button');
+  b.textContent = key.toUpperCase();
+  b.dataset.mode = key;
+  b.setAttribute('aria-pressed', String(key === 'auto'));
+  b.addEventListener('click', () => {
+    sim.forced = key;
+    sim.transient = null;
+    for (const other of $('modes').children) other.setAttribute('aria-pressed', String(other === b));
+  });
+  $('modes').append(b);
+}
+
+/** A gentle curve: each level takes a little more XP than the last. */
+const level = (xp) => Math.floor(Math.sqrt(Math.max(0, xp) / 25));
+
+const bind = (id, out, apply, fmt = (v) => v) => {
+  const el = $(id);
+  const update = () => { apply(el.value); if (out) $(out).textContent = fmt(el.value); };
+  el.addEventListener('input', update);
+  update();
+};
+bind('coffee', 'coffeeOut', (v) => { sim.data.coffee = Number(v); }, (v) => `${v}%`);
+bind('fps', 'fpsOut', (v) => { opts.fps = Number(v); });
+bind('cols', 'colsOut', (v) => { big.resize(Number(v), rowsFor(Number(v))); });
+bind('font', 'fontOut', (v) => { $('big').style.fontSize = `${v}px`; }, (v) => `${v}px`);
+bind('lineW', 'lineWOut', (v) => { opts.lineW = Number(v) / 100; }, (v) => (Number(v) / 100).toFixed(2));
+bind('lineThr', 'lineThrOut', (v) => { opts.lineThr = Number(v) / 100; }, (v) => (Number(v) / 100).toFixed(2));
+bind('shadowD', 'shadowDOut', (v) => { opts.shadowD = Number(v); });
+bind('xp', 'lvlOut', () => {}, (v) => `L${String(level(Number(v))).padStart(2, '0')}`);
+$('time').addEventListener('change', (e) => { sim.data.time = e.target.value; });
+bind('darkW', 'darkWOut', (v) => { opts.darkW = Number(v) / 100; }, (v) => `${(Number(v) / 100).toFixed(1)} CELL`);
+$('mouthInk').addEventListener('change', (e) => { document.documentElement.style.setProperty('--ink-dark', e.target.value); });
+bind('eyeScale', 'eyeScaleOut', (v) => { opts.eyeScale = Number(v) / 100; }, (v) => `${v}%`);
+bind('irisScale', 'irisScaleOut', (v) => { opts.irisScale = Number(v) / 100; }, (v) => `${v}%`);
+$('tone').addEventListener('change', (e) => { opts.tones[opts.species] = e.target.value; });
+$('eyes').addEventListener('change', (e) => { opts.eyes = e.target.value; });
+$('color').addEventListener('change', (e) => { opts.color = e.target.checked; });
+$('debug').addEventListener('change', (e) => { $('debugWrap').classList.toggle('on', e.target.checked); });
+$('reduced').addEventListener('change', (e) => { opts.reduced = e.target.checked; });
+
+// Gaze follows the cursor, measured from the enlarged view's centre.
+window.addEventListener('mousemove', (e) => {
+  const box = $('big').getBoundingClientRect();
+  const x = (e.clientX - (box.left + box.width / 2)) / (box.width / 2);
+  const y = (e.clientY - (box.top + box.height / 2)) / (box.height / 2);
+  sim.look(x * 0.8, y * 0.8);
+});
+
+// Click: purr. Three quick clicks: dizzy.
+let clicks = [];
+for (const v of views) {
+  v.pre.addEventListener('click', () => {
+    clicks = clicks.filter((t) => sim.t - t < 0.6);
+    clicks.push(sim.t);
+    if (clicks.length >= 3) { sim.react('dizzy', 2.5); clicks = []; }
+    else sim.react('happy', 2.2);
+  });
+}
+
+// The loop: the pose updates every frame; the ASCII prints at the chosen fps.
+// Paused while the tab is hidden.
+let last = performance.now();
+let acc = 1;
+function tick(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+
+  if (!opts.reduced) sim.step(dt);
+  else {
+    sim.pose = { ...sim.pose, ...MOODS.idle, blink: 1, jx: 0, jy: 0, breath: 0, tail: 0.1, wobble: 0, lookX: 0, lookY: 0 };
+    sim.particles = [];
+  }
+
+  acc += dt;
+  if (acc >= 1 / opts.fps) {
+    acc = 0;
+    for (const v of views) v.render(sim, opts);
+    if ($('debugWrap').classList.contains('on')) {
+      for (const [src, dst] of [[big.canvases.tone, 'dbgTone'], [big.canvases.lines, 'dbgLines'], [big.canvases.accent, 'dbgAccent']]) {
+        const d = $(dst);
+        d.width = src.width;
+        d.height = src.height;
+        d.getContext('2d').drawImage(src, 0, 0);
+      }
+    }
+    const mood = sim.mood();
+    $('mood').textContent = MOOD_LABEL[mood];
+    $('lvl').textContent = `LVL ${String(level(Number($('xp').value))).padStart(2, '0')} · ${$('xp').value} XP`;
+    $('alive').textContent = mood === 'sleep' ? 'IDLE' : 'ALIVE';
+  }
+  if (!document.hidden) requestAnimationFrame(tick);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { last = performance.now(); requestAnimationFrame(tick); }
+});
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
