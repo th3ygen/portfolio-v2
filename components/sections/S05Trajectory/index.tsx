@@ -106,7 +106,13 @@ export function S05Trajectory() {
                 data-active={index === active}
                 data-status={post.status}
               >
-                <div className={styles.ghost} data-traj-ghost data-ghost-numeral aria-hidden="true">
+                {/*
+                  Drifts against the scroll at the same depth as every other
+                  section's ghost numeral, and further than the greebles in
+                  front of it (their data-py is 10 to 18), so the plate reads
+                  as the deepest layer of the post.
+                */}
+                <div className={styles.ghost} data-py="-46" data-traj-ghost data-ghost-numeral aria-hidden="true">
                   {post.year}
                 </div>
                 <div className={styles.hatch} data-py="18" aria-hidden="true" />

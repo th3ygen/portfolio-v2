@@ -94,21 +94,41 @@
   align-items: center;
 }
 
-/* Greebles, re-inked for the dark ground at the same weights as s02's. */
+/*
+ * Greebles, inked at the weights s04 and s01 use on the same ground.
+ *
+ * They were at s02's weights — borderDim1, and the hatch and dots at under
+ * half opacity on top of that — which on #070809 left them a shade or two off
+ * the ground: there in a colour picker, not on a screen. The post being read
+ * lifts its set one step further (below), so they follow the reader down the
+ * timeline with the rail node and the role.
+ */
 .ghost {
   position: absolute;
   top: 50%;
   right: 1%;
-  transform: translateY(-50%);
+  /* Centred by margin — half the 0.78 line box — not by translateY(-50%):
+     the transform belongs to the scroll drift (data-py), and a percentage
+     translate under it would be baked to pixels once and go stale on resize. */
+  margin-top: -0.39em;
   pointer-events: none;
   z-index: 0;
   font-family: var(--font-display), Impact, sans-serif;
   font-size: clamp(150px, 21vw, 300px);
   line-height: 0.78;
   letter-spacing: -0.05em;
-  color: transparent;
-  -webkit-text-stroke: 1px var(--color-surface3);
+  /*
+   * A faint fill, not the 1px -webkit-text-stroke outline the other ghost
+   * numerals use. At this size a hairline that dark anti-aliases into a
+   * broken, uneven line — thinner on every curve and diagonal — and a stroke
+   * traces each contour of the glyph, so the font's overlapping shapes showed
+   * as stray lines inside the numerals (the join in the 2). A fill has no
+   * inner contours and anti-aliases cleanly, and it holds up while the
+   * scroll drift moves it at sub-pixel offsets.
+   */
+  color: rgba(232, 236, 234, 0.016);
   user-select: none;
+  transition: color 0.24s steps(2);
 }
 
 .hatch {
@@ -119,11 +139,11 @@
   height: 120px;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.42;
+  --hatch-ink: var(--color-borderMid1);
   background: repeating-linear-gradient(
     135deg,
-    var(--color-borderDim1) 0px,
-    var(--color-borderDim1) 4px,
+    var(--hatch-ink) 0px,
+    var(--hatch-ink) 4px,
     transparent 4px,
     transparent 11px
   );
@@ -137,8 +157,7 @@
   height: 120px;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.5;
-  background-image: radial-gradient(var(--color-borderDim1) 1px, transparent 1px);
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
   background-size: 12px 12px;
 }
 
@@ -154,8 +173,8 @@
   width: 86px;
 }
 
-.bar { height: 3px; background: var(--color-borderDim1); }
-.barStrong { height: 3px; background: var(--color-textGhost); }
+.bar { height: 3px; background: var(--color-border); }
+.barStrong { height: 3px; background: var(--color-borderMid3); transition: background-color 0.24s steps(2); }
 
 .rail {
   position: relative;
@@ -232,6 +251,16 @@
 .post[data-active='true'] .role { color: var(--color-textPrimary); }
 
 /*
+ * Its greebles lift with it, one grey step brighter. The ghost year stays
+ * neutral: a trace of the accent on it was tried and was one green too many
+ * behind a green year and a green rail node. The strong bar takes the
+ * half-strength accent s00's readout bars use.
+ */
+.post[data-active='true'] .ghost { color: rgba(232, 236, 234, 0.028); }
+.post[data-active='true'] .hatch { --hatch-ink: var(--color-borderMid3); }
+.post[data-active='true'] .barStrong { background: rgba(198, 242, 26, 0.5); }
+
+/*
  * Still running. The status carries the accent and a pulsing dot — the same
  * live signal the masthead uses — because these two are the only posts on the
  * page that are not history.
@@ -261,7 +290,9 @@
   .stickyMeta,
   .post[data-status='ACTIVE'] .status::before { animation: none; }
   .railDot,
-  .role { transition: none; }
+  .role,
+  .ghost,
+  .barStrong { transition: none; }
 }
 
 @media (max-width: 900px) {
