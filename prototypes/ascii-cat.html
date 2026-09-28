@@ -16,26 +16,33 @@
 
   How a frame is made:
     1. A pose simulation (Sim) runs every frame: breathing, blinking, ear
-       flicks, tail sway, gaze and mood.
-    2. Each view (AsciiView) draws the cat from the pose onto three hidden
+       flicks, tail sway, gaze, mood, idle routines and particles.
+    2. Each view (AsciiView) draws the pet from the pose onto four hidden
        canvases:
          - TONE: which toon band each point is in — lit, or in shadow — on
            the red channel, and which coat — base or dark markings — on the
            green. Hard bands, no gradients: the shadow is the shape minus a
            copy of itself nudged toward the light, so it is a crisp crescent
            on the far side.
-         - LINES: every outline and feature line, drawn as straight segments,
-           each coloured by its own direction (| - / \). A cell a line passes
-           through prints the glyph of that line's direction — the direction
-           is known, not guessed from pixels, so outlines stay one clean
-           character thick.
-         - ACCENT: lines that print in the accent colour.
-       Eyes are not drawn at all: each is stamped as a hand-made glyph sprite
-       (see EYES), because an eye is only a few cells across and a sampled
-       polygon that small comes out ragged.
-    3. Each character cell prints, in priority order: an eye stamp, a line
-       glyph, the shadow band, the lit band, or nothing.
-    4. Particles (z, <3, !, *) are printed straight into the grid.
+         - LINES: every outline, drawn as straight segments, each coloured by
+           its own direction (| - / \). A cell a line passes through prints
+           the glyph of that line's direction — the direction is known, not
+           guessed from pixels, so outlines stay one clean character thick.
+         - ACCENT: the eyes — opening, iris, pupil — and lines that print in
+           the accent colour.
+         - FEATURE: small solid shapes — nose, mouth, tongue — and their shine.
+    3. Each character cell prints, in priority order: an eye, a feature, a
+       line glyph, the shadow band, the lit band, or nothing. Eyes and
+       features print as quadrant cells (2 x 2 sub-pixels, painted in CSS),
+       not glyphs: a shape a few cells across sampled into glyphs is ragged.
+    4. Then, over the grid: eye sprites (the SPRITES eye shader), dizzy
+       spirals, hairlines (lids, whiskers — one sub-pixel thick), the moon at
+       night, text particles (z, <3, prrr, brrr) and sprite ones (the anger
+       mark, '!').
+
+  Around it: the interactions (tap, circle, poke, stroke, startle, doze,
+  coffee), each with its own tab in the INTERACTION LAB so it can be tried
+  alone; status badges over each view; and the COFFEE card to feed it from.
 
   Nothing here depends on the site. Serve the folder, or open the file.
 -->
@@ -711,7 +718,7 @@ const ROUTINES = {
   },
 };
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP', eager: 'WANTS THAT' };
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'GRUMPY', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP', eager: 'WANTS THAT' };
 
 class Sim {
   constructor() {
