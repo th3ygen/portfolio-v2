@@ -1,47 +1,57 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { TRAJECTORY_LABEL } from '@/content/trajectory';
-import { gsap, useGSAP } from '@/components/motion/gsap';
-import { EASE, SCRUB } from '@/components/motion/tokens';
+import { ScrollTrigger, useGSAP } from '@/components/motion/gsap';
 import { prefersReducedMotion } from '@/components/motion/useReducedMotion';
-import { zoomScale } from '@/lib/zoom/camera';
-import { handAngles, rewindLabel } from '@/lib/zoom/clock';
-import { BrutalistClock } from './BrutalistClock';
-import { ZoomWords, TRAIL_OFFSETS, TRAIL_OPACITY } from './ZoomWords';
-import { DOT_R } from '@/components/odometer/YearOdometer';
+import { useSmoothScroll } from '@/components/motion/SmoothScrollProvider';
+import { rewindLabel } from '@/lib/zoom/clock';
+import { RewindWorld } from './RewindWorld';
+import { STREAK_DASH, buildRewind, setOpeningFrame } from './rewindTimeline';
+import { UptimeWidgets } from './UptimeWidgets';
+import { UPTIME_SINCE } from '@/content/uptime';
+import { createRewindGate } from './rewindGate';
 import styles from './S04ToS05Zoom.module.css';
 
+/** The year the trajectory rewinds to: the first post's. */
+const END_YEAR = UPTIME_SINCE;
+
 /**
- * When the dot opens into a ring, and when the opening reaches the dot's full
- * radius. By the start the dot is a couple of hundred pixels across on a
- * desktop frame — big enough to read as something you could go through. By
- * the end the ring's green band has swept out past the corners.
+ * The warp streaks, as angles around the dot. Evenly spaced with a fixed
+ * jitter, so the tunnel is irregular but identical on every visit and on the
+ * server.
  */
-const OPEN_FROM = 0.55;
-const OPEN_TO = 0.9;
-
-/** The year the trajectory rewinds to — POST.01. */
-const END_YEAR = 2020;
-
-/**
- * Where SINCE <year> takes over. UPTIME's column has fully faded by 0.16, so
- * this leaves a beat of empty frame between the two rather than crossing them.
- */
-const HANDOFF = 0.17;
+const STREAKS = Array.from({ length: 32 }, (_, i) => {
+  const jitter = ((i * 37) % 11) - 5;
+  const angle = ((i * 360) / 32 + jitter) * (Math.PI / 180);
+  const inner = 60 + ((i * 53) % 7) * 12;
+  // Rounded: the server's and the browser's trig disagree in the last digit,
+  // and an unrounded coordinate is a hydration mismatch.
+  const at = (r: number, f: (a: number) => number) => Math.round(f(angle) * r * 10) / 10;
+  return { x1: at(inner, Math.cos), y1: at(inner, Math.sin), x2: at(760, Math.cos), y2: at(760, Math.sin) };
+});
 
 /**
- * The pinned s04 → s05 transition.
+ * The s04 → s05 transition, in two sections on one stage.
  *
- * One ScrollTrigger, one timeline. A single linear tween drives `p`; scale
- * comes from `zoomScale(p)` and is never tweened directly, because apparent
- * zoom speed is the slope of ln(scale). All positions below are normalised
- * progress of the pinned scroll.
+ * 1. UPTIME. The word, with a summary around it — years online, posts opened
+ *    per year, deployments, what is still running. A place to read, not a
+ *    transition: it builds in as the page arrives and then waits.
+ * 2. The clock. One scroll and the summary's data flies into a clock — the
+ *    gauge becomes the rim, the years' bars land on the year ring, the
+ *    project cells become ticks, the running processes and UPTIME fall into
+ *    the hub — which winds smoothly back until 2020 is in the window at
+ *    twelve. The next scroll dives through its dot onto s05's ground.
+ *
+ * It is triggered, not scrubbed: each scroll plays one of those through at
+ * its own speed and the page waits for the next; see rewindGate. The stage is
+ * one screen tall and never pinned — the page is held at its top edge.
  */
 export function S04ToS05Zoom({ startYear }: { startYear: number }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const scalerRef = useRef<SVGGElement>(null);
-  const [year, setYear] = useState(startYear);
+  const smooth = useSmoothScroll();
+  const years = startYear - END_YEAR;
 
   useGSAP(
     () => {
@@ -49,178 +59,96 @@ export function S04ToS05Zoom({ startYear }: { startYear: number }) {
       const root = rootRef.current;
       if (!scaler || !root) return;
 
+      setOpeningFrame(root, scaler, startYear);
+      const { master, stops } = buildRewind({ root, scaler, startYear, endYear: END_YEAR });
+
       if (prefersReducedMotion()) {
-        // No pin, no zoom: land on the final state and cross-fade into s05.
-        setYear(END_YEAR);
-        gsap.set('[data-zw="0"]', { autoAlpha: 0 });
-        gsap.set('[data-zw="1"]', { autoAlpha: 1, y: 0 });
-        gsap.set('[data-clock]', { opacity: 0 });
+        // No hold, no clock: the summary, built and still, and the page
+        // scrolls on past it.
+        master.time(stops[1]);
         return;
       }
 
-      // Camera writes the transform attribute directly. GSAP resolves
-      // transformOrigin against the element's *bounding box*, and this group's
-      // bbox moves every frame as UPTIME leaves and SINCE arrives — so a GSAP
-      // scale would drift the zoom target frame by frame. The content is
-      // authored around the dot at 0,0 and the parent group centres it, so a
-      // bare SVG scale() flies into the dot exactly.
-      const setCamera = (p: number) => {
-        scaler.setAttribute('transform', `scale(${zoomScale(p).toFixed(4)})`);
+      // The flights into the clock are measured from the layout. A resize
+      // moves both ends, so drop the measurements and re-render where the
+      // playhead is.
+      const remeasure = () => {
+        const time = master.time();
+        master.invalidate().time(0).time(time);
       };
-      setCamera(0);
+      ScrollTrigger.addEventListener('refresh', remeasure);
 
-      const clones = gsap.utils.toArray<SVGElement>('[data-clone]');
-      const trail1 = gsap.utils.toArray<SVGElement>('[data-trail="1"]');
-      const trailIn = (index: number) => TRAIL_OPACITY[index] ?? 0;
-      const trailOut = (index: number) => -(TRAIL_OFFSETS[index] ?? 0);
-      /** Each clone's landing place, read off the element that owns it. */
-      const cloneY = (_i: number, el: Element) =>
-        Number.parseFloat(el.getAttribute('data-clone-y') ?? '0');
-
-      // UPTIME's own opening state, stated rather than assumed. Everything else
-      // here declares where it starts; this group used to inherit whatever the
-      // DOM happened to be holding, and the timeline drives it with `.to`,
-      // which reads its start value live. Re-run the effect while the group is
-      // already faded — a React Strict Mode double-mount in dev, a Fast Refresh,
-      // a remount after a reload that restored scroll past this section — and
-      // it tweened 0 to 0, so UPTIME never came back. Measured: 0 of 4 reloads
-      // recovered before this, 4 of 4 after.
-      gsap.set('[data-zw="0"]', { opacity: 1, y: 0 });
-      gsap.set('[data-zw="1"]', { opacity: 0, y: TRAIL_OFFSETS[0] });
-      // Clones start stacked exactly on the solid word, so the explosion has
-      // somewhere to come from.
-      gsap.set(clones, { opacity: 0, y: 0 });
-      gsap.set(trail1, { opacity: 0, y: (i: number) => trailOut(i) });
-      gsap.set('[data-clock]', { opacity: 0 });
-
-      const camera = { p: 0 };
-      const timeline = gsap.timeline({
-        defaults: { ease: EASE.linear },
-        scrollTrigger: {
-          trigger: root,
-          start: 'top top',
-          end: '+=340%',
-          pin: true,
-          scrub: SCRUB.tight,
+      // Without the provider there is no page to hold — a component test.
+      if (!smooth) {
+        return () => ScrollTrigger.removeEventListener('refresh', remeasure);
+      }
+      const gate = createRewindGate({
+        stage: root,
+        master,
+        stops,
+        smooth,
+        onHold: (held) => {
+          root.dataset.held = String(held);
         },
       });
-
-      // Camera. Linear in p; the curve lives in zoomScale.
-      timeline.to(
-        camera,
-        {
-          p: 1,
-          duration: 1,
-          onUpdate: () => setCamera(camera.p),
-        },
-        0,
-      );
-
-      // UPTIME detonates into a vertical column of hollow copies of itself,
-      // then the whole column is shoved off the top. SINCE <year> steps up from
-      // below to replace it.
-      //
-      // from:'center' so the pair nearest the word leaves first and the outer
-      // ones chase — a blast outward, not a sweep down the column.
-      timeline
-        .to(clones, {
-          opacity: 1,
-          y: cloneY,
-          duration: 0.075,
-          ease: EASE.enter,
-          stagger: { each: 0.011, from: 'center' },
-        }, 0)
-        .to('[data-zw="0"]', { y: -520, duration: 0.09, ease: EASE.exit }, 0.06)
-        .to(clones, { opacity: 0, duration: 0.05, stagger: { each: 0.01, from: 'center' }, ease: EASE.exitSoft }, 0.085)
-        // The whole group fades rather than snapping, and finishes before
-        // SINCE starts — the two never share a frame.
-        .to('[data-zw="0"]', { opacity: 0, duration: 0.055, ease: EASE.exit }, 0.105)
-        .set('[data-zw="0"]', { opacity: 0 }, 0.16)
-        .to('[data-zw="1"]', { opacity: 1, duration: 0.035, ease: EASE.enterSoft }, HANDOFF)
-        .to(trail1, { opacity: trailIn, y: 0, duration: 0.05, stagger: 0.016, ease: EASE.enterSoft }, HANDOFF)
-        .to('[data-zw="1"]', { y: 0, duration: 0.09, ease: EASE.enter }, HANDOFF);
-
-      // Year rolls backwards. The numeric counter is the source of truth; the
-      // odometer reacts to it.
-      const counter = { value: startYear };
-      timeline.to(
-        counter,
-        {
-          value: END_YEAR,
-          duration: 0.3,
-          ease: EASE.drift,
-          onUpdate: () => setYear(Math.round(counter.value)),
-          onComplete: () => setYear(END_YEAR),
-        },
-        // Starts with the handoff, not before it: the rewind has to be seen
-        // from the current year, and the odometer is invisible until then.
-        HANDOFF,
-      );
-
-      // Clock. Keeps spinning through the whole zoom and never fades out.
-      const clock = { p: 0 };
-      timeline
-        .fromTo('[data-clock]', { opacity: 0 }, { opacity: 1, duration: 0.08 }, 0.08)
-        .to(
-          clock,
-          {
-            p: 1,
-            duration: 0.88,
-            onUpdate: () => {
-              const angles = handAngles(clock.p);
-              gsap.set('[data-clock-hand="h"]', { rotate: angles.hour });
-              gsap.set('[data-clock-hand="m"]', { rotate: angles.minute });
-              gsap.set('[data-clock-hand="s"]', { rotate: angles.second });
-              const label = root.querySelector('[data-clock-label]');
-              if (label) label.textContent = rewindLabel(clock.p);
-            },
-          },
-          0.1,
-        );
-
-      // Chrome clears out early.
-      timeline
-        .to(`.${styles.meta}`, { opacity: 0, duration: 0.1 }, 0)
-        .to(`.${styles.grid}`, { opacity: 0, duration: 0.3 }, 0);
-
-      // The camera goes through the dot, not into it. This used to end on a
-      // full-screen accent flood, which the section after it inherited as its
-      // ground — a whole screen of #c6f21a on an otherwise dark page. The dot
-      // opens instead: its green becomes a ring, the ring's band sweeps out
-      // past the frame, and what is left is the inside of the dot, which is
-      // the page background.
-      timeline.fromTo(
-        '[data-zoom-hole]',
-        { attr: { r: 0 } },
-        { attr: { r: DOT_R }, duration: OPEN_TO - OPEN_FROM },
-        OPEN_FROM,
-      );
+      return () => {
+        ScrollTrigger.removeEventListener('refresh', remeasure);
+        gate.destroy();
+      };
     },
     { scope: rootRef, revertOnUpdate: true },
   );
 
   return (
-    <div ref={rootRef} className={styles.stage} data-zoom-stage>
-      <div className={styles.grid} aria-hidden="true" />
-      <BrutalistClock />
+    <div ref={rootRef} className={styles.stage} data-zoom-stage data-held="false">
+      <div className={styles.grid} data-rewind-grid aria-hidden="true" />
 
+      <div className={styles.shake} data-rewind-shake>
+        {/*
+          Units are a thousandth of the viewport's shorter side, centred: the
+          clock fills the same share of a phone as of a monitor.
+        */}
+        <svg
+          className={styles.svg}
+          viewBox="-500 -500 1000 1000"
+          preserveAspectRatio="xMidYMid meet"
+          aria-hidden="true"
+        >
+          {/* The camera. See writeCamera. */}
+          <g ref={scalerRef} data-zoom-scaler>
+            <RewindWorld startYear={startYear} endYear={END_YEAR} label={rewindLabel(years)} />
+          </g>
+        </svg>
+      </div>
+
+      {/* Screen space, not camera space: the tunnel is the lens's, not the world's. */}
       <svg
-        className={styles.svg}
-        viewBox="0 0 1000 400"
-        preserveAspectRatio="xMidYMid meet"
+        className={styles.warp}
+        viewBox="-500 -500 1000 1000"
+        preserveAspectRatio="xMidYMid slice"
+        data-warp
         aria-hidden="true"
       >
-        <g transform="translate(500 200)">
-          <g ref={scalerRef} data-zoom-scaler>
-            <ZoomWords year={year} />
-          </g>
-        </g>
+        {STREAKS.map((line, i) => (
+          <line
+            key={i}
+            {...line}
+            data-streak
+            pathLength={100}
+            strokeDasharray={`${STREAK_DASH} 200`}
+            strokeDashoffset={STREAK_DASH}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
       </svg>
 
-      <div className={styles.meta}>
+      <UptimeWidgets />
+
+      <div className={styles.meta} data-rewind-meta>
         <span>{TRAJECTORY_LABEL}</span>
         <span className={styles.metaRule} aria-hidden="true" />
       </div>
+
     </div>
   );
 }

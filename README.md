@@ -136,40 +136,54 @@ Scrubbed, `scrub: .45`, from `top 78%` to `top -30%` (a long window so it comple
 - Portrait card wipes down via `clip-path: inset(0 0 100% 0)` → `inset(0 0 0 0)`, **`ease: "steps(5)"`** — the hard stepping is intentional.
 - Copy lines animate `opacity 0→1`, `y 14→0`, and `clip-path: inset(0 100% 0 0)` → `inset(0 0% 0 0)` (left-to-right reveal), `.3s`, `power2.out`, `.07s` stagger.
 
-### `s04` → `s05` zoom transition — **the centrepiece**
+### `s04` → `s05` UPTIME and the rewind — **the centrepiece**
 
-A pinned SVG stage. All timings below are normalized progress `0`–`1` of the pinned scroll.
+One stage, two sections, and the dive between them and `s05`:
 
-**Camera.** Scale is driven **in log space**, because apparent zoom speed is the slope of `ln(scale)`. A naive `power2.out` → `power2.in` chain produced a visible velocity trough at the word handoff. Instead, a single linear tween drives `p: 0→1`, and:
+1. **UPTIME.** The word, with a summary around it, two widgets a side (above and below it on upright screens). It is a place to read, not a transition: it builds in as the page arrives, then waits.
+2. **The clock.** One scroll and the summary's data flies into a clock, which winds smoothly back until 2020 is in the window at twelve. It waits there. The next scroll dives through 2020's dot onto `s05`'s ground.
 
-```
-L0 = ln(0.55), L1 = ln(190), SPLIT = 0.13, SHARE = 0.22
-f = p < SPLIT
-      ? SHARE * (p / SPLIT)                          // fast first leg
-      : SHARE + (1 - SHARE) * ((p - SPLIT)/(1 - SPLIT))  // steady cruise
-scale = exp(L0 + (L1 - L0) * f)
-```
+It is **triggered, not scrubbed**: a one-screen stage (never pinned) that takes the page as it comes up and plays each part through at its own speed, waiting for a scroll between them. There is no progress indicator: the summary and the clock are the content.
 
-This gives a snappier push while `UPTIME` is on screen and constant perceived speed after, with no trough. **End scale is 190×**, not 62× — at 62× the background was still visible around the expanding dot when the zoom finished.
+**The gate** (`rewindGate.ts`, `lib/zoom/gate.ts`). When the stage's top edge comes within 30% of the viewport's, from either side, Lenis stops, the stage glides flush (`.5s`) and the next beat plays. From there, scroll input is read as **requests for beats, not distance**:
 
-**Word handoff (`UPTIME` → `SINCE <year>`).** Each word has a **two-step motion trail**: duplicate copies at `y: 150` (opacity `.16`) and `y: 76` (opacity `.36`).
+- Events are grouped into gestures: a run in one direction with no gap over `180ms`. A gesture asks for **exactly one beat**, however long or hard it is. A trackpad swipe plus its inertia is one beat, not sixty; so is a wheel spun hard.
+- The gesture that carried the reader in is treated as continuing, so arriving plays beat one and nothing more.
+- Anything asked for **while a beat is playing is dropped**. A beat always plays out at its written speed, and nothing queues behind it. Hurrying (5× on a mid-beat scroll) and throw-to-skip were both built and removed: beats collapsing into each other read as the page glitching.
+- Arrows, Page keys and Space step like a scroll.
+- Asking past either end lets the page go: down onto the top of `s05` (`.9s` glide), or up to 45% of a screen above the stage. After the dive the page carries on by itself, since the frame is already `s05`'s ground.
+- It holds from below too. Coming back up out of `s05`, the same beats play **backwards**: out of the dot, the year rolling forward, UPTIME reassembling.
+- A jump that crosses the band in one frame (rail link, restored scroll) doesn't hold. It sets the stage to whichever end it landed past.
 
-- Trail ghosts start invisible and collapsed onto the word (`y: -offset`), then fade in while staggering down into their trailing offsets — `.05s`, `.016s` stagger, `power2.out`. `UPTIME`'s trail starts at `p = 0`, the moment the zoom begins.
-- `UPTIME` translates `y: -320` over `.085`, `power2.in`, then hides at `.135`.
-- `SINCE <year>` fades in at `.13` and translates from `y: 150` to `0` over `.09`, `power3.out`, with its own trail.
-- Trails **do not fade out** during the zoom — they persist.
+The first stop is the summary unbuilt: arriving plays the build, and scrolling back up from the built summary lets the page go without un-building it.
 
-Rejected alternatives, for the record: a horizontal seam bar that split open (disliked), and a scaleY flip (disliked). Literal `steps()` easing on the words was also tried — the *stepped trail look* was wanted, the *stepped motion* was not.
+**The world** (`RewindWorld.tsx`). One SVG coordinate space, filmed by the camera. Units are a thousandth of the viewport's shorter side (`viewBox="-500 -500 1000 1000"`, `meet`), so the clock fills the same share of a phone as of a monitor. The clock is centred on the origin: a 60-tick face (`r 300`), an outer rim (`r 400`), three hands and a square accent hub. Between them is the **year ring** (`r 350`), twelve slots 30° apart. This year down to 2020 fill seven of them, newest at twelve and older anticlockwise, written like the odometer (`20•26`); the other five are blank squares. A **window** is fixed to the dial at twelve: an accent frame, a ▼ marker, and `SINCE` beneath it. Only 2020 carries the opening for the dive.
 
-**Year counter.** Rolls **backwards from the current year to 2020**, starting at `p = 0.10` over `.3`, `power1.inOut`.
+**Camera.** Positioned by **depth** (the fraction of log-space travel from `1×` to `260×`: `scale = exp(L0 + (L1 − L0)·depth)`) and a **focus** on the vertical axis. Apparent zoom speed is the slope of `ln(scale)`, so equal steps of depth are equal pushes of the lens at any magnification. 260× is what it takes for the dot to cover the corners of an upright phone. The camera writes its own transform attribute, `scale(s) translate(0 −focus)`. A GSAP transform would resolve its origin against the moving bounding box and drift.
 
-Implemented as an odometer: each digit has a current and next glyph in a clipped window; the new digit rises from below while the old exits (`y: 0 → -84`, `.34s`, `power3.out`). **The numeric counter is the single source of truth** — a digit lands instantly (skipping its roll) if a roll is already in flight or the jump is more than one step. Without this, a fast scroll flick drops increments and the year lands wrong.
+**The summary** (`UptimeWidgets.tsx`, `content/uptime.ts`). Every figure is derived from content the page already states, so it cannot disagree with the sections it summarises:
+- **SYS.UPTIME**: years since the first post (a ring gauge cut into a segment per year).
+- **POSTS OPENED / YR**: a bar per year from 2020, empty years included.
+- **DEPLOYMENTS**: a cell per index project (public filled), with the top sectors.
+- **RUNNING**: the `ACTIVE` posts, plus client and stack counts.
 
-**Background clock.** A brutalist analog clock, `min(78vh, 78vw)` square, centred, `z-index: 0`. Two nested borders (`#14181a`, `#101314`), 60 tick marks (majors every 5th: 3px wide, `4.5%` tall, `#1f2527`; minors 1px, `2%`, `#151a1b`), three hands — hour 4×26% `#1b2022`, minute 3×38% `#242a2c`, second 2×44% `#c6f21a` at `.28` opacity — and a 14px green centre block at `.22` opacity.
+Each widget is split into **chrome** (frame, headings, labels, numbers; `data-w-chrome`), which fades as the clock assembles, and **data**, which flies into the clock and becomes part of it. The flights are measured from the layout, not authored, and are re-measured on resize. The summary is `aria-hidden`: it restates `s01`, `s04` and `s05` in figures, and a reader meets those in order.
 
-Hands spin **counter-clockwise** (matching the backwards year), driven by a linear `.88`-duration tween from `p = 0.10`: second `-p*2160°`, minute `-p*360°`, hour `-p*90°`. **The clock keeps spinning through the entire zoom and never fades out.** Its label counts down: `REWIND 06Y` → `REWIND 00Y`, using `min(p/.34, 1)` so the countdown finishes with the year roll while the hands continue.
+**The timeline** (`rewindTimeline.ts`) is one paused timeline, played between stops by the gate. Every tween is a `fromTo` with both ends stated, and every readout (camera, ring, label) is written in an `onUpdate` from its own tween's value, never in a `call`. That is what makes it reversible. Nothing before the dive steps: the clock moves on eased curves throughout.
 
-**Through the dot.** There is no flood. From 55% of the pin the dot opens: a background-coloured disc inside it widens to the dot's full radius by 90%, so the green becomes a ring whose band sweeps out past the frame, and the zoom lands on the dark ground inside the dot. An earlier version ended on a full-screen `#c6f21a` flood that `s05` inherited as its background — too much green for a dark page.
+1. **Summary** (`1s`). The widgets rise in, the gauge's segments light in turn, the bars grow, the project cells fill and the figures count up to what the markup already prints.
+2. **Clock** (`1.9s` assemble + `2.8s` rewind + `.2s` hold). The data flies into place on `power3.inOut` while the chrome fades:
+   - the **gauge** swells into the **rim**, its stroke counter-scaled so it stays a line;
+   - the **project cells** spread out to become **ticks**, and a sweep turns once and fills in the rest of the face;
+   - each year's **bar** lands on its **year on the ring**, oldest first;
+   - the **running processes** fall into the centre, where UPTIME folds down into the **hub**, and the hands grow out of it.
+
+   Then one continuous turn winds the ring back six slots (`power2.inOut`). The hands sweep back on the same curve: two minute-hand turns across the whole rewind, not six whips. The camera closes in and pans up toward the window at the same time. Each year brightens continuously as it comes round into the window. By the time 2020 is in the window, the window is the centre of the frame at `2.4×`.
+3. **DIVE** (`.5s` lock + `1.5s` dive + `.35s` hold). Four brackets snap in around 2020's dot (`steps(3)`), its digits and `SINCE` dim to `.22` so the dot is the only lit thing, and every hand turns round to twelve: zero hour. Then the camera dives (`power3.in` on depth; the one move on the page that is still accelerating when it ends). The dial fades as it swells past the lens, warp streaks shoot out from the dot in screen space, and from 60% of the dive the dot **opens**. A disc of page ground widens inside it to its full radius, so the green becomes a ring whose band sweeps out past the frame. It lands inside the dot on `--color-bg`. There is no flood.
+
+Under reduced motion there is no hold and no clock: the stage shows the summary, built and still.
+
+Rejected alternatives, for the record: a scroll-scrubbed zoom across a `340%` pin (the whole transition before this one); UPTIME detonating into hollow clones with `SINCE <year>` on an odometer, and the years left behind stamped huge behind the frame (the first triggered version; only its dive survived); a clock that clicked a slot per year with the hands whipping an hour each click, behind a beat-progress HUD (too steppy, too fast, and nothing to read while it played); a horizontal seam bar that split open; a scaleY flip; literal `steps()` easing on the words (the *stepped trail look* was wanted, the *stepped motion* was not); and a full-screen `#c6f21a` flood at the end, which `s05` inherited as its ground — too much green for a dark page.
 
 ### Ambient
 

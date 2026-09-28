@@ -1,89 +1,52 @@
 import { describe, it, expect } from 'vitest';
-import { zoomScale, zoomFraction, START_SCALE, END_SCALE, SPLIT, SHARE } from '../camera';
+import { scaleAt, depthAt, START_SCALE, END_SCALE } from '../camera';
 
-describe('zoomFraction', () => {
-  it('is zero at the start', () => {
-    expect(zoomFraction(0)).toBe(0);
+describe('scaleAt', () => {
+  it('starts with the whole clock in frame', () => {
+    expect(scaleAt(0)).toBeCloseTo(START_SCALE, 10);
+    expect(START_SCALE).toBe(1);
   });
 
-  it('has spent SHARE of its travel by SPLIT', () => {
-    expect(zoomFraction(SPLIT)).toBeCloseTo(SHARE, 10);
-  });
-
-  it('is one at the end', () => {
-    expect(zoomFraction(1)).toBeCloseTo(1, 10);
-  });
-
-  it('is continuous at the split point', () => {
-    const before = zoomFraction(SPLIT - 1e-9);
-    const after = zoomFraction(SPLIT + 1e-9);
-    expect(Math.abs(after - before)).toBeLessThan(1e-6);
-  });
-
-  it('increases monotonically', () => {
-    let previous = -1;
-    for (let p = 0; p <= 1; p += 0.005) {
-      const value = zoomFraction(p);
-      expect(value).toBeGreaterThan(previous);
-      previous = value;
-    }
-  });
-});
-
-describe('zoomScale', () => {
-  it('starts at 0.55', () => {
-    expect(zoomScale(0)).toBeCloseTo(START_SCALE, 10);
-    expect(START_SCALE).toBe(0.55);
-  });
-
-  it('ends at 190, not 62', () => {
-    // At 62x the background was still visible around the expanding dot when
-    // the zoom finished. 190 is the tuned value, not a guess.
-    expect(zoomScale(1)).toBeCloseTo(END_SCALE, 6);
-    expect(END_SCALE).toBe(190);
+  it('ends far enough in for the dot to cover a phone', () => {
+    // A 390x844 phone: 0.39px per unit, 465px to the corner. The dot is 6
+    // units; it has to be past the corner when the dive ends.
+    expect(scaleAt(1)).toBeCloseTo(END_SCALE, 6);
+    expect(6 * 0.39 * END_SCALE).toBeGreaterThan(465);
   });
 
   it('increases monotonically', () => {
     let previous = 0;
-    for (let p = 0; p <= 1; p += 0.005) {
-      const scale = zoomScale(p);
+    for (let depth = 0; depth <= 1; depth += 0.005) {
+      const scale = scaleAt(depth);
       expect(scale).toBeGreaterThan(previous);
       previous = scale;
     }
   });
 
-  it('has no velocity trough — log-space slope never dips below the cruise rate', () => {
-    // Apparent zoom speed is the slope of ln(scale). A naive power2.out into
-    // power2.in produced a visible stall at the word handoff; this is the
-    // regression guard for it.
-    const step = 0.002;
-    const slopeAt = (p: number) =>
-      (Math.log(zoomScale(p + step)) - Math.log(zoomScale(p))) / step;
-    const cruise = slopeAt(0.5);
-    for (let p = SPLIT + step; p < 1 - step * 2; p += step) {
-      expect(slopeAt(p)).toBeGreaterThan(cruise * 0.99);
-    }
-  });
-
-  it('pushes faster than cruise while UPTIME is still on screen', () => {
-    const step = 0.002;
-    const slopeAt = (p: number) =>
-      (Math.log(zoomScale(p + step)) - Math.log(zoomScale(p))) / step;
-    expect(slopeAt(0.05)).toBeGreaterThan(slopeAt(0.5));
-  });
-
-  it('holds a constant perceived speed after the split', () => {
-    const step = 0.002;
-    const slopeAt = (p: number) =>
-      (Math.log(zoomScale(p + step)) - Math.log(zoomScale(p))) / step;
-    const samples = [0.3, 0.5, 0.7, 0.9].map(slopeAt);
-    for (const sample of samples) {
-      expect(sample).toBeCloseTo(samples[0] ?? 0, 6);
+  it('pushes the lens by the same ratio for every equal step of depth', () => {
+    // The point of driving depth: six equal ratchets in the rewind must read
+    // as six equal pushes, at 2x and at 20x alike.
+    const ratio = (depth: number) => scaleAt(depth + 0.05) / scaleAt(depth);
+    for (const depth of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+      expect(ratio(depth)).toBeCloseTo(ratio(0.1), 8);
     }
   });
 
   it('clamps outside 0 to 1', () => {
-    expect(zoomScale(-1)).toBeCloseTo(START_SCALE, 10);
-    expect(zoomScale(2)).toBeCloseTo(END_SCALE, 6);
+    expect(scaleAt(-1)).toBeCloseTo(START_SCALE, 10);
+    expect(scaleAt(2)).toBeCloseTo(END_SCALE, 6);
+  });
+});
+
+describe('depthAt', () => {
+  it('inverts scaleAt', () => {
+    for (const depth of [0, 0.2, 0.5, 0.83, 1]) {
+      expect(depthAt(scaleAt(depth))).toBeCloseTo(depth, 10);
+    }
+  });
+
+  it('clamps scales outside the camera range', () => {
+    expect(depthAt(0.1)).toBe(0);
+    expect(depthAt(1000)).toBe(1);
   });
 });

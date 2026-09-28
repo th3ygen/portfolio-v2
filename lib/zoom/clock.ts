@@ -1,38 +1,34 @@
 /**
- * The brutalist analog clock behind the s04 → s05 zoom.
+ * The brutalist analog clock behind the s04 → s05 rewind.
  *
- * Hands spin counter-clockwise, matching the year rolling backwards. They keep
- * spinning through the entire zoom and never fade out — only the label
- * finishes early, alongside the year roll.
+ * Hands only ever turn counter-clockwise, matching the years going back, and
+ * never whip: a gentle spin-up as the clock assembles, one long eased sweep
+ * across the whole rewind, and a turn round to twelve — zero hour — as the
+ * camera locks onto the dot.
  */
 
-export const REWIND_YEARS = 6;
-/** The label lands here; the hands carry on to p = 1. */
-export const REWIND_COMPLETE_AT = 0.34;
+/** Where the spin-up leaves each hand. Negative is counter-clockwise. */
+export const SPIN_UP = { hour: -8, minute: -60, second: -180 } as const;
 
-const HOUR_SWEEP = 90;
-const MINUTE_SWEEP = 360;
-const SECOND_SWEEP = 2160;
+/**
+ * How far each hand turns across the whole rewind. Two turns of the minute
+ * hand over six years, not six: fast enough to read as time running
+ * backwards, slow enough to follow.
+ */
+export const REWIND_SWEEP = { hour: -60, minute: -720, second: -1440 } as const;
 
-export type HandAngles = {
-  readonly hour: number;
-  readonly minute: number;
-  readonly second: number;
-};
-
-/** Degrees for each hand at zoom progress `p`. Negative is counter-clockwise. */
-export function handAngles(p: number): HandAngles {
-  const t = Math.min(1, Math.max(0, p));
-  return {
-    hour: -(t * HOUR_SWEEP),
-    minute: -(t * MINUTE_SWEEP),
-    second: -(t * SECOND_SWEEP),
-  };
+/**
+ * The next twelve o'clock behind `angle`, going backwards.
+ *
+ * Strictly behind: a hand already at twelve still makes a full turn, because
+ * zero hour is a hand arriving, not a hand that happens to be there.
+ */
+export function zeroHour(angle: number): number {
+  return (Math.ceil(angle / 360) - 1) * 360;
 }
 
-/** The countdown readout beside the clock. */
-export function rewindLabel(p: number): string {
-  const progress = Math.min(Math.max(0, p) / REWIND_COMPLETE_AT, 1);
-  const remaining = Math.round(REWIND_YEARS * (1 - progress));
-  return `REWIND ${String(remaining).padStart(2, '0')}Y`;
+/** The countdown readout under the clock. */
+export function rewindLabel(yearsLeft: number): string {
+  const years = Math.max(0, Math.round(yearsLeft));
+  return `REWIND ${String(years).padStart(2, '0')}Y`;
 }

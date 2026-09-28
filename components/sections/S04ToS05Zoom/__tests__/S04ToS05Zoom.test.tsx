@@ -1,132 +1,88 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { YearOdometer } from '@/components/odometer/YearOdometer';
-import { BrutalistClock } from '../BrutalistClock';
 import { S04ToS05Zoom } from '../index';
-import { CLONE_OFFSETS } from '../ZoomWords';
+import { RING_R, YEAR_STEP_DEG, markAngle } from '../RewindWorld';
 import { TRAJECTORY_LABEL } from '@/content/trajectory';
 
-const svg = (children: React.ReactNode) => <svg>{children}</svg>;
-
-beforeEach(() => {
-  vi.unstubAllGlobals();
-});
-
-describe('YearOdometer', () => {
-  it('announces the year as one number, not eight loose digits', () => {
-    render(svg(<YearOdometer year={2026} />));
-    expect(screen.getByRole('img', { name: '2026' })).toBeInTheDocument();
-    // Each glyph window is hidden so a reader does not enumerate them.
-    const hidden = document.querySelectorAll('[data-odometer] [aria-hidden="true"]');
-    expect(hidden.length).toBeGreaterThan(0);
+describe('S04ToS05Zoom', () => {
+  it('renders the stage, the camera and the clock', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    expect(container.querySelector('[data-zoom-stage]')).toBeInTheDocument();
+    expect(container.querySelector('[data-zoom-scaler]')).toBeInTheDocument();
+    expect(container.querySelector('[data-clock]')).toBeInTheDocument();
+    expect(container.querySelector('[data-uptime]')).toHaveTextContent('UPTIME');
   });
 
-  it('lands on the target year after a rerender', () => {
-    const { rerender } = render(svg(<YearOdometer year={2026} />));
-    rerender(svg(<YearOdometer year={2020} />));
-    expect(screen.getByRole('img', { name: '2020' })).toBeInTheDocument();
-  });
-
-  it('lands correctly after a fast flick through every intermediate year', () => {
-    const { rerender } = render(svg(<YearOdometer year={2026} />));
-    for (const year of [2025, 2024, 2023, 2022, 2021, 2020]) {
-      rerender(svg(<YearOdometer year={year} />));
+  it('draws a 60-tick face and three hands', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    expect(container.querySelectorAll('[data-tick]')).toHaveLength(60);
+    for (const hand of ['h', 'm', 's']) {
+      expect(container.querySelector(`[data-clock-hand="${hand}"]`)).toBeInTheDocument();
     }
-    expect(screen.getByRole('img', { name: '2020' })).toBeInTheDocument();
+    expect(container.querySelector('[data-clock-label]')).toHaveTextContent('REWIND 06Y');
   });
 
-  it('renders the dot the camera flies into', () => {
-    const { container } = render(svg(<YearOdometer year={2026} />));
-    expect(container.querySelector('[data-zoom-dot]')).toBeInTheDocument();
+  it('puts every year from now back to 2020 on the ring, newest first', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    const years = [...container.querySelectorAll('[data-year-mark]')].map((el) => el.getAttribute('data-year-mark'));
+    expect(years).toEqual(['2026', '2025', '2024', '2023', '2022', '2021', '2020']);
   });
 
-  it('keeps the opening in the dot shut at rest, so it reads as a decimal point', () => {
-    const { container } = render(svg(<YearOdometer year={2026} opening />));
-    const hole = container.querySelector('[data-zoom-hole]');
+  it('fills the rest of the twelve slots with blanks', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    expect(container.querySelectorAll('[data-slot]')).toHaveLength(12 - 7);
+  });
+
+  it('opens only the last year, so the dive has exactly one way through', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    const holes = container.querySelectorAll('[data-zoom-hole]');
+    expect(holes).toHaveLength(1);
+    const hole = holes[0]!;
+    expect(hole.closest('[data-year-mark]')).toHaveAttribute('data-year-mark', '2020');
+    // Shut at rest, and centred on the dot, or the camera flies past it.
     expect(hole).toHaveAttribute('r', '0');
-    // Centred on the dot, or the camera flies past the opening instead of
-    // through it.
     expect(hole).toHaveAttribute('cx', '0');
-    expect(hole).toHaveAttribute('cy', '0');
     expect(hole).toHaveAttribute('fill', 'var(--color-bg)');
   });
 
-  it('leaves the opening out unless asked, so only the zoom has one', () => {
-    const { container } = render(svg(<YearOdometer year={2026} />));
-    expect(container.querySelector('[data-zoom-hole]')).toBeNull();
-  });
-
-  it('stacks the opening above the dot', () => {
-    const { container } = render(svg(<YearOdometer year={2026} opening />));
-    const dot = container.querySelector('[data-zoom-dot]')!;
-    const hole = container.querySelector('[data-zoom-hole]')!;
-    expect(dot.compareDocumentPosition(hole) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-});
-
-describe('BrutalistClock', () => {
-  it('renders 60 tick marks with a major every fifth', () => {
-    const { container } = render(<BrutalistClock />);
-    const ticks = container.querySelectorAll('[class*="tick"]');
-    // 60 ticks plus the container element.
-    expect(ticks.length).toBeGreaterThanOrEqual(60);
-  });
-
-  it('renders three hands and a label', () => {
-    const { container } = render(<BrutalistClock />);
-    expect(container.querySelector('[data-clock-hand="h"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-clock-hand="m"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-clock-hand="s"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-clock-label]')).toHaveTextContent('ELAPSED');
-  });
-
-  it('is entirely decorative', () => {
-    const { container } = render(<BrutalistClock />);
-    expect(container.querySelector('[data-clock]')).toHaveAttribute('aria-hidden', 'true');
-  });
-});
-
-describe('S04ToS05Zoom', () => {
-  it('renders the stage, clock, and words', () => {
+  it('locks onto the dot with four corners, at twelve', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
-    expect(container.querySelector('[data-zoom-stage]')).toBeInTheDocument();
-    expect(container.querySelector('[data-clock]')).toBeInTheDocument();
-    expect(container.querySelector('[data-zoom-scaler]')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-lock-corner]')).toHaveLength(4);
+    expect(container.querySelector('[data-lock]')).toHaveAttribute('transform', `translate(0 ${-RING_R})`);
   });
 
-  it('renders both word groups so the handoff has something to swap', () => {
+  it('has no progress indicator — the summary and the clock are the content', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
-    expect(container.querySelector('[data-zw="0"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-zw="1"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-beat-fill], [data-rewind-hud]')).toBeNull();
   });
 
-  it('stacks UPTIME into a hollow clone column and trails SINCE', () => {
+  it('surrounds UPTIME with a summary whose data can become the clock', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
-    // UPTIME detonates into hollow copies; SINCE keeps the two-step trail.
-    expect(container.querySelectorAll('[data-clone]')).toHaveLength(CLONE_OFFSETS.length);
-    expect(container.querySelectorAll('[data-trail="1"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-w-widget]')).toHaveLength(4);
+    // One gauge (the rim), a bar per year (the ring), a cell per project
+    // (ticks), a dot per running post (the hub).
+    expect(container.querySelectorAll('[data-w-gauge]')).toHaveLength(1);
+    const bars = [...container.querySelectorAll('[data-w-bar]')].map((b) => b.getAttribute('data-w-bar'));
+    expect(bars).toEqual(['2020', '2021', '2022', '2023', '2024', '2025', '2026']);
+    expect(container.querySelectorAll('[data-w-cell]')).toHaveLength(16);
+    expect(container.querySelectorAll('[data-w-proc]')).toHaveLength(2);
   });
 
-  it('makes the clones hollow rather than faded copies', () => {
+  it('prints the summary figures in the markup, not only as they count up', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
-    const clone = container.querySelector<SVGTextElement>('[data-clone]');
-    expect(clone).not.toBeNull();
-    // Background fill plus an accent outline: cut-outs, not ghosts. Opacity is
-    // what a ghost would use, and would make them read as the old trail.
-    expect(clone?.style.fill).toBe('var(--color-bg)');
-    expect(clone?.style.stroke).toBe('var(--color-accent)');
-    // The camera reaches 190x. A scaling stroke would be hundreds of pixels
-    // thick by the end of the pin.
-    expect(clone?.getAttribute('vector-effect')).toBe('non-scaling-stroke');
+    const counts = [...container.querySelectorAll('[data-w-count]')];
+    expect(counts.map((el) => el.getAttribute('data-w-count'))).toEqual(['6', '16']);
+    expect(counts.map((el) => el.textContent)).toEqual(['06', '16']);
   });
 
-  it('spaces the clone column symmetrically about the solid word', () => {
-    const offsets = [...CLONE_OFFSETS];
-    expect(offsets).toHaveLength(8);
-    // No clone sits at 0 — that is where the solid word lives.
-    expect(offsets).not.toContain(0);
-    // Sums to zero only if every offset above the word is matched below it.
-    expect(offsets.reduce((total, value) => total + value, 0)).toBe(0);
+  it('keeps the summary from assistive tech — the sections it restates say it in order', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    expect(container.querySelector('[data-w-widget]')!.closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('starts with the page not held', () => {
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    expect(container.querySelector('[data-zoom-stage]')).toHaveAttribute('data-held', 'false');
   });
 
   it('renders the section meta label', () => {
@@ -134,41 +90,38 @@ describe('S04ToS05Zoom', () => {
     expect(screen.getByText(TRAJECTORY_LABEL)).toBeInTheDocument();
   });
 
-  it('hides the whole SVG stage from assistive tech — s05 carries the real content', () => {
+  it('hides every SVG from assistive tech — s05 carries the real content', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
-    expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    for (const svg of container.querySelectorAll('svg')) {
+      expect(svg.closest('[aria-hidden="true"]')).not.toBeNull();
+    }
   });
 });
 
-describe('zoom word start states', () => {
-  it('declares an opening state for UPTIME, not just for the groups around it', () => {
-    // Every other group here is given a start state on mount; UPTIME was not,
-    // so its opening opacity was whatever the DOM happened to hold. The
-    // timeline drives it with `.to`, which reads its start value live — so any
-    // re-run of the effect while the group was already faded (Strict Mode's
-    // double mount, a Fast Refresh, a remount after a reload that restored
-    // scroll past this section) tweened 0 to 0 and the word never came back.
-    //
-    // Asserting the inline style is the point: gsap.set writes there, and the
-    // absence of the call is exactly what the bug was.
-    const { container, unmount } = render(<S04ToS05Zoom startYear={2026} />);
-    const group = container.querySelector<HTMLElement>('[data-zw="0"]');
-    expect(group).not.toBeNull();
-    expect(group!.style.opacity).toBe('1');
-    unmount();
-  });
-
-  it('restores UPTIME when the effect runs again over a faded group', () => {
+describe('opening frame', () => {
+  it('opens on UPTIME alone, whatever the DOM was holding', () => {
+    // The timeline seeks both ways; an effect that re-runs over a stage left
+    // mid-dive (Strict Mode, Fast Refresh, a restored reload) must start from
+    // UPTIME. UPTIME once failed to come back 4 reloads in 4 for this.
     const first = render(<S04ToS05Zoom startYear={2026} />);
-    const faded = first.container.querySelector<HTMLElement>('[data-zw="0"]')!;
-    // Stand in for the state a scrubbed timeline leaves behind when the page
-    // is reloaded already scrolled past this section.
-    faded.style.opacity = '0';
+    first.container.querySelector<SVGElement>('[data-uptime]')!.style.opacity = '0';
     first.unmount();
 
-    const second = render(<S04ToS05Zoom startYear={2026} />);
-    const group = second.container.querySelector<HTMLElement>('[data-zw="0"]')!;
-    expect(group.style.opacity).toBe('1');
-    second.unmount();
+    const { container } = render(<S04ToS05Zoom startYear={2026} />);
+    expect(container.querySelector<SVGElement>('[data-uptime]')!.style.opacity).toBe('1');
+    expect(container.querySelector<SVGElement>('[data-hub]')!.style.opacity).toBe('0');
+    expect(container.querySelector<HTMLElement>('[data-w-widget]')!.style.opacity).toBe('0');
+  });
+});
+
+describe('markAngle', () => {
+  it('puts this year at twelve and each year before one slot anticlockwise', () => {
+    expect(markAngle(2026, 2026)).toBe(0);
+    expect(markAngle(2025, 2026)).toBe(-YEAR_STEP_DEG);
+  });
+
+  it('brings 2020 to twelve after one slot per year rewound', () => {
+    const turned = markAngle(2020, 2026) + 6 * YEAR_STEP_DEG;
+    expect(turned).toBe(0);
   });
 });

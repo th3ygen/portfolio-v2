@@ -1,6 +1,9 @@
 .stage {
   position: relative;
   height: 100vh;
+  /* The phone's toolbar comes and goes; the stage is held at its top edge
+     and has to be exactly one screen whichever state it is in. */
+  height: 100svh;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -19,13 +22,31 @@
   background-size: var(--grid-size) var(--grid-size);
 }
 
+.shake {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 .svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
   overflow: visible;
+}
+
+.warp {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  stroke: var(--color-accent);
+  stroke-width: 1;
+  stroke-opacity: 0.55;
 }
 
 .meta {
@@ -48,4 +69,9 @@
   width: 1px;
   height: 26px;
   background: linear-gradient(180deg, var(--color-textFaint), transparent);
+}
+
+/* Upright, the summary widgets take the bottom of the stage and say this already. */
+@media (max-aspect-ratio: 1/1) {
+  .meta { display: none; }
 }

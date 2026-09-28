@@ -6,11 +6,24 @@ import 'lenis/dist/lenis.css';
 import { gsap, ScrollTrigger } from './gsap';
 import { prefersReducedMotion, useReducedMotion } from './useReducedMotion';
 
+export type ScrollToOptions = {
+  /** Seconds. Lenis's own default when omitted. */
+  duration?: number;
+  /** Jump rather than glide. */
+  immediate?: boolean;
+  /** Move even while scrolling is stopped — for whoever stopped it. */
+  force?: boolean;
+  onComplete?: () => void;
+};
+
 export type SmoothScroll = {
-  /** Halts scrolling. Used by the boot overlay while it holds the viewport. */
+  /**
+   * Halts scrolling. Used by the boot overlay while it holds the viewport, and
+   * by the s04 → s05 rewind while it plays.
+   */
   stop: () => void;
   start: () => void;
-  scrollTo: (target: string | number | HTMLElement) => void;
+  scrollTo: (target: string | number | HTMLElement, options?: ScrollToOptions) => void;
 };
 
 const SmoothScrollContext = createContext<SmoothScroll | null>(null);
@@ -47,14 +60,15 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
           document.documentElement.style.overflow = '';
         }
       },
-      scrollTo: (target) => {
+      scrollTo: (target, options = {}) => {
         const lenis = lenisRef.current;
         if (lenis) {
-          lenis.scrollTo(target);
+          lenis.scrollTo(target, options);
           return;
         }
         if (typeof target === 'number') {
           window.scrollTo({ top: target });
+          options.onComplete?.();
           return;
         }
         const element =
