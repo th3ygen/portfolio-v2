@@ -156,6 +156,23 @@
     color: var(--muted);
   }
   .widget footer { margin-top: 10px; }
+  .widget.coffee { margin-top: 16px; }
+  .widget.coffee footer { align-items: center; }
+  .widget.coffee button { padding: 4px 8px; font-size: 9px; }
+  pre.mug, .mugGhost {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    line-height: 1.1;
+    color: var(--text);
+    margin: 0;
+    white-space: pre;
+    user-select: none;
+    touch-action: none;
+  }
+  pre.mug { cursor: grab; width: max-content; }
+  pre.mug.empty { cursor: not-allowed; color: var(--faint); }
+  .mugGhost { position: fixed; pointer-events: none; z-index: 10; transform: translate(-50%, -60%); }
+  body.carrying, body.carrying * { cursor: grabbing !important; }
   .live { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
   .live::before {
     content: '';
@@ -234,7 +251,7 @@
     <div class="group">
       <div class="label">MODE</div>
       <div class="modes" id="modes"></div>
-      <p class="hint">AUTO picks from the data below: night (22:00–07:00 MYT) starts it asleep, low coffee is grumpy, high coffee is hyper. Tap the pet to make it purr; circle the cursor round it three times to make it dizzy.</p>
+      <p class="hint">AUTO picks from the data below: night (22:00–07:00 MYT) starts it asleep; feeding it coffee makes it hyper until that wears off. COFFEE below is your level, for the dashboard card only. Tap the pet to make it purr; circle the cursor round it three times to make it dizzy.</p>
     </div>
 
     <div class="group">
@@ -320,6 +337,11 @@
         <pre class="ascii" id="small" style="font-size:7px"></pre>
         <footer><span id="lvl">LVL 07</span><span id="mood">CONTENT</span></footer>
       </div>
+      <div class="widget coffee">
+        <header><span>COFFEE</span><span id="coffeePct">45%</span></header>
+        <pre class="mug" id="mug" title="Drag the mug onto the pet"></pre>
+        <footer><span id="coffeeHint">DRAG THE MUG TO THE PET</span></footer>
+      </div>
     </section>
 
     <section>
@@ -377,6 +399,8 @@ const MOODS = {
   drowsy: { eye: 0.3,  pupil: 0.3,  drop: 1.5, tailAmp: 0.1, tailSpeed: 0.8, breathRate: 0.9, breathAmp: 0.045, jitter: 0,   happy: 0, dizzy: 0, earsBack: 0.25 },
   // Woken by the cursor: eyes wide, head up, a startled blink.
   waking: { eye: 1.1,  pupil: 0.7,  drop: -0.5, tailAmp: 0.4, tailSpeed: 2, breathRate: 1.4, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
+  // Coffee in sight: eyes wide, pupils huge, ears up, tail going.
+  eager:  { eye: 1.12, pupil: 1,    drop: -1.5, tailAmp: 0.6, tailSpeed: 5, breathRate: 2, breathAmp: 0.03,   jitter: 0.08, happy: 0, dizzy: 0, earsBack: 0 },
   // Poked a few times: ears going back, eyes narrowing, tail flicking.
   irked:  { eye: 0.7,  pupil: 0.3,  drop: 0.5, tailAmp: 0.5, tailSpeed: 3.5, breathRate: 1.2, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0.6 },
   // Poked too much: ears flat, a grumpy squint, head turned away (see step).
@@ -513,16 +537,42 @@ const ROUTINES = {
       if (k > 0.28) utter(act, 'awoo', { text: 'AWOOOO~', x: 70, y: 2, vx: 2, vy: -1.5, cls: 'l', typed: 5, life: 2.2 });
     },
   },
+  // Fed coffee: head down over the mug, eyes shut, three glugs — and then
+  // it is off the walls. Only when fed (`manual`), never on its own.
+  drink: {
+    dur: 2.2,
+    manual: true,
+    apply(k, p, act) {
+      const w = env(k, 0.15, 0.85);
+      p.lookX = lerp(p.lookX, 0, w);
+      p.lookY = lerp(p.lookY, 0.8, w);
+      p.drop = lerp(p.drop, 2.5, w);
+      p.eye = lerp(p.eye, 0.1, w);
+      p.mouth = w * (0.2 + 0.25 * Math.abs(Math.sin(k * 3 * Math.PI)));
+      p.earsBack = lerp(p.earsBack, 0.2, w);
+      const husky = act.husky;
+      utter(act, 'mug', { text: 'c[_]', x: 46, y: husky ? 59 : 62, vy: 0, cls: 'l', life: 2.2 * 0.85 });
+      for (const [key, at] of [['g1', 0.2], ['g2', 0.45], ['g3', 0.7]]) {
+        if (k > at) utter(act, key, { text: 'glug', x: 74, y: (husky ? 44 : 50) - at * 8, vx: 2, vy: -4, typed: 12, life: 0.9 });
+      }
+    },
+    end(sim) { sim.caffeine = Math.min(FEED.max, sim.caffeine + FEED.dose); },
+  },
 };
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP' };
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP', eager: 'WANTS THAT' };
 
 class Sim {
   constructor() {
     this.t = 0;
     this.forced = 'auto';      // 'auto' or a mood key
     this.transient = null;     // { mood, until } — a click reaction on top of everything
+    // The owner's data. `coffee` is the owner's level, for the dashboard's
+    // COFFEE card; it does not touch the pet.
     this.data = { coffee: 45, time: 'live' };
+    // The pet's own caffeine, from being fed coffee (see FEED). Starts at 0
+    // and wears off by itself; the pet is hyper while it is high.
+    this.caffeine = 0;
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
@@ -567,10 +617,10 @@ class Sim {
     if (this.transient && this.t < this.transient.until) return this.transient.mood;
     if (this.forced !== 'auto') return this.forced;
     if (this.doze.on && this.asleep) return 'sleep';
+    // Fed coffee: wired until it wears off — too wired to doze.
+    if (this.caffeine > FEED.hyperAbove) return 'hyper';
     if (this.doze.on && this.t - this.cursorAt >= this.dozeTimes().drowsy) return 'drowsy';
     if (this.neutral) return this.neutral;
-    if (this.data.coffee < 20) return 'grumpy';
-    if (this.data.coffee > 85) return 'hyper';
     return 'idle';
   }
 
@@ -639,6 +689,7 @@ class Sim {
     this.t += dt;
     const tr = this.transient;
     if (tr && this.t >= tr.until && tr.then) this.react(tr.then.mood, tr.then.seconds);
+    this.caffeine = Math.max(0, this.caffeine - FEED.wearOff * dt);
     const mood = this.mood();
     const target = MOODS[mood];
     const p = this.pose;
@@ -698,6 +749,8 @@ class Sim {
     // which at night is soon.)
     const night = this.isNight();
     if (night && !this.wasNight && this.doze.on) this.asleep = true;
+    // Morning: up with the day.
+    if (!night && this.wasNight) this.asleep = false;
     this.wasNight = night;
     // Still long enough, it drops right off.
     if (this.doze.on && !this.asleep && this.t - this.cursorAt >= this.dozeTimes().asleep) this.asleep = true;
@@ -717,7 +770,7 @@ class Sim {
     p.tongue = 0;
     p.stretch = 1;
     if (!this.action && this.routines.on && mood === 'idle' && !this.transient && this.t - this.cursorAt > 3 && this.t > this.nextRoutine) {
-      const names = Object.keys(ROUTINES).filter((n) => !ROUTINES[n].husky || this.species === 'husky');
+      const names = Object.keys(ROUTINES).filter((n) => !ROUTINES[n].manual && (!ROUTINES[n].husky || this.species === 'husky'));
       this.perform(names[Math.floor(Math.random() * names.length)]);
     }
     if (this.action) {
@@ -727,6 +780,7 @@ class Sim {
       if (k >= 1 || (this.transient && this.t < this.transient.until)) {
         this.action = null;
         this.nextRoutine = this.t + rand(...this.routines.gap);
+        if (k >= 1) r.end?.(this);
       } else r.apply(k, p, this.action);
     }
 
@@ -1935,6 +1989,12 @@ function stampSpiral(sp, grid, cls, cols, rows, t) {
 
 const $ = (id) => document.getElementById(id);
 const sim = new Sim();
+// Feeding the pet coffee. Each feed adds `dose` to the pet's caffeine (up to
+// `max`); it wears off at `wearOff` a second, and the pet is hyper while it is
+// above `hyperAbove` — about 10 seconds for one feed, longer for more. The
+// owner's mug below `minimum` is too empty to feed from; feeding never
+// changes it.
+const FEED = { dose: 45, max: 100, wearOff: 1.5, hyperAbove: 30, minimum: 10 };
 
 /** Settings shared by both views. */
 const opts = {
@@ -2034,7 +2094,7 @@ const bind = (id, out, apply, fmt = (v) => v) => {
   el.addEventListener('input', update);
   update();
 };
-bind('coffee', 'coffeeOut', (v) => { sim.data.coffee = Number(v); }, (v) => `${v}%`);
+bind('coffee', 'coffeeOut', (v) => { sim.data.coffee = Number(v); drawMug(); }, (v) => `${v}%`);
 bind('fps', 'fpsOut', (v) => { opts.fps = Number(v); });
 bind('cols', 'colsOut', (v) => { big.resize(Number(v), rowsFor(Number(v))); });
 bind('font', 'fontOut', (v) => { $('big').style.fontSize = `${v}px`; }, (v) => `${v}px`);
@@ -2209,11 +2269,15 @@ const LAB = {
         : `cursor still for ${still.toFixed(1)}s   (drowsy at ${sim.dozeTimes().drowsy}s, asleep at ${sim.dozeTimes().asleep}s${sim.isNight() ? ', night' : ''})\nstate ${MOOD_LABEL[sim.mood()]}`;
     },
   },
+  coffee: {
+    label: 'COFFEE',
+    hint: 'Drag the mug from the COFFEE card onto a pet: while you carry it the pet wants it — eyes wide, ears up, tail going — and dropped on it, it drinks (three glugs) and is off the walls. The coffee goes into the pet\'s own caffeine, which wears off by itself — about 10 seconds of hyper for one feed, longer if you keep feeding it. Your mug\'s level is never touched.',
+  },
   idle: {
     label: 'IDLE',
     hint: 'Leave it alone — keep the cursor still — and every few seconds it does something on its own: yawns, stretches, grooms, sneezes; the husky sometimes howls. Here it goes every 3 to 5 seconds instead of 8 to 14; the buttons play one now.',
     controls: () => Object.keys(ROUTINES)
-      .filter((n) => !ROUTINES[n].husky || sim.species === 'husky')
+      .filter((n) => !ROUTINES[n].manual && (!ROUTINES[n].husky || sim.species === 'husky'))
       .map((n) => [n.toUpperCase(), () => { sim.action = null; sim.transient = null; sim.perform(n); }]),
   },
   stroke: {
@@ -2265,6 +2329,76 @@ function showLabControls() {
     }),
   );
 }
+
+/*
+ * Feed it coffee. The COFFEE card's mug shows the owner's level (the COFFEE
+ * slider stands in for the real data). Dragging it carries a cup under the
+ * cursor, and the pet wants it; dropped on a pet, it drinks and its own
+ * caffeine goes up, so it is hyper until that wears off. The owner's level
+ * is left alone. Dropped anywhere else, nothing. An empty mug won't lift.
+ */
+function mugArt(level) {
+  const rows = 4;
+  const full = Math.round((level / 100) * rows);
+  const body = Array.from({ length: rows }, (_, i) => (rows - i <= full ? '|####|' : '|    |') + (i === 1 ? ']' : ' '));
+  return [level > 0 ? ' ( (  ' : '      ', level > 0 ? '  ) ) ' : '      ', '.____. ', ...body, "'----' "].join('\n');
+}
+function drawMug() {
+  const level = sim.data.coffee;
+  $('mug').textContent = mugArt(level);
+  $('mug').classList.toggle('empty', level < FEED.minimum);
+  $('coffeePct').textContent = `${level}%`;
+  $('coffeeHint').textContent = level < FEED.minimum ? 'EMPTY' : 'DRAG THE MUG TO THE PET';
+}
+
+let carrying = null;
+$('mug').addEventListener('pointerdown', (e) => {
+  if (!e.isPrimary || e.button !== 0 || !on('coffee') || sim.data.coffee < FEED.minimum) return;
+  e.preventDefault();
+  const ghost = document.createElement('pre');
+  ghost.className = 'mugGhost';
+  ghost.textContent = ' ( (\n  ) )\nc[__]';
+  document.body.append(ghost);
+  carrying = { ghost };
+  document.body.classList.add('carrying');
+  moveMug(e);
+});
+function moveMug(e) {
+  if (!carrying) return;
+  carrying.ghost.style.left = `${e.clientX}px`;
+  carrying.ghost.style.top = `${e.clientY}px`;
+  // It wants it, for as long as the mug is in the air.
+  sim.transient = { mood: 'eager', until: Infinity };
+}
+window.addEventListener('pointermove', (e) => { if (e.isPrimary) moveMug(e); });
+const petUnder = (x, y) => views.find((v) => {
+  const r = v.pre.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+});
+const dropMug = (e) => {
+  if (!carrying) return;
+  carrying.ghost.remove();
+  carrying = null;
+  document.body.classList.remove('carrying');
+  sim.transient = null;
+  if (e && e.type === 'pointerup' && petUnder(e.clientX, e.clientY)) {
+    sim.action = null;
+    sim.perform('drink');
+  }
+};
+window.addEventListener('pointerup', dropMug);
+window.addEventListener('pointercancel', dropMug);
+window.addEventListener('blur', () => dropMug(null));
+LAB.coffee.readout = () => {
+  const state = carrying ? 'carrying the mug' : sim.action?.name === 'drink' ? 'drinking' : '—';
+  const left = Math.max(0, (sim.caffeine - FEED.hyperAbove) / FEED.wearOff);
+  const bar = '#'.repeat(Math.round(sim.caffeine / 5)).padEnd(FEED.max / 5, '.');
+  return [
+    `pet caffeine [${bar}] ${Math.round(sim.caffeine)}   (a feed adds ${FEED.dose}; hyper above ${FEED.hyperAbove}${left ? `, for ${left.toFixed(1)}s more` : ''})`,
+    `your mug ${sim.data.coffee}% (unchanged by feeding)   state ${state}   mood ${MOOD_LABEL[sim.mood()]}`,
+  ].join('\n');
+};
+drawMug();
 
 // Gaze follows the cursor, measured from the enlarged view's centre.
 window.addEventListener('mousemove', (e) => {
