@@ -114,7 +114,7 @@
   .check { display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
   input[type='checkbox'] { accent-color: var(--accent); }
 
-  select, input[type='number'] {
+  select, input[type='number'], input[type='text'] {
     font: inherit;
     color: var(--text);
     background: var(--bg-alt);
@@ -243,11 +243,27 @@
       <div class="row"><label for="fps">FPS</label><input id="fps" type="range" min="6" max="60" value="24"><span id="fpsOut"></span></div>
       <div class="row"><label for="cols">BIG COLS</label><input id="cols" type="range" min="24" max="120" value="72"><span id="colsOut"></span></div>
       <div class="row"><label for="font">BIG FONT</label><input id="font" type="range" min="4" max="16" value="9"><span id="fontOut"></span></div>
+      <div class="row"><label for="eyes">EYE SHADER</label><select id="eyes">
+        <option value="blocks">BLOCKS ▚</option>
+        <option value="sprites">SPRITES</option>
+      </select><span></span></div>
+      <label class="check"><input id="color" type="checkbox" checked> COLOUR</label>
+      <label class="check"><input id="debug" type="checkbox"> SHOW SOURCE CANVASES</label>
+      <label class="check"><input id="reduced" type="checkbox"> REDUCED MOTION (static)</label>
+    </div>
+
+    <div class="group">
+      <div class="label">TUNING</div>
+      <div class="modes" id="target">
+        <button data-target="small" aria-pressed="false">DASHBOARD</button>
+        <button data-target="big" aria-pressed="true">ENLARGED</button>
+      </div>
+      <p class="hint">Each view keeps its own settings; these controls edit the one picked above.</p>
       <div class="row"><label for="lineW">LINE WIDTH</label><input id="lineW" type="range" min="20" max="120" value="70"><span id="lineWOut"></span></div>
       <div class="row"><label for="lineThr">LINE THR</label><input id="lineThr" type="range" min="5" max="60" value="22"><span id="lineThrOut"></span></div>
       <div class="row"><label for="shadowD">SHADOW</label><input id="shadowD" type="range" min="0" max="14" step="0.5" value="7"><span id="shadowDOut"></span></div>
       <div class="row"><label for="tone">TONES</label><select id="tone"></select><span></span></div>
-      <div class="row"><label for="darkW">MOUTH</label><input id="darkW" type="range" min="30" max="200" value="100"><span id="darkWOut"></span></div>
+      <div class="row"><label for="darkW">MOUTH (CELL)</label><input id="darkW" type="range" min="30" max="200" value="100"><span id="darkWOut"></span></div>
       <div class="row"><label for="mouthInk">MOUTH INK</label><select id="mouthInk">
         <option value="#2a3030" selected>INK</option>
         <option value="#070809">BLACK</option>
@@ -257,13 +273,18 @@
       </select><span></span></div>
       <div class="row"><label for="eyeScale">EYE SIZE</label><input id="eyeScale" type="range" min="50" max="160" value="100"><span id="eyeScaleOut"></span></div>
       <div class="row"><label for="irisScale">IRIS</label><input id="irisScale" type="range" min="30" max="110" value="100"><span id="irisScaleOut"></span></div>
-      <div class="row"><label for="eyes">EYE SHADER</label><select id="eyes">
-        <option value="blocks">BLOCKS ▚</option>
-        <option value="sprites">SPRITES</option>
-      </select><span></span></div>
-      <label class="check"><input id="color" type="checkbox" checked> COLOUR</label>
-      <label class="check"><input id="debug" type="checkbox"> SHOW SOURCE CANVASES</label>
-      <label class="check"><input id="reduced" type="checkbox"> REDUCED MOTION (static)</label>
+      <button id="copyTune">COPY TO THE OTHER VIEW</button>
+    </div>
+
+    <div class="group">
+      <div class="label">PROFILES (this browser)</div>
+      <div class="row"><label for="profile">PROFILE</label><select id="profile"></select><span></span></div>
+      <div class="row"><label for="profileName">NAME</label><input id="profileName" type="text" placeholder="new profile" maxlength="24"><span></span></div>
+      <div class="modes">
+        <button id="saveProfile">SAVE</button>
+        <button id="deleteProfile">DELETE</button>
+      </div>
+      <p class="hint" id="profileMsg">A profile holds both views' tuning and the render settings.</p>
     </div>
   </aside>
 
@@ -1452,30 +1473,43 @@ class AsciiView {
 const $ = (id) => document.getElementById(id);
 const sim = new Sim();
 
+/** Settings shared by both views. */
 const opts = {
   species: 'cat',
   eyes: 'blocks',
   fps: 24,
   color: true,
+  reduced: false,
+};
+
+/**
+ * Settings each view keeps for itself: what reads at 40 columns and at 72 is
+ * not the same — a line or a mouth one cell thick is a much bigger share of
+ * the small pet.
+ */
+const defaultTune = () => ({
   lineW: 0.7,
-  // Dark line work (the mouth), in cells across.
-  darkW: 1,
   lineThr: 0.22,
   shadowD: 7,
+  // Dark line work (the mouth), in cells across, and its ink.
+  darkW: 1,
+  mouthInk: '#2a3030',
   // Eye opening and iris, as multiples of each species' drawn size.
   eyeScale: 1,
   irisScale: 1,
   // The chosen preset, per species, so switching tabs keeps each pet's own.
   tones: { cat: 'hatch', husky: 'dense' },
-  reduced: false,
-};
+});
+const tune = { small: defaultTune(), big: defaultTune() };
+// The view the TUNING controls edit.
+let target = 'big';
 
 /** Fill the TONES select with the current species' presets. */
 function fillTones() {
   const select = $('tone');
   const presets = TONES[SPECIES[opts.species].tones];
   select.replaceChildren(
-    ...Object.entries(presets).map(([key, preset]) => new Option(preset.label, key, false, key === opts.tones[opts.species])),
+    ...Object.entries(presets).map(([key, preset]) => new Option(preset.label, key, false, key === tune[target].tones[opts.species])),
   );
 }
 
@@ -1487,6 +1521,8 @@ const rowsFor = (cols) => {
 
 const small = new AsciiView($('small'), 40, rowsFor(40));
 const big = new AsciiView($('big'), 72, rowsFor(72));
+small.key = 'small';
+big.key = 'big';
 const views = [small, big];
 
 // Species tabs. The simulation is shared, so a mood carries across.
@@ -1530,16 +1566,140 @@ bind('coffee', 'coffeeOut', (v) => { sim.data.coffee = Number(v); }, (v) => `${v
 bind('fps', 'fpsOut', (v) => { opts.fps = Number(v); });
 bind('cols', 'colsOut', (v) => { big.resize(Number(v), rowsFor(Number(v))); });
 bind('font', 'fontOut', (v) => { $('big').style.fontSize = `${v}px`; }, (v) => `${v}px`);
-bind('lineW', 'lineWOut', (v) => { opts.lineW = Number(v) / 100; }, (v) => (Number(v) / 100).toFixed(2));
-bind('lineThr', 'lineThrOut', (v) => { opts.lineThr = Number(v) / 100; }, (v) => (Number(v) / 100).toFixed(2));
-bind('shadowD', 'shadowDOut', (v) => { opts.shadowD = Number(v); });
 bind('xp', 'lvlOut', () => {}, (v) => `L${String(level(Number(v))).padStart(2, '0')}`);
 $('time').addEventListener('change', (e) => { sim.data.time = e.target.value; });
-bind('darkW', 'darkWOut', (v) => { opts.darkW = Number(v) / 100; }, (v) => `${(Number(v) / 100).toFixed(1)} CELL`);
-$('mouthInk').addEventListener('change', (e) => { document.documentElement.style.setProperty('--ink-dark', e.target.value); });
-bind('eyeScale', 'eyeScaleOut', (v) => { opts.eyeScale = Number(v) / 100; }, (v) => `${v}%`);
-bind('irisScale', 'irisScaleOut', (v) => { opts.irisScale = Number(v) / 100; }, (v) => `${v}%`);
-$('tone').addEventListener('change', (e) => { opts.tones[opts.species] = e.target.value; });
+
+/**
+ * The TUNING controls, each bound to a key of the targeted view's settings.
+ * `scale` converts between the control's value and the setting's.
+ */
+const TUNE_CONTROLS = [
+  { id: 'lineW', scale: 100, fmt: (x) => x.toFixed(2) },
+  { id: 'lineThr', scale: 100, fmt: (x) => x.toFixed(2) },
+  { id: 'shadowD', scale: 1, fmt: (x) => String(x) },
+  { id: 'darkW', scale: 100, fmt: (x) => x.toFixed(1) },
+  { id: 'eyeScale', scale: 100, fmt: (x) => `${Math.round(x * 100)}%` },
+  { id: 'irisScale', scale: 100, fmt: (x) => `${Math.round(x * 100)}%` },
+];
+for (const c of TUNE_CONTROLS) {
+  $(c.id).addEventListener('input', (e) => {
+    tune[target][c.id] = Number(e.target.value) / c.scale;
+    $(`${c.id}Out`).textContent = c.fmt(tune[target][c.id]);
+  });
+}
+$('mouthInk').addEventListener('change', (e) => { tune[target].mouthInk = e.target.value; });
+$('tone').addEventListener('change', (e) => { tune[target].tones[opts.species] = e.target.value; });
+
+/** Show the targeted view's settings in the TUNING controls. */
+function showTune() {
+  const t = tune[target];
+  for (const c of TUNE_CONTROLS) {
+    $(c.id).value = String(t[c.id] * c.scale);
+    $(`${c.id}Out`).textContent = c.fmt(t[c.id]);
+  }
+  $('mouthInk').value = t.mouthInk;
+  fillTones();
+}
+for (const b of $('target').children) {
+  b.addEventListener('click', () => {
+    target = b.dataset.target;
+    for (const other of $('target').children) other.setAttribute('aria-pressed', String(other === b));
+    showTune();
+  });
+}
+$('copyTune').addEventListener('click', () => {
+  tune[target === 'big' ? 'small' : 'big'] = structuredClone(tune[target]);
+});
+showTune();
+
+/* Profiles, in localStorage. Storage can be missing or throw (private
+ * windows, blocked site data); the page works without it, just unsaved. */
+const PROFILES_KEY = 'ascii-pet.profiles';
+const LAST_KEY = 'ascii-pet.lastProfile';
+const store = {
+  get(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v === null ? fallback : JSON.parse(v);
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+const say = (text) => { $('profileMsg').textContent = text; };
+
+function fillProfiles(selected = '') {
+  const names = Object.keys(store.get(PROFILES_KEY, {})).sort();
+  $('profile').replaceChildren(
+    new Option('— none —', '', false, selected === ''),
+    ...names.map((n) => new Option(n, n, false, n === selected)),
+  );
+}
+
+/** Load a saved profile. Missing keys fall back to the defaults, so profiles
+ *  saved before a setting existed still load. */
+function applyProfile(p) {
+  for (const key of ['small', 'big']) {
+    const saved = p.tune?.[key] ?? {};
+    tune[key] = { ...defaultTune(), ...saved, tones: { ...defaultTune().tones, ...saved.tones } };
+  }
+  const shared = p.shared ?? {};
+  if (shared.eyes) $('eyes').value = opts.eyes = shared.eyes;
+  if (shared.color != null) $('color').checked = opts.color = shared.color;
+  for (const id of ['fps', 'cols', 'font']) {
+    if (shared[id] == null) continue;
+    $(id).value = String(shared[id]);
+    $(id).dispatchEvent(new Event('input'));
+  }
+  showTune();
+}
+
+$('saveProfile').addEventListener('click', () => {
+  const name = $('profileName').value.trim() || $('profile').value;
+  if (!name) { say('Type a name first.'); return; }
+  const profiles = store.get(PROFILES_KEY, {});
+  profiles[name] = {
+    tune: structuredClone(tune),
+    shared: { eyes: opts.eyes, fps: opts.fps, color: opts.color, cols: Number($('cols').value), font: Number($('font').value) },
+  };
+  if (!store.set(PROFILES_KEY, profiles)) { say('Could not save: storage is blocked here.'); return; }
+  store.set(LAST_KEY, name);
+  $('profileName').value = '';
+  fillProfiles(name);
+  say(`Saved "${name}".`);
+});
+$('profile').addEventListener('change', (e) => {
+  const name = e.target.value;
+  store.set(LAST_KEY, name);
+  const p = name && store.get(PROFILES_KEY, {})[name];
+  if (p) { applyProfile(p); say(`Loaded "${name}".`); }
+});
+$('deleteProfile').addEventListener('click', () => {
+  const name = $('profile').value;
+  if (!name) { say('Pick a profile to delete.'); return; }
+  const profiles = store.get(PROFILES_KEY, {});
+  delete profiles[name];
+  store.set(PROFILES_KEY, profiles);
+  store.set(LAST_KEY, '');
+  fillProfiles();
+  say(`Deleted "${name}".`);
+});
+
+// Open on the last profile used.
+{
+  const last = store.get(LAST_KEY, '');
+  const p = last && store.get(PROFILES_KEY, {})[last];
+  fillProfiles(p ? last : '');
+  if (p) { applyProfile(p); say(`Loaded "${last}".`); }
+}
 $('eyes').addEventListener('change', (e) => { opts.eyes = e.target.value; });
 $('color').addEventListener('change', (e) => { opts.color = e.target.checked; });
 $('debug').addEventListener('change', (e) => { $('debugWrap').classList.toggle('on', e.target.checked); });
@@ -1581,7 +1741,10 @@ function tick(now) {
   acc += dt;
   if (acc >= 1 / opts.fps) {
     acc = 0;
-    for (const v of views) v.render(sim, opts);
+    for (const v of views) {
+      v.pre.style.setProperty('--ink-dark', tune[v.key].mouthInk);
+      v.render(sim, { ...opts, ...tune[v.key] });
+    }
     if ($('debugWrap').classList.contains('on')) {
       for (const [src, dst] of [[big.canvases.tone, 'dbgTone'], [big.canvases.lines, 'dbgLines'], [big.canvases.accent, 'dbgAccent']]) {
         const d = $(dst);
