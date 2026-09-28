@@ -1,17 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { S02Manifest } from '../index';
-import { MANIFEST, MANIFEST_LABEL } from '@/content/manifest';
+import {
+  MANIFEST,
+  MANIFEST_COUNT,
+  MANIFEST_EQUIPPED,
+  MANIFEST_EQUIPPED_TAG,
+} from '@/content/manifest';
 
 const TOTAL_ITEMS = MANIFEST.reduce((sum, c) => sum + c.items.length, 0);
+
+function stubReducedMotion(matches: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
 
 beforeEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('S02Manifest', () => {
-  it('renders the whole manifest expanded by default', () => {
+  it('renders the whole manifest', () => {
     render(<S02Manifest />);
     expect(screen.getAllByRole('listitem')).toHaveLength(TOTAL_ITEMS);
   });
@@ -22,44 +39,59 @@ describe('S02Manifest', () => {
     expect(headings.map((h) => h.textContent)).toEqual(MANIFEST.map((c) => c.category));
   });
 
-  it('collapses the grid on toggle', async () => {
-    const user = userEvent.setup();
+  it('has no collapse control — the manifest is always open', () => {
     render(<S02Manifest />);
-    await user.click(screen.getByRole('button'));
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('reflects expanded state to assistive tech', async () => {
-    const user = userEvent.setup();
-    render(<S02Manifest />);
-    const toggle = screen.getByRole('button');
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  it('tags the rows that are also in the core loadout', () => {
+    const { container } = render(<S02Manifest />);
+    const tagged = [...container.querySelectorAll('li[data-equipped]')];
+    expect(tagged).toHaveLength(MANIFEST_EQUIPPED.size);
+    for (const li of tagged) {
+      expect(li).toHaveTextContent(MANIFEST_EQUIPPED_TAG);
+      expect(MANIFEST_EQUIPPED).toContain(li.getAttribute('data-equipped'));
+    }
   });
 
-  it('swaps the toggle label with the state', async () => {
-    const user = userEvent.setup();
-    render(<S02Manifest />);
-    const toggle = screen.getByRole('button');
-    expect(toggle).toHaveTextContent(MANIFEST_LABEL.open);
-    await user.click(toggle);
-    expect(toggle).toHaveTextContent(MANIFEST_LABEL.closed);
+  it('says a row is equipped in words, since the tag itself is hidden from screen readers', () => {
+    const { container } = render(<S02Manifest />);
+    const li = container.querySelector('li[data-equipped]')!;
+    expect(li.querySelector('[aria-hidden="true"]')).toHaveTextContent(MANIFEST_EQUIPPED_TAG);
+    expect(li.querySelector('.sr-only')).toHaveTextContent(/core loadout/i);
   });
 
-  it('reopens after collapsing', async () => {
-    const user = userEvent.setup();
-    render(<S02Manifest />);
-    const toggle = screen.getByRole('button');
-    await user.click(toggle);
-    await user.click(toggle);
-    expect(screen.getAllByRole('listitem')).toHaveLength(TOTAL_ITEMS);
+  describe('with reduced motion', () => {
+    beforeEach(() => stubReducedMotion(true));
+
+    it('shows the finished count at once', () => {
+      const { container } = render(<S02Manifest />);
+      const count = container.querySelector('[data-manifest-count]');
+      expect(count).toHaveTextContent(String(MANIFEST_COUNT));
+    });
+
+    it('shows the grid, every row and every tag at once', () => {
+      const { container } = render(<S02Manifest />);
+      const grid = container.querySelector<HTMLElement>('[data-manifest-grid]')!;
+      expect(grid.style.clipPath).toBe('');
+      for (const li of container.querySelectorAll('li')) {
+        expect((li as HTMLElement).style.opacity).not.toBe('0');
+      }
+      expect(container.querySelector('section')).not.toHaveAttribute('data-equipped', 'off');
+    });
   });
 
-  it('points the toggle at the region it controls', () => {
-    render(<S02Manifest />);
-    const controls = screen.getByRole('button').getAttribute('aria-controls');
-    expect(controls).toBeTruthy();
-    expect(document.getElementById(controls ?? '')).toBeInTheDocument();
+  describe('with motion', () => {
+    beforeEach(() => stubReducedMotion(false));
+
+    it('holds the grid shut and the rows back until it scrolls in', () => {
+      const { container } = render(<S02Manifest />);
+      const grid = container.querySelector<HTMLElement>('[data-manifest-grid]')!;
+      expect(grid.style.clipPath).toBe('inset(0% 0% 100% 0%)');
+      const first = container.querySelector('li')!;
+      expect(first.style.opacity).toBe('0');
+      expect(container.querySelector('[data-manifest-count]')).toHaveTextContent('00');
+      expect(container.querySelector('section')).toHaveAttribute('data-equipped', 'off');
+    });
   });
 });

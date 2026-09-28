@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CORE_LOADOUT, SOCIALS } from '@/content/operator';
-import { MANIFEST } from '@/content/manifest';
+import { MANIFEST, MANIFEST_COUNT, MANIFEST_EQUIPPED } from '@/content/manifest';
 import { SPOTLIGHTS } from '@/content/spotlights';
 import { INDEX_ROWS } from '@/content/index-rows';
 import { TRAJECTORY } from '@/content/trajectory';
@@ -33,6 +33,21 @@ describe('manifest', () => {
     for (const category of MANIFEST) {
       expect(new Set(category.items).size).toBe(category.items.length);
     }
+  });
+
+  it('counts distinct items, so a skill listed under two categories counts once', () => {
+    const rows = MANIFEST.flatMap((c) => c.items);
+    expect(MANIFEST_COUNT).toBe(new Set(rows).size);
+    expect(MANIFEST_COUNT).toBe(72);
+  });
+
+  it('finds every core loadout entry among its rows', () => {
+    const rows = new Set(MANIFEST.flatMap((c) => c.items));
+    for (const name of MANIFEST_EQUIPPED) {
+      expect(rows).toContain(name);
+    }
+    // Eight slots, nine rows: TRANSPORT carries MQTT and Socket.io.
+    expect(MANIFEST_EQUIPPED.size).toBe(9);
   });
 
   it('is substantially larger than the core loadout — that contrast is the point', () => {

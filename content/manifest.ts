@@ -1,9 +1,10 @@
 import type { ManifestCategory } from '@/lib/types';
+import { CORE_LOADOUT } from '@/content/operator';
 
 /**
  * The s02 full manifest — everything, including the unglamorous parts.
- * Nine lettered categories. The whole grid sits behind a toggle that defaults
- * to open; the 8-item core loadout in s01 is what carries the count discipline.
+ * Nine lettered categories, always open; the 8-item core loadout in s01 is what
+ * carries the count discipline.
  */
 export const MANIFEST: readonly ManifestCategory[] = [
   {
@@ -70,7 +71,28 @@ export const MANIFEST: readonly ManifestCategory[] = [
   },
 ] as const;
 
-export const MANIFEST_LABEL = {
-  open: '[ − ] COLLAPSE MANIFEST',
-  closed: '[ + ] EXPAND FULL MANIFEST',
-} as const;
+/**
+ * How many distinct things the manifest lists — the number the s02 head
+ * counts up to.
+ *
+ * Distinct, not rows: Zod sits under both FRONTEND and BACKEND because it does
+ * both jobs, and counting it twice would inflate the one figure the section
+ * exists to state honestly.
+ */
+export const MANIFEST_COUNT = new Set(MANIFEST.flatMap((c) => c.items)).size;
+
+export const MANIFEST_UNIT = 'ITEMS';
+
+/**
+ * The manifest rows that are also in the s01 core loadout. s02 tags them
+ * [EQ], which is what makes the gap between the eight and the rest visible
+ * rather than something the copy has to assert.
+ *
+ * Derived from the loadout rather than listed again, so swapping a slot in s01
+ * moves the tag here.
+ */
+export const MANIFEST_EQUIPPED: ReadonlySet<string> = new Set(
+  CORE_LOADOUT.flatMap((item) => item.manifest ?? [item.name]),
+);
+
+export const MANIFEST_EQUIPPED_TAG = '[EQ]';

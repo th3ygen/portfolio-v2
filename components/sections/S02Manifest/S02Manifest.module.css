@@ -35,33 +35,25 @@
   color: var(--color-textPrimary);
 }
 
+.headCount {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: var(--color-textDim);
+}
+
+/* Tabular so the count does not jitter sideways as its digits change. */
+.headCountValue {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+
 .headNote {
   flex: 1;
   text-align: right;
   font-size: var(--fs-micro);
   letter-spacing: var(--track-org);
   color: var(--color-textDim);
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-10);
-  margin-bottom: var(--gap-34);
-  padding: var(--gap-10) var(--gap-16);
-  background: transparent;
-  border: 1px solid var(--color-textGhost);
-  color: var(--color-textMuted);
-  font-family: inherit;
-  font-size: var(--fs-label);
-  letter-spacing: var(--track-org);
-  cursor: pointer;
-}
-
-.toggle:hover,
-.toggle:focus-visible {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
 }
 
 .grid {
@@ -97,6 +89,45 @@
   font-size: var(--fs-body-sm);
   line-height: 2.1;
   color: var(--color-textMuted);
+}
+
+/*
+ * The rows also in the s01 loadout. The name lifts to primary and the tag
+ * carries the accent — the one accent, so nine rows of it would stop reading
+ * as a mark.
+ *
+ * Both step on with steps(2), CSS's copy of EASE.snap: a tag is a state the
+ * row is in, not a light coming up. Tagged is the default, so the tags are
+ * there without JavaScript; the readout sets data-equipped="off" before first
+ * paint and lifts it when the print lands. Turning off takes no delay — the
+ * stagger is only for the arrival.
+ */
+.items li[data-equipped] {
+  color: var(--color-textPrimary);
+  transition: color 0.24s steps(2) calc(var(--eq-i) * 70ms);
+}
+
+.eq {
+  margin-left: 8px;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-org);
+  color: var(--color-accent);
+  transition: opacity 0.24s steps(2) calc(var(--eq-i) * 70ms);
+}
+
+.section[data-equipped='off'] .items li[data-equipped] {
+  color: var(--color-textMuted);
+  transition-delay: 0s;
+}
+
+.section[data-equipped='off'] .eq {
+  opacity: 0;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .items li[data-equipped],
+  .eq { transition: none; }
 }
 
 /* Greebles. */

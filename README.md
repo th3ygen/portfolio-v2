@@ -9,7 +9,7 @@ The redesign fixed two problems in the previous site:
 1. **It contradicted itself on experience level** — copy claimed both junior and senior framing.
 2. **It buried the real story.** The interesting throughline is physical-systems and IoT work from 2020 onward (vehicle/face recognition, piping calculators, safety telemetry). The old site hid this under a generic full-stack skills dump (90 skills across 9 categories).
 
-The redesign resolves both: one consistent voice, an 8-item "core loadout" with the full manifest behind a toggle, 4 project spotlights instead of 17 flat cards, and a reverse-chronological career timeline as the emotional centre.
+The redesign resolves both: one consistent voice, an 8-item "core loadout" with the full manifest beneath it, 4 project spotlights instead of 17 flat cards, and a reverse-chronological career timeline as the emotional centre.
 
 ## About the Design Files
 
@@ -75,7 +75,7 @@ Full-viewport dark overlay that self-dismisses after ~2.3s. Fires before any pag
 
 ### `s02` — Full manifest (skills)
 
-8-item core loadout shown by default; full manifest expands behind a toggle. This is the section that replaced the old 90-skill grid — **keep the count discipline.**
+The 8-item core loadout lives in `s01`; `s02` is the full manifest, always open, printing in on view with the eight tagged `[EQ]` where they sit. This is the section that replaced the old 90-skill grid — **keep the count discipline.**
 
 ### `s03` — Spotlight (projects)
 
@@ -180,7 +180,6 @@ Grain and scanline overlays; a `om-flick` keyframe animation on the scanline lay
 Minimal — this is a static page. What exists:
 
 - Boot overlay: progress value, current log index, done flag. Locks body scroll while active.
-- `s02`: full-manifest expanded/collapsed boolean.
 - Everything else is scroll position, owned by ScrollTrigger.
 
 Two tweakable props on the root component, both booleans defaulting to `true`, grouped under "Motion": `parallax` and `reveal`. Worth keeping as feature flags, and worth wiring to `prefers-reduced-motion`.

@@ -181,6 +181,7 @@ export const CORE_LOADOUT: readonly LoadoutItem[] = [
     logo: 'mqtt',
     logoColor: '#C700C7',
     accent: true,
+    manifest: ['MQTT', 'Socket.io'],
   },
   { name: 'WebRTC', detail: 'LIVE VIDEO · INTERCOM', slot: 'COMMS', logo: 'webrtc', logoColor: '#FFFFFF', accent: true },
   { name: 'Flutter', detail: 'CURRENT ROLE', slot: 'MOBILE', logo: 'flutter', logoColor: '#0372CD' },

@@ -35,6 +35,13 @@ export type LoadoutItem = {
   readonly logoColor: string;
   /** Two entries are accent-coloured in the design; this is not decorative. */
   readonly accent?: boolean;
+  /**
+   * The s02 manifest rows this slot stands for, when that is not just `name`.
+   *
+   * A slot can hold two technologies that the manifest lists separately —
+   * TRANSPORT is MQTT and Socket.io — and s02 tags the rows, not the slot.
+   */
+  readonly manifest?: readonly string[];
 };
 
 /** One lettered category of the s02 full manifest. */

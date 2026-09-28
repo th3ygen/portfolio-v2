@@ -54,16 +54,14 @@ test('boot overlay plays once, then not again in the same session', async ({ pag
   await expect(page.getByText('COLD BOOT')).toHaveCount(0);
 });
 
-test('the manifest toggle collapses and reopens', async ({ page }) => {
+test('the manifest prints in when it scrolls into view', async ({ page }) => {
   await page.goto('/');
-  const toggle = page.getByRole('button', { name: /MANIFEST/ });
-  await toggle.scrollIntoViewIfNeeded();
+  const grid = page.locator('[data-manifest-grid]');
+  await grid.scrollIntoViewIfNeeded();
 
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('[data-manifest-count]')).toHaveText('72');
+  await expect(grid.locator('li').last()).toHaveCSS('opacity', '1');
+  await expect(page.locator('#s02')).toHaveAttribute('data-equipped', 'on');
 });
 
 test('the contact form reports a server failure rather than claiming success', async ({ page }) => {
