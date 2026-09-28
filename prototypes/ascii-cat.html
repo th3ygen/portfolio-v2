@@ -184,7 +184,56 @@
   }
   @keyframes live { 50% { opacity: 0.25; } }
 
-  .big { border: 1px solid var(--border); background: var(--bg-alt); padding: 20px; justify-self: start; }
+  .big { position: relative; border: 1px solid var(--border); background: var(--bg-alt); padding: 20px; justify-self: start; }
+
+  /* Status badges, top right of the pet: a pixel icon in a square, and for a
+     timed one a bar along the bottom for how much is left. Nearly out, it
+     blinks softly. */
+  .badges { position: absolute; z-index: 2; display: flex; gap: 4px; }
+  .widget .badges { top: 38px; right: 16px; }
+  .big .badges { top: 10px; right: 10px; gap: 6px; }
+  .badge {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border: 1px solid var(--border);
+    background: var(--bg-alt);
+    color: var(--text);
+  }
+  .big .badge { width: 24px; height: 24px; }
+  .badge svg { width: 9px; height: 9px; shape-rendering: crispEdges; }
+  .big .badge svg { width: 12px; height: 12px; }
+  .badge.a { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .badge.s { color: var(--muted); }
+  .badge i { position: absolute; left: 1px; bottom: 1px; height: 1px; background: currentColor; }
+  /* The blink is on the icon and the bar, not the square, so an open tooltip
+     stays steady. */
+  .badge.ending > svg, .badge.ending > i { animation: ending 1s ease-in-out infinite; }
+  @keyframes ending { 50% { opacity: 0.3; } }
+  /* Tooltip: under the badge, right-aligned so it stays inside the view. */
+  .badge .tip {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: -1px;
+    display: none;
+    width: max-content;
+    max-width: 200px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font: 9px/1.5 'JetBrains Mono', ui-monospace, monospace;
+    letter-spacing: 0.12em;
+    white-space: normal;
+    text-align: left;
+    pointer-events: none;
+  }
+  .badge:hover .tip { display: block; }
+  .tip b { display: flex; justify-content: space-between; gap: 12px; font-weight: 400; color: currentColor; }
+  .tip em { font-style: normal; }
+  .tip b span { color: var(--muted); }
+  .tip p { margin: 3px 0 0; color: var(--muted); letter-spacing: 0.04em; }
 
   .tabs { grid-column: 1 / -1; display: flex; gap: 6px; }
   .tabs button { min-width: 110px; text-align: center; }
@@ -275,6 +324,10 @@
         <option value="round">SPIRAL ◎</option>
         <option value="cross">CROSS X</option>
       </select><span></span></div>
+      <div class="row"><label for="catNose">CAT NOSE</label><select id="catNose">
+        <option value="blocks" selected>BLOCKS</option>
+        <option value="lines">LINES</option>
+      </select><span></span></div>
       <label class="check"><input id="color" type="checkbox" checked> COLOUR</label>
       <label class="check"><input id="debug" type="checkbox"> SHOW SOURCE CANVASES</label>
       <label class="check"><input id="reduced" type="checkbox"> REDUCED MOTION (static)</label>
@@ -335,6 +388,7 @@
       <div class="widget">
         <header><span>PET.EXE</span><span class="live" id="alive">ALIVE</span></header>
         <pre class="ascii" id="small" style="font-size:7px"></pre>
+        <div class="badges" id="badgesSmall"></div>
         <footer><span id="lvl">LVL 07</span><span id="mood">CONTENT</span></footer>
       </div>
       <div class="widget coffee">
@@ -346,7 +400,7 @@
 
     <section>
       <div class="caption">ENLARGED — MOVE THE CURSOR, CLICK THE CAT</div>
-      <div class="big"><pre class="ascii" id="big"></pre></div>
+      <div class="big"><pre class="ascii" id="big"></pre><div class="badges" id="badgesBig"></div></div>
     </section>
 
     <section class="debug" id="debugWrap">
@@ -432,6 +486,47 @@ const MOON = [
   '.###....',
   '...###..',
 ];
+
+/** Status badge icons, 8 x 8 pixels. */
+const ICONS = {
+  cup: [
+    '..#.#...',
+    '.#.#....',
+    '........',
+    '######..',
+    '#####.#.',
+    '#####.#.',
+    '######..',
+    '.####...',
+  ],
+  zzz: [
+    '....####',
+    '......#.',
+    '.....#..',
+    '....####',
+    '####....',
+    '..#.....',
+    '.#......',
+    '####....',
+  ],
+  lid: [
+    '........',
+    '........',
+    '########',
+    '########',
+    '#.####.#',
+    '........',
+    '.#.#.#..',
+    '........',
+  ],
+  moon: MOON,
+  vein: ['........', ...VEIN, '........'],
+};
+const iconSvg = (rows) => {
+  const rects = [];
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '#') rects.push(`<rect x="${x}" y="${y}" width="1" height="1"/>`); }));
+  return `<svg viewBox="0 0 8 8" fill="currentColor" aria-hidden="true">${rects.join('')}</svg>`;
+};
 
 /** A bold '!', the same way: a cell wide, three tall. */
 const BANG = ['##', '##', '##', '##', '..', '##'];
@@ -556,7 +651,10 @@ const ROUTINES = {
         if (k > at) utter(act, key, { text: 'glug', x: 74, y: (husky ? 44 : 50) - at * 8, vx: 2, vy: -4, typed: 12, life: 0.9 });
       }
     },
-    end(sim) { sim.caffeine = Math.min(FEED.max, sim.caffeine + FEED.dose); },
+    end(sim) {
+      // A fresh dose, not another on top: the clock starts over.
+      sim.caffeine = FEED.dose;
+    },
   },
 };
 
@@ -573,10 +671,12 @@ class Sim {
     // The pet's own caffeine, from being fed coffee (see FEED). Starts at 0
     // and wears off by itself; the pet is hyper while it is high.
     this.caffeine = 0;
+    // When it last had any in it: it does not doze off before that.
+    this.alertAt = -Infinity;
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -619,7 +719,7 @@ class Sim {
     if (this.doze.on && this.asleep) return 'sleep';
     // Fed coffee: wired until it wears off — too wired to doze.
     if (this.caffeine > FEED.hyperAbove) return 'hyper';
-    if (this.doze.on && this.t - this.cursorAt >= this.dozeTimes().drowsy) return 'drowsy';
+    if (this.doze.on && this.still() >= this.dozeTimes().drowsy) return 'drowsy';
     if (this.neutral) return this.neutral;
     return 'idle';
   }
@@ -639,6 +739,20 @@ class Sim {
   dozeTimes() {
     const d = this.doze;
     return this.isNight() ? { drowsy: Math.round(d.drowsy * 0.3), asleep: Math.round(d.asleep * 0.35) } : d;
+  }
+
+  /**
+   * Seconds it has had nothing keeping it up: no cursor moving, and no
+   * caffeine in it — day or night, it doesn't doze off while it has any.
+   */
+  still() { return this.t - Math.max(this.cursorAt, this.alertAt); }
+
+  /** Fed coffee: up, if it was asleep, and drinking. */
+  feed() {
+    this.asleep = false;
+    this.cursorAt = this.t;
+    this.action = null;
+    this.perform('drink');
   }
 
   /** A mood on top of everything for a while; `then`, another after it. */
@@ -690,6 +804,7 @@ class Sim {
     const tr = this.transient;
     if (tr && this.t >= tr.until && tr.then) this.react(tr.then.mood, tr.then.seconds);
     this.caffeine = Math.max(0, this.caffeine - FEED.wearOff * dt);
+    if (this.caffeine > 0) this.alertAt = this.t;
     const mood = this.mood();
     const target = MOODS[mood];
     const p = this.pose;
@@ -699,6 +814,10 @@ class Sim {
     // Breathing and tail are continuous oscillators; their speed follows the mood.
     p.breath = Math.sin(this.t * p.breathRate * Math.PI) * p.breathAmp;
     p.tail = Math.sin(this.t * p.tailSpeed) * p.tailAmp + Math.sin(this.t * p.tailSpeed * 0.37) * p.tailAmp * 0.4;
+    // Getting sleepy, the tail sinks, slowly: part way while drowsy, down on
+    // the floor asleep. Awake again, it comes up a little quicker.
+    const tailDown = mood === 'sleep' ? 1 : mood === 'drowsy' ? 0.55 : 0;
+    p.tailDown = approach(p.tailDown, tailDown, tailDown > p.tailDown ? 0.45 : 1.5, dt);
     p.wobble = p.dizzy * Math.sin(this.t * 7) * 0.22;
     p.jx = p.jitter * rand(-1.3, 1.3);
     p.jy = p.jitter * rand(-0.8, 0.8);
@@ -748,17 +867,17 @@ class Sim {
     // Night falls: it is asleep. (Woken, it stays up until it dozes off again,
     // which at night is soon.)
     const night = this.isNight();
-    if (night && !this.wasNight && this.doze.on) this.asleep = true;
+    if (night && !this.wasNight && this.doze.on && this.caffeine <= 0) this.asleep = true;
     // Morning: up with the day.
     if (!night && this.wasNight) this.asleep = false;
     this.wasNight = night;
     // Still long enough, it drops right off.
-    if (this.doze.on && !this.asleep && this.t - this.cursorAt >= this.dozeTimes().asleep) this.asleep = true;
+    if (this.doze.on && !this.asleep && this.still() >= this.dozeTimes().asleep) this.asleep = true;
 
     // Drowsy: the head sinks slowly and jerks back up, eyes flickering open
     // on each jerk — nodding off.
     if (mood === 'drowsy') {
-      const c = (this.t - this.cursorAt - this.dozeTimes().drowsy) % 2.2;
+      const c = (this.still() - this.dozeTimes().drowsy) % 2.2;
       const sink = c < 1.8 ? c / 1.8 : 1 - (c - 1.8) / 0.4;
       p.drop = 1 + 3.5 * sink * sink;
       p.eye = c < 1.8 ? 0.32 - 0.22 * sink : 0.6;
@@ -915,6 +1034,22 @@ class Pen {
     this.feature.fill(path);
     this.lines.fillStyle = '#000';
     this.lines.fill(path);
+  }
+
+  /** A polyline `width` thick, as feature blobs: a quad for each segment. */
+  band(points, width, kind = 'shine') {
+    for (let i = 1; i < points.length; i++) {
+      const [ax, ay] = points[i - 1];
+      const [bx, by] = points[i];
+      const len = Math.hypot(bx - ax, by - ay) || 1;
+      // Half the width across the segment, and a little past each end so the
+      // joints close.
+      const nx = (-(by - ay) / len) * width / 2;
+      const ny = ((bx - ax) / len) * width / 2;
+      const ex = ((bx - ax) / len) * width * 0.3;
+      const ey = ((by - ay) / len) * width * 0.3;
+      this.blob([[ax - ex + nx, ay - ey + ny], [bx + ex + nx, by + ey + ny], [bx + ex - nx, by + ey - ny], [ax - ex - nx, ay - ey - ny]], kind);
+    }
   }
 
   /**
@@ -1152,15 +1287,14 @@ function strip(centre, w) {
 function drawCat(pen, p) {
   const breathe = 1 + p.breath;
 
-  // ── Tail, behind the body: a jointed strip, the tip swinging.
+  // ── Tail, behind the body: a jointed strip, the tip swinging. Sleepy, it
+  // sinks (tailDown, 0 to 1) until it lies along the floor, the tip turned
+  // up a little and barely moving.
   const s = p.tail;
-  pen.solid(strip([
-    [64, 91],
-    [80, 91],
-    [88, 82],
-    [88 + s * 6, 68],
-    [82 + s * 16, 57 - Math.abs(s) * 3],
-  ], 5.5), { shadow: 0.5 });
+  const d = p.tailDown;
+  const up = [[64, 91], [80, 91], [88, 82], [88 + s * 6, 68], [82 + s * 16, 57 - Math.abs(s) * 3]];
+  const down = [[64, 91], [79, 93], [89, 93.5], [96 + s * 2, 92.5], [100 + s * 3, 89 - Math.abs(s)]];
+  pen.solid(strip(up.map(([x, y], i) => [lerp(x, down[i][0], d), lerp(y, down[i][1], d)]), 5.5), { shadow: 0.5 });
 
   // ── Body, sitting: a faceted bell, breathing upward from the ground.
   const by = (y) => 95 - (95 - y) * breathe;
@@ -1216,9 +1350,19 @@ function drawCat(pen, p) {
     // ── Eyes.
     for (const side of [-1, 1]) pen.eye(side * 8.5, -2, 12.5, p);
 
-    // ── Nose, mouth, whiskers: straight lines.
-    pen.stroke([[-2.5, 6], [0, 8.5], [2.5, 6]]);
-    pen.stroke([[-4.5, 10.5], [-2, 12], [0, 9.5], [2, 12], [4.5, 10.5]]);
+    // ── Nose and mouth. LINES: straight strokes, as the outline is drawn —
+    // at this size they print as a tangle of slashes. BLOCKS: solid quadrant
+    // cells, as the husky's nose — a grey triangle with a shine, and the
+    // mouth a grey band hanging from it.
+    if (pen.opts.catNose === 'lines') {
+      pen.stroke([[-2.5, 6], [0, 8.5], [2.5, 6]]);
+      pen.stroke([[-4.5, 10.5], [-2, 12], [0, 9.5], [2, 12], [4.5, 10.5]]);
+    } else {
+      pen.blob([[-3.2, 5.6], [3.2, 5.6], [0.9, 8.6], [-0.9, 8.6]]);
+      pen.blob([[-2.4, 5.8], [-0.6, 5.8], [-0.8, 6.8], [-2.2, 6.8]], 'shine');
+      pen.band([[0, 8.4], [0, 10]], 1.1, 'dark');
+      for (const side of [-1, 1]) pen.band([[0, 10], [side * 2.2, 11.6], [side * 4.6, 10.6]], 1.1, 'dark');
+    }
     // Open (yawning, sneezing): a dark mouth under the nose, as wide and deep
     // as the pose says.
     if (p.mouth > 0.12) {
@@ -1991,10 +2135,12 @@ const $ = (id) => document.getElementById(id);
 const sim = new Sim();
 // Feeding the pet coffee. Each feed adds `dose` to the pet's caffeine (up to
 // `max`); it wears off at `wearOff` a second, and the pet is hyper while it is
-// above `hyperAbove` — about 10 seconds for one feed, longer for more. The
+// above `hyperAbove` — about 10 seconds. The
 // owner's mug below `minimum` is too empty to feed from; feeding never
-// changes it.
-const FEED = { dose: 45, max: 100, wearOff: 1.5, hyperAbove: 30, minimum: 10 };
+// changes it. It stays up until the caffeine is all gone, 30 seconds. Fed
+// again at any point, the caffeine goes back to one dose: the time starts
+// over rather than stacking.
+const FEED = { dose: 45, wearOff: 1.5, hyperAbove: 30, minimum: 10 };
 
 /** Settings shared by both views. */
 const opts = {
@@ -2002,6 +2148,8 @@ const opts = {
   eyes: 'blocks',
   // Dizzy eyes: a spinning 'square' or 'round' spiral, or a 'cross'.
   dizzyEyes: 'square',
+  // The cat's nose and mouth: solid 'blocks', or 'lines'.
+  catNose: 'blocks',
   fps: 24,
   color: true,
   reduced: false,
@@ -2185,6 +2333,7 @@ function applyProfile(p) {
   }
   const shared = p.shared ?? {};
   if (shared.eyes) $('eyes').value = opts.eyes = shared.eyes;
+  if (shared.catNose) $('catNose').value = opts.catNose = shared.catNose;
   if (shared.dizzyEyes) $('dizzyEyes').value = opts.dizzyEyes = shared.dizzyEyes;
   if (shared.color != null) $('color').checked = opts.color = shared.color;
   for (const id of ['fps', 'cols', 'font']) {
@@ -2201,7 +2350,7 @@ $('saveProfile').addEventListener('click', () => {
   const profiles = store.get(PROFILES_KEY, {});
   profiles[name] = {
     tune: structuredClone(tune),
-    shared: { eyes: opts.eyes, dizzyEyes: opts.dizzyEyes, fps: opts.fps, color: opts.color, cols: Number($('cols').value), font: Number($('font').value) },
+    shared: { eyes: opts.eyes, catNose: opts.catNose, dizzyEyes: opts.dizzyEyes, fps: opts.fps, color: opts.color, cols: Number($('cols').value), font: Number($('font').value) },
   };
   if (!store.set(PROFILES_KEY, profiles)) { say('Could not save: storage is blocked here.'); return; }
   store.set(LAST_KEY, name);
@@ -2234,6 +2383,7 @@ $('deleteProfile').addEventListener('click', () => {
   if (p) { applyProfile(p); say(`Loaded "${last}".`); }
 }
 $('eyes').addEventListener('change', (e) => { opts.eyes = e.target.value; });
+$('catNose').addEventListener('change', (e) => { opts.catNose = e.target.value; });
 $('dizzyEyes').addEventListener('change', (e) => { opts.dizzyEyes = e.target.value; });
 $('color').addEventListener('change', (e) => { opts.color = e.target.checked; });
 $('debug').addEventListener('change', (e) => { $('debugWrap').classList.toggle('on', e.target.checked); });
@@ -2262,7 +2412,7 @@ const LAB = {
     label: 'DOZE',
     hint: 'Keep the cursor still: it gets drowsy — eyes to slits, head nodding — then falls asleep. Drowsy, moving the cursor keeps it awake; asleep, it takes three taps (one only makes it stir) or a dart at it (a startle) to wake it. Here that takes 5 and 10 seconds; normally 20 and 26. At night (set TIME to FORCE NIGHT to try it) it starts asleep, a moon is up, and once woken it drops off again far sooner.',
     readout: () => {
-      const still = sim.t - sim.cursorAt;
+      const still = sim.still();
       const taps = wakeTaps.filter((t) => performance.now() - t < WAKE.windowMs).length;
       return sim.asleep
         ? `asleep   wake taps ${taps} / ${WAKE.taps} (within ${WAKE.windowMs / 1000}s), or dart at it\nstate ${MOOD_LABEL[sim.mood()]}`
@@ -2271,7 +2421,7 @@ const LAB = {
   },
   coffee: {
     label: 'COFFEE',
-    hint: 'Drag the mug from the COFFEE card onto a pet: while you carry it the pet wants it — eyes wide, ears up, tail going — and dropped on it, it drinks (three glugs) and is off the walls. The coffee goes into the pet\'s own caffeine, which wears off by itself — about 10 seconds of hyper for one feed, longer if you keep feeding it. Your mug\'s level is never touched.',
+    hint: 'Drag the mug from the COFFEE card onto a pet: while you carry it the pet wants it — eyes wide, ears up, tail going — and dropped on it, it drinks (three glugs) and is off the walls. The coffee goes into the pet\'s own caffeine, which wears off by itself — about 10 seconds of hyper. Until it is all gone (30 seconds) the pet won\'t doze off, day or night. Feed it again at any time and the clock starts over — it doesn\'t stack. Here it dozes off after 10 seconds still and keeps the hours — try FORCE NIGHT and feed it asleep. The badges top right show its state; a timed one blinks softly as it runs out. Your mug\'s level is never touched.',
   },
   idle: {
     label: 'IDLE',
@@ -2308,10 +2458,11 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.nextRoutine = sim.t + rand(...sim.routines.gap);
     // Dozing is on in ALL and DOZE; DOZE nods off much sooner. The click on
     // the tab counts as the cursor moving.
-    sim.doze = key === 'doze' ? { on: true, drowsy: 5, asleep: 10 } : { on: on('doze'), drowsy: 20, asleep: 26 };
+    sim.doze = key === 'doze' || key === 'coffee' ? { on: true, drowsy: 5, asleep: 10 } : { on: on('doze'), drowsy: 20, asleep: 26 };
     sim.cursorAt = sim.t;
     sim.asleep = false;
-    sim.nightAware = on('doze');
+    sim.nightAware = on('doze') || key === 'coffee';
+    sim.caffeine = 0;
     sim.wasNight = false;
   });
   $('labTabs').append(b);
@@ -2346,8 +2497,13 @@ function mugArt(level) {
 function drawMug() {
   const level = sim.data.coffee;
   $('mug').textContent = mugArt(level);
-  $('mug').classList.toggle('empty', level < FEED.minimum);
   $('coffeePct').textContent = `${level}%`;
+  drawMugHint();
+}
+/** The hint, and whether the mug lifts. */
+function drawMugHint() {
+  const level = sim.data.coffee;
+  $('mug').classList.toggle('empty', level < FEED.minimum);
   $('coffeeHint').textContent = level < FEED.minimum ? 'EMPTY' : 'DRAG THE MUG TO THE PET';
 }
 
@@ -2382,8 +2538,7 @@ const dropMug = (e) => {
   document.body.classList.remove('carrying');
   sim.transient = null;
   if (e && e.type === 'pointerup' && petUnder(e.clientX, e.clientY)) {
-    sim.action = null;
-    sim.perform('drink');
+    sim.feed();
   }
 };
 window.addEventListener('pointerup', dropMug);
@@ -2392,16 +2547,75 @@ window.addEventListener('blur', () => dropMug(null));
 LAB.coffee.readout = () => {
   const state = carrying ? 'carrying the mug' : sim.action?.name === 'drink' ? 'drinking' : '—';
   const left = Math.max(0, (sim.caffeine - FEED.hyperAbove) / FEED.wearOff);
-  const bar = '#'.repeat(Math.round(sim.caffeine / 5)).padEnd(FEED.max / 5, '.');
+  const up = sim.caffeine / FEED.wearOff;
+  const bar = '#'.repeat(Math.round(sim.caffeine / 5)).padEnd(FEED.dose / 5, '.');
   return [
-    `pet caffeine [${bar}] ${Math.round(sim.caffeine)}   (a feed adds ${FEED.dose}; hyper above ${FEED.hyperAbove}${left ? `, for ${left.toFixed(1)}s more` : ''})`,
+    `pet caffeine [${bar}] ${Math.round(sim.caffeine)}   (a feed adds ${FEED.dose}; hyper above ${FEED.hyperAbove}${left ? `, for ${left.toFixed(1)}s more` : ''}${up ? `; awake ${up.toFixed(1)}s more` : ''})`,
     `your mug ${sim.data.coffee}% (unchanged by feeding)   state ${state}   mood ${MOOD_LABEL[sim.mood()]}`,
   ].join('\n');
 };
 drawMug();
 
-// Gaze follows the cursor, measured from the enlarged view's centre.
-window.addEventListener('mousemove', (e) => {
+/*
+ * Status badges. Each: an icon, a colour, and for a timed one the seconds and
+ * the fraction left. Under `ENDING` seconds left it blinks softly — three
+ * times, and it is gone.
+ */
+const ENDING = 3;
+function statuses() {
+  const list = [];
+  const mood = sim.mood();
+  if (sim.isNight()) list.push({ key: 'night', icon: 'moon', cls: 's', label: 'NIGHT', desc: 'Past 22:00 in Malaysia. It sleeps, and once woken drops off again fast.' });
+  if (mood === 'sleep') list.push({ key: 'sleep', icon: 'zzz', cls: '', label: 'SLEEPING', desc: 'Tap it three times, or dart the cursor at it, to wake it.' });
+  else if (mood === 'drowsy') list.push({ key: 'drowsy', icon: 'lid', cls: 's', label: 'DROWSY', desc: 'Nodding off. Move the cursor to keep it up.' });
+  if (sim.caffeine > 0) {
+    const hyper = sim.caffeine > FEED.hyperAbove;
+    list.push({
+      key: 'caffeine', icon: 'cup', cls: 'a',
+      label: hyper ? 'CAFFEINATED' : 'WIRED',
+      desc: hyper ? 'Off the walls. It won\'t sleep until the coffee wears off.' : 'Calming down, but it won\'t sleep until the coffee wears off.',
+      left: sim.caffeine / FEED.wearOff,
+      frac: sim.caffeine / FEED.dose,
+    });
+  }
+  const tr = sim.transient;
+  if (tr && tr.mood === 'annoyed' && sim.t < tr.until) {
+    const left = tr.until - sim.t;
+    list.push({ key: 'annoyed', icon: 'vein', cls: 'a', label: 'ANNOYED', desc: 'Leave it be. Every poke keeps it cross a little longer.', left, frac: left / POKE.maxLeft });
+  }
+  return list;
+}
+function drawBadges() {
+  const list = opts.reduced ? [] : statuses();
+  const sig = list.map((b) => b.key).join(',');
+  for (const el of [$('badgesSmall'), $('badgesBig')]) {
+    if (el.dataset.sig !== sig) {
+      el.dataset.sig = sig;
+      el.innerHTML = list.map((b) => `<span class="badge" role="img">${iconSvg(ICONS[b.icon])}${b.left != null ? '<i></i>' : ''}<span class="tip"><b><em></em><span></span></b><p></p></span></span>`).join('');
+    }
+    list.forEach((b, n) => {
+      const badge = el.children[n];
+      const time = b.left != null ? `${Math.ceil(b.left)}S LEFT` : '';
+      const tip = badge.querySelector('.tip');
+      // Written only when it changes, so the text isn't rebuilt every frame.
+      if (tip.dataset.text !== b.label + time + b.desc) {
+        tip.dataset.text = b.label + time + b.desc;
+        tip.querySelector('em').textContent = b.label;
+        tip.querySelector('b span').textContent = time;
+        tip.querySelector('p').textContent = b.desc;
+        badge.setAttribute('aria-label', `${b.label}${time ? `, ${time.toLowerCase()}` : ''}. ${b.desc}`);
+      }
+      badge.className = `badge ${b.cls}${b.left != null && b.left < ENDING ? ' ending' : ''}`;
+      if (b.left != null) badge.querySelector('i').style.width = `calc((100% - 2px) * ${clamp(b.frac, 0, 1).toFixed(3)})`;
+    });
+  }
+}
+
+// Gaze follows the cursor, measured from the enlarged view's centre. Pointer
+// events, not mouse ones: carrying the mug cancels the pointerdown's default,
+// and the browser then sends no mousemove until the button is let go.
+window.addEventListener('pointermove', (e) => {
+  if (!e.isPrimary) return;
   const box = $('big').getBoundingClientRect();
   const x = (e.clientX - (box.left + box.width / 2)) / (box.width / 2);
   const y = (e.clientY - (box.top + box.height / 2)) / (box.height / 2);
@@ -2666,6 +2880,8 @@ function tick(now) {
       sim.react('lookup', 1.4);
     }
     $('labOut').textContent = LAB[lab].readout?.() ?? '';
+    drawBadges();
+    drawMugHint();
     const mood = sim.mood();
     $('mood').textContent = MOOD_LABEL[mood];
     $('lvl').textContent = `LVL ${String(level(Number($('xp').value))).padStart(2, '0')} · ${$('xp').value} XP`;
