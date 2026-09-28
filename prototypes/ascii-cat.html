@@ -228,7 +228,7 @@
     <div class="group">
       <div class="label">MODE</div>
       <div class="modes" id="modes"></div>
-      <p class="hint">AUTO picks from the data below: night sleeps, low coffee is grumpy, high coffee is hyper. Click the cat to make it purr; three quick clicks make it dizzy.</p>
+      <p class="hint">AUTO picks from the data below: night sleeps, low coffee is grumpy, high coffee is hyper. Tap the pet to make it purr; circle the cursor round it three times to make it dizzy.</p>
     </div>
 
     <div class="group">
@@ -246,6 +246,11 @@
       <div class="row"><label for="eyes">EYE SHADER</label><select id="eyes">
         <option value="blocks">BLOCKS ▚</option>
         <option value="sprites">SPRITES</option>
+      </select><span></span></div>
+      <div class="row"><label for="dizzyEyes">DIZZY EYES</label><select id="dizzyEyes">
+        <option value="square" selected>SPIRAL ▣</option>
+        <option value="round">SPIRAL ◎</option>
+        <option value="cross">CROSS X</option>
       </select><span></span></div>
       <label class="check"><input id="color" type="checkbox" checked> COLOUR</label>
       <label class="check"><input id="debug" type="checkbox"> SHOW SOURCE CANVASES</label>
@@ -524,6 +529,8 @@ class Pen {
     this.feature = feature;
     this.opts = opts;
     this.eyes = [];
+    // Dizzy eyes, in screen pixels, printed by stampSpiral.
+    this.spirals = [];
   }
 
   /** Run `fn` with every canvas under the same extra transform. */
@@ -644,6 +651,22 @@ class Pen {
   eye(x, y, drawnWidth, p, { cls = 'a', pupil = 'slit' } = {}) {
     const width = drawnWidth * this.opts.eyeScale;
     const state = eyeState(p);
+    // Dizzy, either shader: a spiral, recorded here and printed by its own
+    // shader once the grid is built (see stampSpiral).
+    if (state === 'dizzy' && this.opts.dizzyEyes !== 'cross') {
+      const m = this.lines.getTransform();
+      const cx = m.a * x + m.c * y + m.e;
+      const cy = m.b * x + m.d * y + m.f;
+      const R = (width / 2) * Math.hypot(m.a, m.b) * 1.05;
+      this.spirals.push({ x: cx, y: cy, R, cls, shape: this.opts.dizzyEyes });
+      // Nothing behind the eye prints through its edge.
+      this.lines.save();
+      this.lines.setTransform(1, 0, 0, 1, 0, 0);
+      this.lines.fillStyle = '#000';
+      this.lines.fillRect(cx - R, cy - R, R * 2, R * 2);
+      this.lines.restore();
+      return;
+    }
     if (this.opts.eyes === 'sprites') {
       const m = this.lines.getTransform();
       this.eyes.push({
@@ -1396,6 +1419,7 @@ class AsciiView {
 
     // Eyes, stamped over everything but particles.
     for (const eye of pen.eyes) stampEye(eye, grid, cls, cols, rows);
+    for (const sp of pen.spirals) stampSpiral(sp, grid, cls, cols, rows, sim.t);
 
     // Particles, printed into the grid.
     for (const q of sim.particles) {
@@ -1441,6 +1465,71 @@ class AsciiView {
   }
 }
 
+/**
+ * The dizzy eye's shader: a spinning spiral, worked out per quadrant rather
+ * than painted and sampled. Painted, a spiral this small smeared into a blob
+ * in the sampler; asked directly — "is this sub-pixel on the arm?" — it comes
+ * out as a clean coil at the quadrant cells' double resolution.
+ *
+ * For a point at radius r (0 at the centre, 1 at the edge) and angle a, it is
+ * on the arm when (r x turns - a / 2pi - spin) is in the first part of each
+ * whole number. 'square' measures r as the larger of |x| and |y|, so the coil
+ * runs in squares, like the rest of the pet; 'round' measures it straight.
+ * Each quadrant is supersampled 3 x 3 and lit on a majority. Everything inside
+ * the eye that is not arm prints dark, like an open eye's opening.
+ */
+const SPIRAL = { gap: 8, maxTurns: 2.2, arm: 0.42, spin: 1.4, glyphs: ['@', '@', '0', 'O'] };
+
+function stampSpiral(sp, grid, cls, cols, rows, t) {
+  const { x, y, R } = sp;
+  const spin = t * SPIRAL.spin;
+  // A coil needs room: one arm and one gap take about `gap` pixels. An eye too
+  // small for even one turn — the dashboard pet's — prints the nearest thing
+  // ASCII has to a spiral, an '@', in one cell, pulsing as it turns.
+  const turns = Math.min(SPIRAL.maxTurns, R / SPIRAL.gap);
+  if (turns < 1) {
+    const r = Math.floor(y / CELL_H);
+    const c = Math.floor(x / CELL_W);
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+    grid[r * cols + c] = SPIRAL.glyphs[Math.floor(spin * SPIRAL.glyphs.length) % SPIRAL.glyphs.length];
+    cls[r * cols + c] = sp.cls;
+    return;
+  }
+  const r0 = Math.max(0, Math.floor((y - R) / CELL_H));
+  const r1 = Math.min(rows - 1, Math.floor((y + R) / CELL_H));
+  const c0 = Math.max(0, Math.floor((x - R) / CELL_W));
+  const c1 = Math.min(cols - 1, Math.floor((x + R) / CELL_W));
+  const radius = (u, v) => (sp.shape === 'square' ? Math.max(Math.abs(u), Math.abs(v)) : Math.hypot(u, v)) / R;
+  const onArm = (u, v) => {
+    const r = radius(u, v);
+    if (r > 1) return false;
+    if (r < 0.12) return true;
+    const f = r * turns - Math.atan2(v, u) / (2 * Math.PI) - spin;
+    return f - Math.floor(f) < SPIRAL.arm;
+  };
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      // Only cells mostly inside the eye; the rest stay fur.
+      if (radius((c + 0.5) * CELL_W - x, (r + 0.5) * CELL_H - y) > 1) continue;
+      let pattern = '';
+      for (let q = 0; q < 4; q++) {
+        const qx = c * CELL_W + (q % 2) * (CELL_W / 2);
+        const qy = r * CELL_H + (q >> 1) * (CELL_H / 2);
+        let lit = 0;
+        for (let sy = 0; sy < 3; sy++) {
+          for (let sx = 0; sx < 3; sx++) {
+            if (onArm(qx + ((sx + 0.5) * CELL_W) / 6 - x, qy + ((sy + 0.5) * CELL_H) / 6 - y)) lit++;
+          }
+        }
+        pattern += lit >= 5 ? '1' : '0';
+      }
+      const i = r * cols + c;
+      grid[i] = { q: pattern };
+      cls[i] = sp.cls;
+    }
+  }
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * Quadrant cells: every pattern of a 2 x 2 cell, as CSS backgrounds
  *
@@ -1477,6 +1566,8 @@ const sim = new Sim();
 const opts = {
   species: 'cat',
   eyes: 'blocks',
+  // Dizzy eyes: a spinning 'square' or 'round' spiral, or a 'cross'.
+  dizzyEyes: 'square',
   fps: 24,
   color: true,
   reduced: false,
@@ -1653,6 +1744,7 @@ function applyProfile(p) {
   }
   const shared = p.shared ?? {};
   if (shared.eyes) $('eyes').value = opts.eyes = shared.eyes;
+  if (shared.dizzyEyes) $('dizzyEyes').value = opts.dizzyEyes = shared.dizzyEyes;
   if (shared.color != null) $('color').checked = opts.color = shared.color;
   for (const id of ['fps', 'cols', 'font']) {
     if (shared[id] == null) continue;
@@ -1668,7 +1760,7 @@ $('saveProfile').addEventListener('click', () => {
   const profiles = store.get(PROFILES_KEY, {});
   profiles[name] = {
     tune: structuredClone(tune),
-    shared: { eyes: opts.eyes, fps: opts.fps, color: opts.color, cols: Number($('cols').value), font: Number($('font').value) },
+    shared: { eyes: opts.eyes, dizzyEyes: opts.dizzyEyes, fps: opts.fps, color: opts.color, cols: Number($('cols').value), font: Number($('font').value) },
   };
   if (!store.set(PROFILES_KEY, profiles)) { say('Could not save: storage is blocked here.'); return; }
   store.set(LAST_KEY, name);
@@ -1701,6 +1793,7 @@ $('deleteProfile').addEventListener('click', () => {
   if (p) { applyProfile(p); say(`Loaded "${last}".`); }
 }
 $('eyes').addEventListener('change', (e) => { opts.eyes = e.target.value; });
+$('dizzyEyes').addEventListener('change', (e) => { opts.dizzyEyes = e.target.value; });
 $('color').addEventListener('change', (e) => { opts.color = e.target.checked; });
 $('debug').addEventListener('change', (e) => { $('debugWrap').classList.toggle('on', e.target.checked); });
 $('reduced').addEventListener('change', (e) => { opts.reduced = e.target.checked; });
@@ -1713,16 +1806,59 @@ window.addEventListener('mousemove', (e) => {
   sim.look(x * 0.8, y * 0.8);
 });
 
-// Click: purr. Three quick clicks: dizzy.
-let clicks = [];
+// Tap or click: purr. On press, not on click: the grid is reprinted every
+// frame, so the character pressed is usually gone by the release, and the
+// browser drops a click whose press target was removed.
 for (const v of views) {
-  v.pre.addEventListener('click', () => {
-    clicks = clicks.filter((t) => sim.t - t < 0.6);
-    clicks.push(sim.t);
-    if (clicks.length >= 3) { sim.react('dizzy', 2.5); clicks = []; }
-    else sim.react('happy', 2.2);
+  v.pre.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || e.button !== 0) return;
+    sim.react('happy', 2.2);
   });
 }
+
+/*
+ * Circle the pointer round a pet three times: dizzy. The pointer's angle
+ * round each pet's centre is unwrapped into turns, and the net turn over the
+ * last few seconds is what counts — so it takes three laps the same way, and
+ * wiggling back and forth cancels out.
+ *
+ * Forgiving on purpose. Each pet keeps its own count: going by the nearest
+ * pet, a wide lap round the enlarged one swung nearer the dashboard one and
+ * reset it every time. And a stray moment too near the centre (where the
+ * angle jumps at the smallest move) or too far out pauses the count rather
+ * than wiping it, so a loose, wobbly circle still gets there.
+ */
+const CIRCLE = { laps: 3, windowMs: 8000, inner: 0.1, outer: 2.2, maxStep: 2.4 };
+const circles = new Map(views.map((v) => [v, { angle: null, turns: [] }]));
+window.addEventListener('pointermove', (e) => {
+  if (!e.isPrimary) return;
+  const now = performance.now();
+  for (const v of views) {
+    const c = circles.get(v);
+    c.turns = c.turns.filter(([t]) => now - t < CIRCLE.windowMs);
+    const box = v.pre.getBoundingClientRect();
+    const half = Math.max(box.width, box.height) / 2;
+    const dx = e.clientX - (box.left + box.width / 2);
+    const dy = e.clientY - (box.top + box.height / 2);
+    const r = Math.hypot(dx, dy) / half;
+    if (r < CIRCLE.inner || r > CIRCLE.outer) { c.angle = null; continue; }
+    const angle = Math.atan2(dy, dx);
+    if (c.angle !== null) {
+      let d = angle - c.angle;
+      if (d > Math.PI) d -= 2 * Math.PI;
+      else if (d < -Math.PI) d += 2 * Math.PI;
+      // A jump of most of a half turn in one move is a cut across the
+      // middle, not circling; its direction is a guess, so it is dropped.
+      if (Math.abs(d) < CIRCLE.maxStep) c.turns.push([now, d]);
+    }
+    c.angle = angle;
+    const net = c.turns.reduce((sum, [, d]) => sum + d, 0);
+    if (Math.abs(net) >= CIRCLE.laps * 2 * Math.PI) {
+      sim.react('dizzy', 2.5);
+      for (const other of circles.values()) other.turns = [];
+    }
+  }
+});
 
 // The loop: the pose updates every frame; the ASCII prints at the chosen fps.
 // Paused while the tab is hidden.
