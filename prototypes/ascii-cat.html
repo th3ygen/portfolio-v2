@@ -283,6 +283,9 @@
   /* Features: a dark nose and mouth, with a shine on the nose. */
   pre.ascii .q.m { --qc: var(--muted); --gc: var(--text); }
   pre.ascii .q.k { --qc: var(--ink-dark); }
+  /* Hairlines (see stampHairs): whiskers fine, lids a little heavier. */
+  pre.ascii .q.t { --hair: max(1px, 0.14em); }
+  pre.ascii .q.t.a, pre.ascii .q.t.l { --hair: max(1px, 0.22em); }
   pre.mono .q { --qc: var(--muted); --gc: var(--text); }
   pre.mono .q.k { --qc: var(--ink-dark); }
   pre.mono { color: var(--muted); }
@@ -324,7 +327,7 @@
         <option value="round">SPIRAL ◎</option>
         <option value="cross">CROSS X</option>
       </select><span></span></div>
-      <div class="row"><label for="catNose">CAT NOSE</label><select id="catNose">
+      <div class="row"><label for="face">FACE</label><select id="face">
         <option value="blocks" selected>BLOCKS</option>
         <option value="lines">LINES</option>
       </select><span></span></div>
@@ -475,17 +478,42 @@ const VEIN = [
   '.#....#.',
 ];
 
-/** A crescent moon, the same way, for the corner of the view at night. */
-const MOON = [
-  '...###..',
-  '.###....',
-  '.##.....',
-  '###.....',
-  '###.....',
-  '.##.....',
-  '.###....',
-  '...###..',
-];
+/**
+ * A crescent moon, for the corner of the view at night: a disc with a
+ * slightly smaller one taken out of its upper right. Two tones: '+' the lit
+ * face, '#' grey — along the inner edge, where it turns into shadow, and a few
+ * craters. Worked out in real proportions: a sub-pixel is 3 wide and 5 tall
+ * (a 6 x 10 cell, halved), so drawn by hand on a square grid it came out as a
+ * thin bracket.
+ */
+function crescent(W, H) {
+  const pw = 3;
+  const ph = 5;
+  const R = Math.min(W * pw, H * ph) / 2 - 0.5;
+  const cx = (W * pw) / 2;
+  const cy = (H * ph) / 2;
+  const bx = cx + R * 0.5;
+  const by = cy - R * 0.12;
+  const bR = R * 0.86;
+  const craters = [[-0.5, -0.25, 0.13], [-0.6, 0.3, 0.1], [-0.2, 0.62, 0.1]];
+  const rows = [];
+  for (let y = 0; y < H; y++) {
+    let row = '';
+    for (let x = 0; x < W; x++) {
+      const X = (x + 0.5) * pw;
+      const Y = (y + 0.5) * ph;
+      const shade = Math.hypot(X - bx, Y - by) - bR;
+      if (Math.hypot(X - cx, Y - cy) > R || shade < 0) { row += '.'; continue; }
+      const crater = craters.some(([u, v, r]) => Math.hypot(X - (cx + u * R), Y - (cy + v * R)) < r * R);
+      row += shade < R * 0.17 || crater ? '#' : '+';
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+// Ten cells by six in the enlarged view; six by four on the dashboard.
+const MOON = crescent(20, 12);
+const MOON_S = crescent(12, 8);
 
 /** Status badge icons, 8 x 8 pixels. */
 const ICONS = {
@@ -519,7 +547,16 @@ const ICONS = {
     '.#.#.#..',
     '........',
   ],
-  moon: MOON,
+  moon: [
+    '..###...',
+    '.##.....',
+    '##......',
+    '##......',
+    '##......',
+    '##.....#',
+    '.##...##',
+    '..####..',
+  ],
   vein: ['........', ...VEIN, '........'],
 };
 const iconSvg = (rows) => {
@@ -1012,6 +1049,8 @@ class Pen {
     this.eyes = [];
     // Dizzy eyes, in screen pixels, printed by stampSpiral.
     this.spirals = [];
+    // Hairlines (whiskers), in canvas pixels: drawn once the grid is built.
+    this.hairs = [];
   }
 
   /** Run `fn` with every canvas under the same extra transform. */
@@ -1034,6 +1073,46 @@ class Pen {
     this.feature.fill(path);
     this.lines.fillStyle = '#000';
     this.lines.fill(path);
+  }
+
+  /**
+   * The thinnest line that still prints in quadrant cells: a sub-pixel is half
+   * a cell tall, and a line needs to cover most of one, whatever the view's
+   * scale. In design units, at the current transform.
+   */
+  hair(canvas = this.feature, share = 0.6) {
+    const m = canvas.getTransform();
+    return (CELL_H * share) / Math.hypot(m.a, m.b);
+  }
+
+  /**
+   * A lid — shut, happy or grumpy — ruled as a hairline in the eye's colour
+   * (see stampHairs), rather than printed as '---' or '/^\'. Nothing behind
+   * it prints through.
+   */
+  lid(points, cls) {
+    const c = this.lines;
+    c.save();
+    c.strokeStyle = '#000';
+    c.lineWidth = this.hair(c) * 1.8;
+    c.lineJoin = 'miter';
+    c.lineCap = 'square';
+    c.beginPath();
+    points.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+    c.stroke();
+    c.restore();
+    this.hairline(points, cls);
+  }
+
+  /**
+   * A hairline — a whisker. Not drawn: recorded, in canvas pixels, and ruled
+   * into the grid once it is built (see stampHairs), one sub-pixel thick. A
+   * thin slanted line sampled into cells breaks up into dashes; ruled, it is
+   * an unbroken staircase at any size.
+   */
+  hairline(points, cls = 'm') {
+    const m = this.lines.getTransform();
+    this.hairs.push({ cls, pts: points.map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]) });
   }
 
   /** A polyline `width` thick, as feature blobs: a quad for each segment. */
@@ -1180,12 +1259,18 @@ class Pen {
 
     const rx = width / 2;
     const accentLine = { accent: cls === 'a' };
+    const blocks = this.opts.face !== 'lines';
+    // Shut (asleep, or mid-blink): a lid, curved down a touch at the ends.
     if (state === 'closed') {
-      this.stroke([[x - rx * 0.8, y + 0.5], [x + rx * 0.8, y + 0.5]]);
+      if (blocks) this.lid([[x - rx * 0.8, y], [x - rx * 0.4, y + 0.9], [x + rx * 0.4, y + 0.9], [x + rx * 0.8, y]], cls);
+      else this.stroke([[x - rx * 0.8, y + 0.5], [x + rx * 0.8, y + 0.5]]);
       return;
     }
+    // Happy: the lid arched up, '^'.
     if (state === 'happy') {
-      this.stroke([[x - rx * 0.8, y + 2], [x, y - 2.5], [x + rx * 0.8, y + 2]], false, accentLine);
+      const arch = [[x - rx * 0.8, y + 2], [x, y - 2.5], [x + rx * 0.8, y + 2]];
+      if (blocks) this.lid(arch, cls);
+      else this.stroke(arch, false, accentLine);
       return;
     }
     if (state === 'dizzy') {
@@ -1247,7 +1332,8 @@ class Pen {
       a.fillStyle = '#000';
       a.fillRect(x - rx - 1, y - h - 2, width + 2, h * 0.9 + 2);
       a.restore();
-      this.stroke([[x - rx, y - h * 0.1], [x + rx, y - h * 0.1]]);
+      if (this.opts.face !== 'lines') this.lid([[x - rx, y - h * 0.1], [x + rx, y - h * 0.1]], cls);
+      else this.stroke([[x - rx, y - h * 0.1], [x + rx, y - h * 0.1]]);
     }
   }
 }
@@ -1354,7 +1440,7 @@ function drawCat(pen, p) {
     // at this size they print as a tangle of slashes. BLOCKS: solid quadrant
     // cells, as the husky's nose — a grey triangle with a shine, and the
     // mouth a grey band hanging from it.
-    if (pen.opts.catNose === 'lines') {
+    if (pen.opts.face === 'lines') {
       pen.stroke([[-2.5, 6], [0, 8.5], [2.5, 6]]);
       pen.stroke([[-4.5, 10.5], [-2, 12], [0, 9.5], [2, 12], [4.5, 10.5]]);
     } else {
@@ -1375,9 +1461,13 @@ function drawCat(pen, p) {
       const L = 5 * p.tongue;
       pen.blob([[-1.8, 11], [1.8, 11], [1.8, 11 + L], [0, 12 + L], [-1.8, 11 + L]], 'shine');
     }
+    // Whiskers: in BLOCKS, grey hairlines a sub-pixel thick, so they read as
+    // fine hairs rather than runs of '-' and '_'.
     for (const side of [-1, 1]) {
-      pen.stroke([[side * 9, 7], [side * 27, 4 + s * 1.5]]);
-      pen.stroke([[side * 9, 9.5], [side * 27, 11 + s * 1.5]]);
+      for (const w of [[[side * 9, 7], [side * 27, 4 + s * 1.5]], [[side * 9, 9.5], [side * 27, 11 + s * 1.5]]]) {
+        if (pen.opts.face === 'lines') pen.stroke(w);
+        else pen.hairline(w);
+      }
     }
   }, { x: hx, y: hy, rot: tilt });
 }
@@ -1952,6 +2042,7 @@ class AsciiView {
     // Eyes, stamped over everything but particles.
     for (const eye of pen.eyes) stampEye(eye, grid, cls, cols, rows);
     for (const sp of pen.spirals) stampSpiral(sp, grid, cls, cols, rows, sim.t);
+    stampHairs(pen.hairs, grid, cls, cols, rows);
 
     // Particles, printed into the grid.
     for (const q of sim.particles) {
@@ -1973,9 +2064,12 @@ class AsciiView {
       const view = species.view;
       const mc = Math.round((ox + (view.x + 3) * u) / CELL_W);
       const mr = Math.round((oy + (view.y + 3) * u) / CELL_H);
-      stampSprite(MOON, mr, mc, 'l', grid, cls, cols, rows);
+      // Grey ('m': --qc muted) and white (--gc text).
+      const large = cols >= 60;
+      stampSprite(large ? MOON : MOON_S, mr, mc, 'm', grid, cls, cols, rows);
       const twinkle = Math.floor(sim.t * 1.5) % 2;
-      for (const [dc, dr, on] of [[6, 1, twinkle], [3, 5, 1 - twinkle]]) {
+      const stars = large ? [[13, 0], [11, 5]] : [[8, 0], [7, 3]];
+      for (const [[dc, dr], on] of stars.map((st, n) => [st, n ? 1 - twinkle : twinkle])) {
         const i = (mr + dr) * cols + mc + dc;
         if (mr + dr < rows && mc + dc < cols) { grid[i] = on ? '+' : '.'; cls[i] = on ? 'l' : 's'; }
       }
@@ -2037,16 +2131,66 @@ class AsciiView {
  */
 const SPIRAL = { gap: 8, maxTurns: 2.2, arm: 0.42, spin: 1.4, glyphs: ['@', '@', '0', 'O'] };
 
+/**
+ * Rule hairlines into the grid, one sub-pixel thick (Bresenham, on the grid
+ * of quadrant sub-pixels, two per cell each way), in grey. They go behind the
+ * eyes and the nose — any cell already printed in quadrants — and over glyphs.
+ */
+function stampHairs(hairs, grid, cls, cols, rows) {
+  const bits = new Map();
+  const kinds = new Map();
+  let kind = 'm';
+  const plot = (sx, sy) => {
+    const r = sy >> 1;
+    const c = sx >> 1;
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+    const idx = r * cols + c;
+    // Whiskers go behind the eyes and nose; a lid goes over its eye.
+    if (kind === 'm' && typeof grid[idx] === 'object' && !bits.has(idx)) return;
+    const b = bits.get(idx) ?? [0, 0, 0, 0];
+    b[(sy & 1) * 2 + (sx & 1)] = 1;
+    bits.set(idx, b);
+    kinds.set(idx, kind);
+  };
+  for (const { pts, cls: k } of hairs) {
+    kind = k;
+    for (let i = 1; i < pts.length; i++) {
+      let x0 = Math.floor(pts[i - 1][0] / (CELL_W / 2));
+      let y0 = Math.floor(pts[i - 1][1] / (CELL_H / 2));
+      const x1 = Math.floor(pts[i][0] / (CELL_W / 2));
+      const y1 = Math.floor(pts[i][1] / (CELL_H / 2));
+      const dx = Math.abs(x1 - x0);
+      const dy = -Math.abs(y1 - y0);
+      const stepX = x0 < x1 ? 1 : -1;
+      const stepY = y0 < y1 ? 1 : -1;
+      let err = dx + dy;
+      for (;;) {
+        plot(x0, y0);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += stepX; }
+        if (e2 <= dx) { err += dx; y0 += stepY; }
+      }
+    }
+  }
+  // Printed as thin ('t') cells: bars, not blocks.
+  for (const [idx, b] of bits) {
+    grid[idx] = { q: b.join('') };
+    cls[idx] = `${kinds.get(idx)} t`;
+  }
+}
+
 /** Print a quadrant-pixel sprite with its top-left cell at (r, c). */
 function stampSprite(sprite, r, c, kind, grid, cls, cols, rows) {
   for (let y = 0; y < sprite.length; y += 2) {
     for (let x = 0; x < sprite[0].length; x += 2) {
       const bits = [sprite[y][x], sprite[y][x + 1], sprite[y + 1]?.[x], sprite[y + 1]?.[x + 1]];
-      if (!bits.includes('#')) continue;
+      if (!bits.some((b) => b === '#' || b === '+')) continue;
       const gr = r + y / 2;
       const gc = c + x / 2;
       if (gr < 0 || gr >= rows || gc < 0 || gc >= cols) continue;
-      grid[gr * cols + gc] = { q: bits.map((b) => (b === '#' ? '1' : '0')).join('') };
+      // '#' the first tone (--qc), '+' the second (--gc).
+      grid[gr * cols + gc] = { q: bits.map((b) => (b === '#' ? '1' : b === '+' ? '2' : '0')).join('') };
       cls[gr * cols + gc] = kind;
     }
   }
@@ -2121,6 +2265,14 @@ function stampSpiral(sp, grid, cls, cols, rows, t) {
       .map((d, q) => (d ? `linear-gradient(${colour[d]}, ${colour[d]}) ${at[q]} / 50% 50% no-repeat` : null))
       .filter(Boolean);
     if (layers.length) css += `pre.ascii .q${digits.join('')} { background: ${layers.join(', ')}; }\n`;
+    // Thin ('t') cells, for hairlines — lids and whiskers: each sub-pixel is
+    // a bar `--hair` tall across the middle of its half of the cell, not the
+    // whole half, so a line one sub-pixel thick prints finer than a block.
+    const mid = ['0.25em', '0.25em', '0.75em', '0.75em'];
+    const thin = digits
+      .map((d, q) => (d ? `linear-gradient(${colour[d]}, ${colour[d]}) ${at[q].split(' ')[0]} calc(${mid[q]} - var(--hair) / 2) / 50% var(--hair) no-repeat` : null))
+      .filter(Boolean);
+    if (thin.length) css += `pre.ascii .q.t.q${digits.join('')} { background: ${thin.join(', ')}; }\n`;
   }
   const style = document.createElement('style');
   style.textContent = css;
@@ -2148,8 +2300,9 @@ const opts = {
   eyes: 'blocks',
   // Dizzy eyes: a spinning 'square' or 'round' spiral, or a 'cross'.
   dizzyEyes: 'square',
-  // The cat's nose and mouth: solid 'blocks', or 'lines'.
-  catNose: 'blocks',
+  // Face details — the cat's nose, mouth and whiskers, and both pets' shut,
+  // happy and grumpy lids: solid 'blocks', or 'lines' as the outline is drawn.
+  face: 'blocks',
   fps: 24,
   color: true,
   reduced: false,
@@ -2333,7 +2486,8 @@ function applyProfile(p) {
   }
   const shared = p.shared ?? {};
   if (shared.eyes) $('eyes').value = opts.eyes = shared.eyes;
-  if (shared.catNose) $('catNose').value = opts.catNose = shared.catNose;
+  const face = shared.face ?? shared.catNose;
+  if (face) $('face').value = opts.face = face;
   if (shared.dizzyEyes) $('dizzyEyes').value = opts.dizzyEyes = shared.dizzyEyes;
   if (shared.color != null) $('color').checked = opts.color = shared.color;
   for (const id of ['fps', 'cols', 'font']) {
@@ -2350,7 +2504,7 @@ $('saveProfile').addEventListener('click', () => {
   const profiles = store.get(PROFILES_KEY, {});
   profiles[name] = {
     tune: structuredClone(tune),
-    shared: { eyes: opts.eyes, catNose: opts.catNose, dizzyEyes: opts.dizzyEyes, fps: opts.fps, color: opts.color, cols: Number($('cols').value), font: Number($('font').value) },
+    shared: { eyes: opts.eyes, face: opts.face, dizzyEyes: opts.dizzyEyes, fps: opts.fps, color: opts.color, cols: Number($('cols').value), font: Number($('font').value) },
   };
   if (!store.set(PROFILES_KEY, profiles)) { say('Could not save: storage is blocked here.'); return; }
   store.set(LAST_KEY, name);
@@ -2383,7 +2537,7 @@ $('deleteProfile').addEventListener('click', () => {
   if (p) { applyProfile(p); say(`Loaded "${last}".`); }
 }
 $('eyes').addEventListener('change', (e) => { opts.eyes = e.target.value; });
-$('catNose').addEventListener('change', (e) => { opts.catNose = e.target.value; });
+$('face').addEventListener('change', (e) => { opts.face = e.target.value; });
 $('dizzyEyes').addEventListener('change', (e) => { opts.dizzyEyes = e.target.value; });
 $('color').addEventListener('change', (e) => { opts.color = e.target.checked; });
 $('debug').addEventListener('change', (e) => { $('debugWrap').classList.toggle('on', e.target.checked); });
@@ -2737,6 +2891,12 @@ const CIRCLE = { laps: 3, windowMs: 8000, inner: 0.1, outer: 2.2, maxStep: 2.4 }
 const circles = new Map(views.map((v) => [v, { angle: null, turns: [] }]));
 window.addEventListener('pointermove', (e) => {
   if (!e.isPrimary || !on('dizzy')) return;
+  // Asleep, its eyes are shut: it can't follow the cursor round, so nothing
+  // counts — and laps from before it dropped off don't carry over.
+  if (sim.mood() === 'sleep') {
+    for (const c of circles.values()) { c.angle = null; c.turns = []; }
+    return;
+  }
   const now = performance.now();
   for (const v of views) {
     const c = circles.get(v);
