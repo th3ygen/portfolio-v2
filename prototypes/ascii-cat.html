@@ -370,9 +370,27 @@ const MOODS = {
   petted: { eye: 0,    pupil: 0.4,  drop: 1.5, tailAmp: 0.25, tailSpeed: 1.1, breathRate: 1.0, breathAmp: 0.045, jitter: 0,   happy: 0, dizzy: 0, earsBack: 0.35 },
   // Just after: wide eyes, big pupils, head up — "why did you stop?"
   lookup: { eye: 1.12, pupil: 0.85, drop: -1, tailAmp: 0.45, tailSpeed: 2.2, breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
+  // Poked a few times: ears going back, eyes narrowing, tail flicking.
+  irked:  { eye: 0.7,  pupil: 0.3,  drop: 0.5, tailAmp: 0.5, tailSpeed: 3.5, breathRate: 1.2, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0.6 },
+  // Poked too much: ears flat, a grumpy squint, head turned away (see step).
+  annoyed: { eye: 0.42, pupil: 0.15, drop: -0.5, tailAmp: 0.7, tailSpeed: 4.5, breathRate: 1.6, breathAmp: 0.035, jitter: 0.05, happy: 0, dizzy: 0, earsBack: 1 },
 };
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS' };
+/**
+ * The anger mark (💢), as quadrant pixels: '#' on, '.' off, two across and
+ * two down to a cell. Four corners, each bent in toward the middle, their
+ * arms reaching out — the vein that throbs on an angry cartoon's head.
+ */
+const VEIN = [
+  '.#....#.',
+  '##....##',
+  '........',
+  '........',
+  '##....##',
+  '.#....#.',
+];
+
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'NEEDS COFFEE', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED' };
 
 class Sim {
   constructor() {
@@ -472,6 +490,7 @@ class Sim {
       gy = this.wander.y;
     }
     if (mood === 'sleep') { gx = 0; gy = 0.3; }
+    if (mood === 'annoyed') { gx = this.gaze.x > 0 ? -0.95 : 0.95; gy = -0.45; }
     p.lookX = approach(p.lookX, gx, mood === 'hyper' ? 20 : 9, dt);
     p.lookY = approach(p.lookY, gy, mood === 'hyper' ? 20 : 9, dt);
 
@@ -496,6 +515,11 @@ class Sim {
       this.particles.push({ text, x: husky ? 77 : 66, y: husky ? 20 : 34, vx: 1.5, vy: -3, life: 2.4, life0: 2.4, cls: 's', typed: 7 });
       this.nextSound = this.t + 2.6;
     }
+    // Annoyed: an anger mark on the head, for as long as it lasts.
+    if (mood === 'annoyed' && !this.particles.some((q) => q.sprite)) {
+      const husky = this.species === 'husky';
+      this.particles.push({ sprite: VEIN, x: husky ? 58 : 58, y: husky ? 23 : 34, vx: 0, vy: 0, life: 0.5, cls: 'a', throb: true });
+    }
     if (this.t < this.nextParticle) return;
     const spawn = (text, x, y, vx, vy, life, cls, gap, typed = 0) => {
       // `typed`: characters a second, when the text types itself out.
@@ -506,6 +530,14 @@ class Sim {
     else if (mood === 'happy') spawn('<3', rand(30, 70), 22, rand(-4, 4), -12, 1.6, 'a', 0.35);
     else if (mood === 'hyper') spawn(Math.random() < 0.5 ? '!' : '*', rand(28, 72), 20, rand(-10, 10), -14, 0.8, 'l', 0.25);
     else if (mood === 'grumpy') spawn('...', 70, 28, 2, -3, 2, 's', 2.2);
+    // Irked: a '?'. Annoyed: grawlix, and a hiss or a growl, typed out fast.
+    else if (mood === 'irked') spawn('?', rand(62, 70), 26, 1, -5, 1, 'l', 1.2);
+    else if (mood === 'annoyed') {
+      const words = ['#@%!', this.species === 'husky' ? 'grr!' : 'hss!', '&$#!'];
+      const text = words[Math.floor(Math.random() * words.length)];
+      this.particles.push({ text, x: this.species === 'husky' ? rand(44, 52) : rand(40, 64), y: this.species === 'husky' ? 9 : 26, vx: rand(-3, 3), vy: -5, life: 1.2, life0: 1.2, cls: 'l', typed: 14 });
+      this.nextParticle = this.t + 0.7;
+    }
     // Petted: '~' contentment rising off the head.
     else if (mood === 'petted') spawn('~', rand(40, 62), 24, rand(-3, 3), -6, 1.4, 's', 0.45);
     else if (mood === 'dizzy') {
@@ -1464,6 +1496,7 @@ class AsciiView {
     for (const q of sim.particles) {
       const c = Math.round((ox + q.x * u) / CELL_W);
       const r = Math.round((oy + q.y * u) / CELL_H);
+      if (q.sprite) continue;
       if (r < 0 || r >= rows) continue;
       const shown = q.typed ? Math.min(q.text.length, Math.floor((q.life0 - q.life) * q.typed) + 1) : q.text.length;
       for (let j = 0; j < shown; j++) {
@@ -1472,6 +1505,16 @@ class AsciiView {
         grid[r * cols + cc] = q.text[j];
         cls[r * cols + cc] = q.cls;
       }
+    }
+
+    // Sprites last, over text particles: the anger mark, on the forehead.
+    for (const q of sim.particles) {
+      if (!q.sprite) continue;
+      // Throb: on for two beats, off for one.
+      if (q.throb && Math.floor(sim.t * 6) % 3 === 2) continue;
+      const c = Math.round((ox + q.x * u) / CELL_W);
+      const r = Math.round((oy + q.y * u) / CELL_H);
+      stampSprite(q.sprite, r, c, q.cls, grid, cls, cols, rows);
     }
 
     // Emit as runs of one class, so the DOM is a handful of spans per row.
@@ -1519,6 +1562,21 @@ class AsciiView {
  * the eye that is not arm prints dark, like an open eye's opening.
  */
 const SPIRAL = { gap: 8, maxTurns: 2.2, arm: 0.42, spin: 1.4, glyphs: ['@', '@', '0', 'O'] };
+
+/** Print a quadrant-pixel sprite with its top-left cell at (r, c). */
+function stampSprite(sprite, r, c, kind, grid, cls, cols, rows) {
+  for (let y = 0; y < sprite.length; y += 2) {
+    for (let x = 0; x < sprite[0].length; x += 2) {
+      const bits = [sprite[y][x], sprite[y][x + 1], sprite[y + 1]?.[x], sprite[y + 1]?.[x + 1]];
+      if (!bits.includes('#')) continue;
+      const gr = r + y / 2;
+      const gc = c + x / 2;
+      if (gr < 0 || gr >= rows || gc < 0 || gc >= cols) continue;
+      grid[gr * cols + gc] = { q: bits.map((b) => (b === '#' ? '1' : '0')).join('') };
+      cls[gr * cols + gc] = kind;
+    }
+  }
+}
 
 function stampSpiral(sp, grid, cls, cols, rows, t) {
   const { x, y, R } = sp;
@@ -1851,6 +1909,10 @@ const LAB = {
   all: { label: 'ALL', hint: 'Everything on at once, over the usual moods.' },
   tap: { label: 'TAP', hint: 'Tap or click the pet: it purrs.' },
   dizzy: { label: 'DIZZY', hint: 'Circle the cursor round a pet three times, the same way, within 8 seconds: it gets dizzy.' },
+  poke: {
+    label: 'POKE',
+    hint: 'Tap the pet over and over. The first few taps it purrs; tap on quickly and it gets irked; six taps in a couple of seconds and it is annoyed — ears flat, head turned away from you, swearing. Poke it while it is annoyed and it stays annoyed longer.',
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -1887,12 +1949,42 @@ window.addEventListener('mousemove', (e) => {
 // Tap or click: purr. On press, not on click: the grid is reprinted every
 // frame, so the character pressed is usually gone by the release, and the
 // browser drops a click whose press target was removed.
+//
+// Poke too much and it escalates: taps within a couple of seconds of each
+// other count up — a few purr, a few more irk it, and six annoy it. Annoyed,
+// every tap keeps it annoyed a while longer, up to a limit.
+const POKE = { irked: 4, annoyed: 6, windowMs: 2500, annoyedFor: 4, extend: 1.5, maxLeft: 6 };
+let pokes = [];
 for (const v of views) {
   v.pre.addEventListener('pointerdown', (e) => {
-    if (!e.isPrimary || e.button !== 0 || !on('tap')) return;
-    sim.react('happy', 2.2);
+    if (!e.isPrimary || e.button !== 0) return;
+    const now = performance.now();
+    if (on('poke')) {
+      pokes = pokes.filter((t) => now - t < POKE.windowMs);
+      pokes.push(now);
+      const tr = sim.transient;
+      if (tr && tr.mood === 'annoyed' && sim.t < tr.until) {
+        tr.until = Math.min(sim.t + POKE.maxLeft, tr.until + POKE.extend);
+        return;
+      }
+      if (pokes.length >= POKE.annoyed) {
+        sim.react('annoyed', POKE.annoyedFor);
+        // No hearts left floating from the purring a moment ago.
+        sim.particles = sim.particles.filter((q) => q.text !== '<3');
+        return;
+      }
+      if (pokes.length >= POKE.irked) { sim.react('irked', 1.8); return; }
+    }
+    if (on('tap') || on('poke')) sim.react('happy', 2.2);
   });
 }
+LAB.poke.readout = () => {
+  const n = pokes.filter((t) => performance.now() - t < POKE.windowMs).length;
+  const tr = sim.transient;
+  const left = tr && sim.t < tr.until ? ` for ${(tr.until - sim.t).toFixed(1)}s` : '';
+  return `taps ${n}   (irked at ${POKE.irked}, annoyed at ${POKE.annoyed}, within ${POKE.windowMs / 1000}s)\nstate ${MOOD_LABEL[sim.mood()]}${left}`;
+};
+LAB.poke.reset = () => { pokes = []; };
 
 /*
  * Circle the pointer round a pet three times: dizzy. The pointer's angle
