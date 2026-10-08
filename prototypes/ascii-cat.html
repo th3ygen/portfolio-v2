@@ -482,6 +482,8 @@ const MOODS = {
   // Just after: wide eyes, big pupils, head up — "why did you stop?"
   // Booped on the nose: eyes squeezed shut, head bobbed back, ears eased.
   booped: { eye: 0,    pupil: 0.4,  drop: -1.2, tailAmp: 0.3, tailSpeed: 2,  breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0.4 },
+  // A scratch under the chin: head up into the hand, eyes shut, purring.
+  chin:   { eye: 0,    pupil: 0.4,  drop: -2.5, tailAmp: 0.35, tailSpeed: 1.2, breathRate: 1.0, breathAmp: 0.045, jitter: 0,  happy: 0, dizzy: 0, earsBack: 0.15 },
   lookup: { eye: 1.12, pupil: 0.85, drop: -1, tailAmp: 0.45, tailSpeed: 2.2, breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
   // Startled: eyes wide, pupils down to pinpricks, ears up, tail going.
   startled: { eye: 1.15, pupil: 0, drop: -2, tailAmp: 0.8, tailSpeed: 7, breathRate: 3, breathAmp: 0.03, jitter: 0.1, happy: 0, dizzy: 0, earsBack: 0 },
@@ -744,7 +746,7 @@ const ROUTINES = {
   },
 };
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'GRUMPY', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP', eager: 'WANTS THAT', booped: 'BOOPED' };
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'GRUMPY', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP', eager: 'WANTS THAT', booped: 'BOOPED', chin: 'CHIN SCRATCH' };
 
 class Sim {
   constructor() {
@@ -1130,6 +1132,8 @@ class Sim {
     }
     if (mood === 'sleep') { gx = 0; gy = 0.3; }
     if (mood === 'annoyed') { gx = this.gaze.x > 0 ? -0.95 : 0.95; gy = -0.45; }
+    // Chin scratched: chin up, into the hand.
+    if (mood === 'chin') { gx = 0; gy = -0.9; }
     p.lookX = approach(p.lookX, gx, mood === 'hyper' ? 20 : 9, dt);
     p.lookY = approach(p.lookY, gy, mood === 'hyper' ? 20 : 9, dt);
 
@@ -1216,14 +1220,15 @@ class Sim {
   /** Particles live in the cat's own design space; each view maps them to cells. */
   emit(mood) {
     // The husky's tail thumps the floor while it is petted, on its own beat.
-    if (mood === 'petted' && this.species === 'husky' && this.t >= this.nextThump) {
+    const fussed = mood === 'petted' || mood === 'chin';
+    if (fussed && this.species === 'husky' && this.t >= this.nextThump) {
       this.particles.push({ text: 'thmp', x: 74, y: 93, vx: 0, vy: -2, life: 0.45, cls: 's' });
       this.nextThump = this.t + rand(0.8, 1.2);
     }
     // Petted, the sound it makes, on its own slower beat: the cat purrs, the
     // husky grumbles — the rumbly, contented "talk" huskies do — typed out a
     // letter at a time beside the head.
-    if (mood === 'petted' && this.t >= this.nextSound) {
+    if (fussed && this.t >= this.nextSound) {
       const husky = this.species === 'husky';
       const text = husky ? (Math.random() < 0.5 ? 'mrrrh~' : 'mmrrr~') : Math.random() < 0.5 ? 'prrr' : 'prrrr';
       this.particles.push({ text, x: husky ? 77 : 66, y: husky ? 20 : 34, vx: 1.5, vy: -3, life: 2.4, life0: 2.4, cls: 's', typed: 7 });
@@ -1745,6 +1750,7 @@ function drawCat(pen, p) {
       // Sniffing (p.sniff): the nose lifts a touch, wider at the nostrils.
       const n = p.sniff;
       pen.mark('nose', 0, 7);
+      pen.mark('chin', 0, 16);
       // Booped (p.squish): pressed flat and wide for a moment.
       const q = p.squish;
       pen.blob([[-3.2 - n * 1.2 - q * 1.2, 5.6 - n * 1.4 + q * 0.6], [3.2 + n * 1.2 + q * 1.2, 5.6 - n * 1.4 + q * 0.6], [0.9 + q * 1.4, 8.6 - n * 0.8 - q * 1.2], [-0.9 - q * 1.4, 8.6 - n * 0.8 - q * 1.2]]);
@@ -1963,6 +1969,7 @@ function drawHusky(pen, p) {
     // The nose: low, about a seventh of the face across, with a shine that
     // makes it a wet, rounded nose rather than a flat patch.
     pen.mark('nose', 0, 12);
+    pen.mark('chin', 0, 21);
     // Sniffing (p.sniff): it lifts a touch and the nostrils flare.
     const n = p.sniff;
     // Booped (p.squish): pressed flat and wide for a moment.
@@ -2174,6 +2181,7 @@ class AsciiView {
     species.draw(pen, sim.pose);
     // Where the nose landed, for the cursor (see the TOO CLOSE input).
     this.nose = pen.marks.nose ?? null;
+    this.chin = pen.marks.chin ?? null;
 
     const tone = this.ctx.tone.getImageData(0, 0, W, H).data;
     const lines = this.ctx.lines.getImageData(0, 0, W, H).data;
@@ -3008,6 +3016,10 @@ last routines: ${sim.picked.join(', ') || '—'}   (${yawns} of ${sim.picked.len
     hint: 'Tap the pet right on the nose: boop — its eyes squeeze shut, its head bobs back and its nose squishes, then it looks up at you. Boop it four times within three seconds and it sneezes. Taps anywhere else still make it purr.',
     readout: () => `boops lately ${sim.boops.filter((t) => sim.t - t < BOOP.window).length} / ${BOOP.sneezeAfter} (sneezes)   squish ${sim.pose.squish.toFixed(2)}   mood ${MOOD_LABEL[sim.mood()]}`,
   },
+  chin: {
+    label: 'CHIN',
+    hint: 'Scratch under its chin: wiggle the cursor back and forth in small moves just below its mouth, without pressing. After a few it lifts its chin into your hand, eyes shut, and purrs (the husky rumbles, tail thumping); keep going and it stays. Stop, and it looks up at you. Slow sweeps over the head are stroking, not this.',
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -3213,17 +3225,75 @@ coffeeCard.addEventListener('pointerleave', () => {
  * The cursor right on a pet's nose: measured in that view's canvas pixels,
  * against where its nose was last drawn.
  */
-function onNoseOf(v, clientX, clientY) {
-  if (!v.nose) return false;
+/** A point on screen in a view's canvas pixels. */
+function toCanvas(v, clientX, clientY) {
   const r = v.pre.getBoundingClientRect();
-  const x = ((clientX - r.left) / r.width) * v.cols * CELL_W;
-  const y = ((clientY - r.top) / r.height) * v.rows * CELL_H;
-  return Math.hypot(x - v.nose.x, y - v.nose.y) < NOSE.radius * v.nose.scale;
+  return { x: ((clientX - r.left) / r.width) * v.cols * CELL_W, y: ((clientY - r.top) / r.height) * v.rows * CELL_H };
 }
+/** Whether a point on screen is within `radius` design units of a mark. */
+function nearMark(v, mark, clientX, clientY, radius) {
+  if (!mark) return false;
+  const pt = toCanvas(v, clientX, clientY);
+  return Math.hypot(pt.x - mark.x, pt.y - mark.y) < radius * mark.scale;
+}
+const onNoseOf = (v, clientX, clientY) => nearMark(v, v.nose, clientX, clientY, NOSE.radius);
 window.addEventListener('pointermove', (e) => {
   if (!e.isPrimary) return;
   sim.onNose(views.some((v) => onNoseOf(v, e.clientX, e.clientY)));
 });
+
+/*
+ * A scratch under the chin: small back-and-forth wiggles of the cursor just
+ * below the mouth, pointer up. Each wiggle is a turn back after a short run
+ * along whichever way the cursor is going; `reversals` within `windowMs` and
+ * it lifts its chin into the hand, and each one after keeps it there for
+ * `hold`. Once it is, the zone grows (`keep`), as the chin rises with the
+ * head. When the scratching stops, it looks up at you.
+ */
+const CHIN = { radius: 4.5, keep: 7, minRun: 0.4, reversals: 3, windowMs: 1500, hold: 0.9 };
+const chinState = { last: null, axis: null, dir: 0, run: 0, flips: [] };
+let chinning = false;
+window.addEventListener('pointermove', (e) => {
+  if (!e.isPrimary || !on('chin')) return;
+  const radius = sim.mood() === 'chin' ? CHIN.keep : CHIN.radius;
+  const v = views.find((view) => nearMark(view, view.chin, e.clientX, e.clientY, radius));
+  if (!v || sim.mood() === 'sleep') {
+    chinState.last = null;
+    chinState.flips = [];
+    return;
+  }
+  const now = performance.now();
+  const pt = toCanvas(v, e.clientX, e.clientY);
+  const c = chinState;
+  if (c.last) {
+    const dx = (pt.x - c.last.x) / v.chin.scale;
+    const dy = (pt.y - c.last.y) / v.chin.scale;
+    const axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+    const d = Math.sign(axis === 'x' ? dx : dy);
+    if (d !== 0) {
+      // A turn back along the same axis, after a short run: one wiggle.
+      if (axis === c.axis && d !== c.dir && c.run >= CHIN.minRun) {
+        c.flips.push(now);
+        c.run = 0;
+      }
+      if (axis !== c.axis) c.run = 0;
+      c.axis = axis;
+      c.dir = d;
+      c.run += Math.abs(axis === 'x' ? dx : dy);
+    }
+  }
+  c.last = pt;
+  c.flips = c.flips.filter((t) => now - t < CHIN.windowMs);
+  if (c.flips.length >= CHIN.reversals || (chinning && c.flips.length > 0 && now - c.flips[c.flips.length - 1] < 50)) {
+    sim.react('chin', CHIN.hold);
+    sim.cursorAt = sim.t;
+    chinning = true;
+  }
+});
+LAB.chin.readout = () => {
+  const n = chinState.flips.filter((t) => performance.now() - t < CHIN.windowMs).length;
+  return `wiggles ${n} / ${CHIN.reversals} (within ${CHIN.windowMs / 1000}s)   mood ${MOOD_LABEL[sim.mood()]}`;
+};
 
 /*
  * A click anywhere but on a pet: the tail tip twitches toward it. Which side
@@ -3510,6 +3580,11 @@ function tick(now) {
     // Petting ends when the strokes stop; then it looks up at you.
     if (petting && sim.mood() !== 'petted') {
       petting = false;
+      sim.react('lookup', 1.4);
+    }
+    // The same when the chin scratching stops.
+    if (chinning && sim.mood() !== 'chin') {
+      chinning = false;
       sim.react('lookup', 1.4);
     }
     $('labOut').textContent = LAB[lab].readout?.() ?? '';
