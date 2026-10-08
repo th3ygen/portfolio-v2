@@ -736,7 +736,7 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -768,6 +768,9 @@ class Sim {
     // A click elsewhere on the page: when, and toward which side (-1, 1).
     this.flickAt = -10;
     this.flickSide = 1;
+    // Coffee nearby — the cursor over the COFFEE card, not carrying the mug:
+    // since when, or null.
+    this.smellSince = null;
     // Last frame's mood, to see the dizziness end.
     this.lastMood = 'idle';
 
@@ -934,6 +937,15 @@ class Sim {
     const reach = listening ? clamp((Math.abs(this.gaze.x) - EAR.from) / (EAR.full - EAR.from), 0, 1) : 0;
     p.turnL = approach(p.turnL, this.gaze.x < 0 ? reach : 0, EAR.rate, dt);
     p.turnR = approach(p.turnR, this.gaze.x > 0 ? reach : 0, EAR.rate, dt);
+
+    // Coffee nearby: the nose sniffs — bursts of quick twitches, up and a
+    // little wider at the nostrils, a beat apart. Awake only.
+    let sniff = 0;
+    if (this.smellSince !== null && mood !== 'sleep') {
+      const st = (this.t - this.smellSince) % SNIFF.every;
+      if (st < SNIFF.burst) sniff = Math.abs(Math.sin((st / SNIFF.burst) * Math.PI * SNIFF.twitches));
+    }
+    p.sniff = approach(p.sniff, sniff, 30, dt);
 
     // The tail tip's twitch at a click: two quick beats toward the click,
     // dying away in half a second.
@@ -1508,11 +1520,14 @@ function drawCat(pen, p) {
     // cells, as the husky's nose — a grey triangle with a shine, and the
     // mouth a grey band hanging from it.
     if (pen.opts.face === 'lines') {
-      pen.stroke([[-2.5, 6], [0, 8.5], [2.5, 6]]);
+      const n = p.sniff;
+      pen.stroke([[-2.5 - n, 6 - n * 1.2], [0, 8.5 - n * 1.2], [2.5 + n, 6 - n * 1.2]]);
       pen.stroke([[-4.5, 10.5], [-2, 12], [0, 9.5], [2, 12], [4.5, 10.5]]);
     } else {
-      pen.blob([[-3.2, 5.6], [3.2, 5.6], [0.9, 8.6], [-0.9, 8.6]]);
-      pen.blob([[-2.4, 5.8], [-0.6, 5.8], [-0.8, 6.8], [-2.2, 6.8]], 'shine');
+      // Sniffing (p.sniff): the nose lifts a touch, wider at the nostrils.
+      const n = p.sniff;
+      pen.blob([[-3.2 - n * 1.2, 5.6 - n * 1.4], [3.2 + n * 1.2, 5.6 - n * 1.4], [0.9, 8.6 - n * 0.8], [-0.9, 8.6 - n * 0.8]]);
+      pen.blob([[-2.4 - n * 0.8, 5.8 - n * 1.4], [-0.6, 5.8 - n * 1.4], [-0.8, 6.8 - n * 1.4], [-2.2 - n * 0.8, 6.8 - n * 1.4]], 'shine');
       pen.band([[0, 8.4], [0, 10]], 1.1, 'dark');
       for (const side of [-1, 1]) pen.band([[0, 10], [side * 2.2, 11.6], [side * 4.6, 10.6]], 1.1, 'dark');
     }
@@ -1724,8 +1739,10 @@ function drawHusky(pen, p) {
 
     // The nose: low, about a seventh of the face across, with a shine that
     // makes it a wet, rounded nose rather than a flat patch.
-    pen.blob([[-3.2, 10], [3.2, 10], [3.6, 12], [1.8, 13.8], [-1.8, 13.8], [-3.6, 12]]);
-    pen.blob([[-2.4, 10.5], [-0.6, 10.5], [-0.8, 11.5], [-2.4, 11.5]], 'shine');
+    // Sniffing (p.sniff): it lifts a touch and the nostrils flare.
+    const n = p.sniff;
+    pen.blob([[-3.2, 10 - n * 1.4], [3.2, 10 - n * 1.4], [3.6 + n * 1.4, 12 - n], [1.8, 13.8 - n * 0.8], [-1.8, 13.8 - n * 0.8], [-3.6 - n * 1.4, 12 - n]]);
+    pen.blob([[-2.4, 10.5 - n * 1.4], [-0.6, 10.5 - n * 1.4], [-0.8, 11.5 - n * 1.4], [-2.4, 11.5 - n * 1.4]], 'shine');
 
     // Mouth: a dark band a cell thick — a short line down from the nose into
     // a wide grin curving up toward the cheeks.
@@ -2367,6 +2384,9 @@ const sim = new Sim();
 // as the gaze has it), fully by `full`; eased at `rate`; let go `holdFor`
 // seconds after the cursor stops.
 const EAR = { from: 0.25, full: 0.75, rate: 4, holdFor: 10 };
+// Coffee nearby: a burst of `twitches` sniffs over `burst` seconds, every
+// `every` seconds.
+const SNIFF = { twitches: 3, burst: 0.45, every: 1.2 };
 // A click elsewhere: the tail tip twitches `beats` times over `dur` seconds,
 // fading at `decay`.
 const FLICK = { dur: 0.5, beats: 2, decay: 5 };
@@ -2680,6 +2700,14 @@ cursor ${sim.gaze.x >= 0 ? 'right' : 'left'} ${Math.abs(sim.gaze.x).toFixed(2)} 
       return ago < 30 ? `last click ${ago.toFixed(1)}s ago, on the ${sim.flickSide < 0 ? 'left' : 'right'}   flick ${sim.pose.flick.toFixed(2)}` : 'no click yet';
     },
   },
+  sniff: {
+    label: 'SNIFF',
+    hint: 'Hover the COFFEE card (no need to pick up the mug): the pet glances at it, and its nose starts to sniff — three quick twitches, a beat apart, for as long as you stay. Pick up the mug and it wants it outright (that is the COFFEE tab); asleep, it smells nothing.',
+    readout: () => {
+      const since = sim.smellSince;
+      return since === null ? 'cursor not on the COFFEE card' : `coffee nearby for ${(sim.t - since).toFixed(1)}s   sniff ${sim.pose.sniff.toFixed(2)}   mood ${MOOD_LABEL[sim.mood()]}`;
+    },
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -2861,6 +2889,18 @@ function drawBadges() {
     });
   }
 }
+
+/*
+ * Coffee nearby: the cursor over the COFFEE card. Carrying the mug is its own
+ * reaction (it wants it), so that doesn't count.
+ */
+const coffeeCard = document.querySelector('.widget.coffee');
+coffeeCard.addEventListener('pointerenter', () => {
+  if (on('sniff') && sim.smellSince === null) sim.smellSince = sim.t;
+});
+coffeeCard.addEventListener('pointerleave', () => {
+  sim.smellSince = null;
+});
 
 /*
  * A click anywhere but on a pet: the tail tip twitches toward it. Which side
