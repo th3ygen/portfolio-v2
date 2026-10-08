@@ -760,7 +760,7 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0, shiftX: 0, pawL: 0, pawR: 0, rem: 0, remOffset: 0, loaf: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0, shiftX: 0, pawL: 0, pawR: 0, rem: 0, remOffset: 0, loaf: 0, cross: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -801,6 +801,11 @@ class Sim {
     // Dreaming, asleep: a spell now and then (until), the next one (next), and
     // the next twitch within it. `on`, a lab switch.
     this.dream = { on: true, until: -1, next: rand(...DREAM.gap), nextTwitch: 0, gap: DREAM.gap };
+    // The cursor on its nose: since when (null: not there), and whether a
+    // sneeze is ready — once it has sneezed, the cursor has to leave first.
+    this.noseSince = null;
+    this.noseArmed = true;
+    this.noseOn = true;
     // The hour it lives by, for the lab: null follows TIME (see hour()).
     this.hourOverride = null;
     // Whether it keeps the hours (eyes, yawns); a lab switch.
@@ -918,6 +923,14 @@ class Sim {
     if (this.hourOverride !== null) return this.hourOverride;
     if (this.data.time === 'live') return mytHour();
     return this.data.time === 'night' ? 23 : 12;
+  }
+
+  /** The cursor is (or isn't) right on its nose. */
+  onNose(here) {
+    if (!here) {
+      this.noseSince = null;
+      this.noseArmed = true;
+    } else if (this.noseSince === null) this.noseSince = this.t;
   }
 
   /** Start a dream now, if asleep. */
@@ -1049,6 +1062,23 @@ class Sim {
     // The lids: a fast, faint flicker while it dreams.
     p.rem = approach(p.rem, dreaming ? 1 : 0, 6, dt);
     p.remOffset = p.rem * Math.sin(this.t * 37) * DREAM.flutter;
+
+    // The cursor right on its nose: it goes cross-eyed looking at it, and
+    // after a moment, sneezes. Calm and awake only; once per visit.
+    let cross = 0;
+    const calmNow = mood !== 'sleep' && !(this.transient && this.t < this.transient.until) && !this.action;
+    // After the sneeze it has had enough: no more crossing until the cursor
+    // has left and come back.
+    if (this.noseOn && this.noseSince !== null && calmNow && this.noseArmed) {
+      const held = this.t - this.noseSince;
+      if (held > NOSE.cross) cross = clamp((held - NOSE.cross) / 0.3, 0, 1);
+      if (held > NOSE.sneeze && this.noseArmed) {
+        this.noseArmed = false;
+        cross = 0;
+        this.perform('sneeze');
+      }
+    }
+    p.cross = approach(p.cross, cross, 10, dt);
 
     // The tail tip's twitch at a click: two quick beats toward the click,
     // dying away in half a second.
@@ -1255,6 +1285,8 @@ class Pen {
     this.eyes = [];
     // Dizzy eyes, in screen pixels, printed by stampSpiral.
     this.spirals = [];
+    // Named points, in canvas pixels (see mark).
+    this.marks = {};
     // Hairlines (whiskers), in canvas pixels: drawn once the grid is built.
     this.hairs = [];
   }
@@ -1319,6 +1351,12 @@ class Pen {
   hairline(points, cls = 'm') {
     const m = this.lines.getTransform();
     this.hairs.push({ cls, pts: points.map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]) });
+  }
+
+  /** Remember where a point of the drawing lands, in canvas pixels. */
+  mark(name, x, y) {
+    const m = this.lines.getTransform();
+    this.marks[name] = { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f, scale: Math.hypot(m.a, m.b) };
   }
 
   /** A polyline `width` thick, as feature blobs: a quad for each segment. */
@@ -1488,6 +1526,9 @@ class Pen {
     }
 
     const open = clamp(p.eye * p.blink, 0.3, 1.15);
+    // Cross-eyed (p.cross), staring at its own nose: the eye stays as it is;
+    // only the pupil changes (below).
+    const c = p.cross;
     const h = 4.8 * open * (width / 12.5);
     const almond = (sx, sy) =>
       poly([[x - sx, y], [x - sx * 0.5, y - sy], [x + sx * 0.5, y - sy], [x + sx, y], [x + sx * 0.5, y + sy], [x - sx * 0.5, y + sy]]);
@@ -1513,17 +1554,25 @@ class Pen {
     // Pupil, carved out of the iris: a vertical slit for a cat, a round (well,
     // square — no curves) pupil for a dog. Both dilate, follow the gaze, and
     // scale with the iris.
-    const px = x + p.lookX * rx * k * 0.42;
-    const py = y + p.lookY * h * k * 0.25;
+    // Cross-eyed (p.cross): each pupil drawn in toward the nose — the eye's
+    // own x is its side of the face.
+    // Crossed, the pupils go in and down — at the nose, below and between.
+    const px = x + p.lookX * rx * k * 0.42 * (1 - c) - Math.sign(x) * c * rx * k * 0.5;
+    const py = y + p.lookY * h * k * 0.25 * (1 - c) + c * h * k * 0.38;
     a.save();
     a.clip(iris);
     a.fillStyle = '#00ff00';
     if (pupil === 'round') {
-      const pr = (1.3 + p.pupil * 1.1) * (width / 12.5) * k;
-      a.fillRect(px - pr, py - pr * 1.2, pr * 2, pr * 2.4);
+      // Crossed, bigger and squarer — as round as a square pupil gets.
+      const pr = (1.3 + p.pupil * 1.1 + c * 0.9) * (width / 12.5) * k;
+      const tall = lerp(1.2, 1, c);
+      a.fillRect(px - pr, py - pr * tall, pr * 2, pr * 2 * tall);
     } else {
-      const pw = (0.7 + p.pupil * 1.9) * k;
-      a.fillRect(px - pw, py - h * k * 0.85, pw * 2, h * k * 1.7);
+      // The slit runs the eye's height, so it could not show where it looks;
+      // crossed, it shortens and dilates into a round-ish pupil that can.
+      const pw = (0.7 + p.pupil * 1.9 + c * 1.6) * k;
+      const ph = lerp(h * k * 1.7, pw * 2.2, c);
+      a.fillRect(px - pw, py - ph / 2, pw * 2, ph);
     }
     a.restore();
 
@@ -1663,6 +1712,7 @@ function drawCat(pen, p) {
     } else {
       // Sniffing (p.sniff): the nose lifts a touch, wider at the nostrils.
       const n = p.sniff;
+      pen.mark('nose', 0, 7);
       pen.blob([[-3.2 - n * 1.2, 5.6 - n * 1.4], [3.2 + n * 1.2, 5.6 - n * 1.4], [0.9, 8.6 - n * 0.8], [-0.9, 8.6 - n * 0.8]]);
       pen.blob([[-2.4 - n * 0.8, 5.8 - n * 1.4], [-0.6, 5.8 - n * 1.4], [-0.8, 6.8 - n * 1.4], [-2.2 - n * 0.8, 6.8 - n * 1.4]], 'shine');
       pen.band([[0, 8.4], [0, 10]], 1.1, 'dark');
@@ -1878,6 +1928,7 @@ function drawHusky(pen, p) {
 
     // The nose: low, about a seventh of the face across, with a shine that
     // makes it a wet, rounded nose rather than a flat patch.
+    pen.mark('nose', 0, 12);
     // Sniffing (p.sniff): it lifts a touch and the nostrils flare.
     const n = p.sniff;
     pen.blob([[-3.2, 10 - n * 1.4], [3.2, 10 - n * 1.4], [3.6 + n * 1.4, 12 - n], [1.8, 13.8 - n * 0.8], [-1.8, 13.8 - n * 0.8], [-3.6 - n * 1.4, 12 - n]]);
@@ -2085,6 +2136,8 @@ class AsciiView {
     }
     const pen = new Pen(this.ctx.tone, this.ctx.lines, this.ctx.accent, this.ctx.feature, { ...opts, lineW: CELL_W * opts.lineW });
     species.draw(pen, sim.pose);
+    // Where the nose landed, for the cursor (see the TOO CLOSE input).
+    this.nose = pen.marks.nose ?? null;
 
     const tone = this.ctx.tone.getImageData(0, 0, W, H).data;
     const lines = this.ctx.lines.getImageData(0, 0, W, H).data;
@@ -2537,6 +2590,9 @@ const EAR = { from: 0.25, full: 0.75, rate: 4, holdFor: 10 };
 // Coffee nearby: a burst of `twitches` sniffs over `burst` seconds, every
 // `every` seconds.
 const SNIFF = { twitches: 3, burst: 0.45, every: 1.2 };
+// The cursor on its nose (within `radius` design units): cross-eyed after
+// `cross` seconds, a sneeze at `sneeze`.
+const NOSE = { radius: 3.2, cross: 0.3, sneeze: 1.6 };
 // A click elsewhere: the tail tip twitches `beats` times over `dur` seconds,
 // fading at `decay`.
 const FLICK = { dur: 0.5, beats: 2, decay: 5 };
@@ -2900,6 +2956,14 @@ cursor ${sim.gaze.x >= 0 ? 'right' : 'left'} ${Math.abs(sim.gaze.x).toFixed(2)} 
 last routines: ${sim.picked.join(', ') || '—'}   (${yawns} of ${sim.picked.length} yawns)`;
     },
   },
+  close: {
+    label: 'TOO CLOSE',
+    hint: 'Rest the cursor right on the pet’s nose and keep it there: its eyes cross, looking at it, and after a moment it sneezes. To make it sneeze again, move off its nose and come back.',
+    readout: () => {
+      const on = sim.noseSince !== null;
+      return on ? `on its nose for ${(sim.t - sim.noseSince).toFixed(1)}s   cross-eyed ${sim.pose.cross.toFixed(2)}   ${sim.noseArmed ? `sneezes at ${NOSE.sneeze}s` : 'sneezed — move off and back'}` : 'cursor not on its nose';
+    },
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -2938,6 +3002,7 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.earFollow = on('ears');
     if (key !== 'weight') sim.weight.gap = WEIGHT.gap;
     sim.dream.on = on('dream');
+    sim.noseOn = on('close');
     if (key !== 'dream') sim.dream.gap = DREAM.gap;
     sim.caffeine = 0;
     sim.wasNight = false;
@@ -3098,6 +3163,22 @@ coffeeCard.addEventListener('pointerenter', () => {
 });
 coffeeCard.addEventListener('pointerleave', () => {
   sim.smellSince = null;
+});
+
+/*
+ * The cursor right on a pet's nose: measured in that view's canvas pixels,
+ * against where its nose was last drawn.
+ */
+window.addEventListener('pointermove', (e) => {
+  if (!e.isPrimary) return;
+  const here = views.some((v) => {
+    if (!v.nose) return false;
+    const r = v.pre.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * v.cols * CELL_W;
+    const y = ((e.clientY - r.top) / r.height) * v.rows * CELL_H;
+    return Math.hypot(x - v.nose.x, y - v.nose.y) < NOSE.radius * v.nose.scale;
+  });
+  sim.onNose(here);
 });
 
 /*
