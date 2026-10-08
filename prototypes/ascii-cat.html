@@ -2820,10 +2820,35 @@ const store = {
 };
 const say = (text) => { $('profileMsg').textContent = text; };
 
+/*
+ * Presets: profiles in the code, listed above the saved ones as
+ * "preset:<name>". They load like a saved profile but can't be deleted (save
+ * one under a new name to change it). `default` loads on open whenever there
+ * is no saved profile to go back to.
+ */
+const PRESETS = {
+  default: {
+    tune: {
+      small: { lineW: 0.75, lineThr: 0.31, shadowD: 9.5, darkW: 1.53, mouthInk: '#2a3030', eyeScale: 1.58, irisScale: 1.1, tones: { cat: 'dots', husky: 'light' } },
+      big: { lineW: 0.54, lineThr: 0.25, shadowD: 2, darkW: 0.35, mouthInk: '#070809', eyeScale: 1.6, irisScale: 1.1, tones: { cat: 'dots', husky: 'dense' } },
+    },
+    shared: { eyes: 'blocks', face: 'blocks', dizzyEyes: 'square', fps: 24, color: true, cols: 120, font: 5 },
+  },
+};
+const PRESET = 'preset:';
+
+/** A profile by its option value: a preset, or one saved in this browser. */
+function profileFor(value) {
+  if (!value) return null;
+  if (value.startsWith(PRESET)) return PRESETS[value.slice(PRESET.length)] ?? null;
+  return store.get(PROFILES_KEY, {})[value] ?? null;
+}
+
 function fillProfiles(selected = '') {
   const names = Object.keys(store.get(PROFILES_KEY, {})).sort();
   $('profile').replaceChildren(
     new Option('— none —', '', false, selected === ''),
+    ...Object.keys(PRESETS).map((n) => new Option(`${n} (preset)`, PRESET + n, false, PRESET + n === selected)),
     ...names.map((n) => new Option(n, n, false, n === selected)),
   );
 }
@@ -2850,8 +2875,9 @@ function applyProfile(p) {
 }
 
 $('saveProfile').addEventListener('click', () => {
-  const name = $('profileName').value.trim() || $('profile').value;
-  if (!name) { say('Type a name first.'); return; }
+  const picked = $('profile').value;
+  const name = $('profileName').value.trim() || (picked.startsWith(PRESET) ? '' : picked);
+  if (!name) { say(picked.startsWith(PRESET) ? 'Presets are fixed: type a new name to save a copy.' : 'Type a name first.'); return; }
   const profiles = store.get(PROFILES_KEY, {});
   profiles[name] = {
     tune: structuredClone(tune),
@@ -2866,12 +2892,13 @@ $('saveProfile').addEventListener('click', () => {
 $('profile').addEventListener('change', (e) => {
   const name = e.target.value;
   store.set(LAST_KEY, name);
-  const p = name && store.get(PROFILES_KEY, {})[name];
-  if (p) { applyProfile(p); say(`Loaded "${name}".`); }
+  const p = profileFor(name);
+  if (p) { applyProfile(p); say(`Loaded "${name.replace(PRESET, '')}".`); }
 });
 $('deleteProfile').addEventListener('click', () => {
   const name = $('profile').value;
   if (!name) { say('Pick a profile to delete.'); return; }
+  if (name.startsWith(PRESET)) { say('Presets are part of the code; they can’t be deleted.'); return; }
   const profiles = store.get(PROFILES_KEY, {});
   delete profiles[name];
   store.set(PROFILES_KEY, profiles);
@@ -2880,12 +2907,14 @@ $('deleteProfile').addEventListener('click', () => {
   say(`Deleted "${name}".`);
 });
 
-// Open on the last profile used.
+// Open on the last profile used — or, with none to go back to, the default
+// preset.
 {
   const last = store.get(LAST_KEY, '');
-  const p = last && store.get(PROFILES_KEY, {})[last];
-  fillProfiles(p ? last : '');
-  if (p) { applyProfile(p); say(`Loaded "${last}".`); }
+  const open = profileFor(last) ? last : PRESET + 'default';
+  fillProfiles(open);
+  applyProfile(profileFor(open));
+  say(`Loaded "${open.replace(PRESET, '')}".`);
 }
 $('eyes').addEventListener('change', (e) => { opts.eyes = e.target.value; });
 $('face').addEventListener('change', (e) => { opts.face = e.target.value; });
