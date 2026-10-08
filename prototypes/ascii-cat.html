@@ -480,6 +480,8 @@ const MOODS = {
   // Being stroked: eyes shut, head sunk into the hand, ears eased back.
   petted: { eye: 0,    pupil: 0.4,  drop: 1.5, tailAmp: 0.25, tailSpeed: 1.1, breathRate: 1.0, breathAmp: 0.045, jitter: 0,   happy: 0, dizzy: 0, earsBack: 0.35 },
   // Just after: wide eyes, big pupils, head up — "why did you stop?"
+  // Booped on the nose: eyes squeezed shut, head bobbed back, ears eased.
+  booped: { eye: 0,    pupil: 0.4,  drop: -1.2, tailAmp: 0.3, tailSpeed: 2,  breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0.4 },
   lookup: { eye: 1.12, pupil: 0.85, drop: -1, tailAmp: 0.45, tailSpeed: 2.2, breathRate: 1.3, breathAmp: 0.03,  jitter: 0,    happy: 0, dizzy: 0, earsBack: 0 },
   // Startled: eyes wide, pupils down to pinpricks, ears up, tail going.
   startled: { eye: 1.15, pupil: 0, drop: -2, tailAmp: 0.8, tailSpeed: 7, breathRate: 3, breathAmp: 0.03, jitter: 0.1, happy: 0, dizzy: 0, earsBack: 0 },
@@ -742,7 +744,7 @@ const ROUTINES = {
   },
 };
 
-const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'GRUMPY', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP', eager: 'WANTS THAT' };
+const MOOD_LABEL = { idle: 'CONTENT', sleep: 'ASLEEP', grumpy: 'GRUMPY', hyper: 'CAFFEINATED', happy: 'PURRING', dizzy: 'DIZZY', petted: 'BEING PETTED', lookup: 'CURIOUS', irked: 'IRKED', annoyed: 'ANNOYED', startled: 'STARTLED', drowsy: 'DROWSY', waking: 'WAKING UP', eager: 'WANTS THAT', booped: 'BOOPED' };
 
 class Sim {
   constructor() {
@@ -760,7 +762,7 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0, shiftX: 0, pawL: 0, pawR: 0, rem: 0, remOffset: 0, loaf: 0, cross: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0, shiftX: 0, pawL: 0, pawR: 0, rem: 0, remOffset: 0, loaf: 0, cross: 0, squish: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -806,6 +808,8 @@ class Sim {
     this.noseSince = null;
     this.noseArmed = true;
     this.noseOn = true;
+    // Boops: when, lately (a few in a row and it sneezes).
+    this.boops = [];
     // The hour it lives by, for the lab: null follows TIME (see hour()).
     this.hourOverride = null;
     // Whether it keeps the hours (eyes, yawns); a lab switch.
@@ -923,6 +927,32 @@ class Sim {
     if (this.hourOverride !== null) return this.hourOverride;
     if (this.data.time === 'live') return mytHour();
     return this.data.time === 'night' ? 23 : 12;
+  }
+
+  /**
+   * A tap right on the nose. Awake, it squeezes its eyes shut, bobs back,
+   * its nose squishes, 'boop' — then looks up at you. A few in a row and it
+   * sneezes. Asleep it is just a tap (see the wake taps); returns whether it
+   * was a boop.
+   */
+  boop() {
+    if (this.mood() === 'sleep') return false;
+    this.boops = [...this.boops.filter((t) => this.t - t < BOOP.window), this.t];
+    this.cursorAt = this.t;
+    this.pose.squish = 1;
+    const husky = this.species === 'husky';
+    this.particles.push({ text: 'boop', x: rand(56, 62), y: husky ? 46 : 50, vx: rand(3, 6), vy: -6, life: 0.8, life0: 0.8, cls: 'a' });
+    if (this.boops.length >= BOOP.sneezeAfter) {
+      this.boops = [];
+      this.transient = null;
+      this.action = null;
+      this.perform('sneeze');
+      return true;
+    }
+    this.action = null;
+    this.pose.eye = 0;
+    this.react('booped', BOOP.hold, { mood: 'lookup', seconds: 1.2 });
+    return true;
   }
 
   /** The cursor is (or isn't) right on its nose. */
@@ -1079,6 +1109,8 @@ class Sim {
       }
     }
     p.cross = approach(p.cross, cross, 10, dt);
+    // A boop's squish springs back.
+    p.squish = approach(p.squish, 0, 7, dt);
 
     // The tail tip's twitch at a click: two quick beats toward the click,
     // dying away in half a second.
@@ -1713,7 +1745,9 @@ function drawCat(pen, p) {
       // Sniffing (p.sniff): the nose lifts a touch, wider at the nostrils.
       const n = p.sniff;
       pen.mark('nose', 0, 7);
-      pen.blob([[-3.2 - n * 1.2, 5.6 - n * 1.4], [3.2 + n * 1.2, 5.6 - n * 1.4], [0.9, 8.6 - n * 0.8], [-0.9, 8.6 - n * 0.8]]);
+      // Booped (p.squish): pressed flat and wide for a moment.
+      const q = p.squish;
+      pen.blob([[-3.2 - n * 1.2 - q * 1.2, 5.6 - n * 1.4 + q * 0.6], [3.2 + n * 1.2 + q * 1.2, 5.6 - n * 1.4 + q * 0.6], [0.9 + q * 1.4, 8.6 - n * 0.8 - q * 1.2], [-0.9 - q * 1.4, 8.6 - n * 0.8 - q * 1.2]]);
       pen.blob([[-2.4 - n * 0.8, 5.8 - n * 1.4], [-0.6, 5.8 - n * 1.4], [-0.8, 6.8 - n * 1.4], [-2.2 - n * 0.8, 6.8 - n * 1.4]], 'shine');
       pen.band([[0, 8.4], [0, 10]], 1.1, 'dark');
       for (const side of [-1, 1]) pen.band([[0, 10], [side * 2.2, 11.6], [side * 4.6, 10.6]], 1.1, 'dark');
@@ -1931,7 +1965,9 @@ function drawHusky(pen, p) {
     pen.mark('nose', 0, 12);
     // Sniffing (p.sniff): it lifts a touch and the nostrils flare.
     const n = p.sniff;
-    pen.blob([[-3.2, 10 - n * 1.4], [3.2, 10 - n * 1.4], [3.6 + n * 1.4, 12 - n], [1.8, 13.8 - n * 0.8], [-1.8, 13.8 - n * 0.8], [-3.6 - n * 1.4, 12 - n]]);
+    // Booped (p.squish): pressed flat and wide for a moment.
+    const q = p.squish;
+    pen.blob([[-3.2 - q, 10 - n * 1.4 + q * 0.7], [3.2 + q, 10 - n * 1.4 + q * 0.7], [3.6 + n * 1.4 + q * 1.4, 12 - n], [1.8 + q, 13.8 - n * 0.8 - q * 1.2], [-1.8 - q, 13.8 - n * 0.8 - q * 1.2], [-3.6 - n * 1.4 - q * 1.4, 12 - n]]);
     pen.blob([[-2.4, 10.5 - n * 1.4], [-0.6, 10.5 - n * 1.4], [-0.8, 11.5 - n * 1.4], [-2.4, 11.5 - n * 1.4]], 'shine');
 
     // Mouth: a dark band a cell thick — a short line down from the nose into
@@ -2593,6 +2629,9 @@ const SNIFF = { twitches: 3, burst: 0.45, every: 1.2 };
 // The cursor on its nose (within `radius` design units): cross-eyed after
 // `cross` seconds, a sneeze at `sneeze`.
 const NOSE = { radius: 3.2, cross: 0.3, sneeze: 1.6 };
+// A boop: eyes shut for `hold` seconds; `sneezeAfter` within `window`
+// seconds and it sneezes instead.
+const BOOP = { hold: 0.55, sneezeAfter: 4, window: 3 };
 // A click elsewhere: the tail tip twitches `beats` times over `dur` seconds,
 // fading at `decay`.
 const FLICK = { dur: 0.5, beats: 2, decay: 5 };
@@ -2964,6 +3003,11 @@ last routines: ${sim.picked.join(', ') || '—'}   (${yawns} of ${sim.picked.len
       return on ? `on its nose for ${(sim.t - sim.noseSince).toFixed(1)}s   cross-eyed ${sim.pose.cross.toFixed(2)}   ${sim.noseArmed ? `sneezes at ${NOSE.sneeze}s` : 'sneezed — move off and back'}` : 'cursor not on its nose';
     },
   },
+  boop: {
+    label: 'BOOP',
+    hint: 'Tap the pet right on the nose: boop — its eyes squeeze shut, its head bobs back and its nose squishes, then it looks up at you. Boop it four times within three seconds and it sneezes. Taps anywhere else still make it purr.',
+    readout: () => `boops lately ${sim.boops.filter((t) => sim.t - t < BOOP.window).length} / ${BOOP.sneezeAfter} (sneezes)   squish ${sim.pose.squish.toFixed(2)}   mood ${MOOD_LABEL[sim.mood()]}`,
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -3169,16 +3213,16 @@ coffeeCard.addEventListener('pointerleave', () => {
  * The cursor right on a pet's nose: measured in that view's canvas pixels,
  * against where its nose was last drawn.
  */
+function onNoseOf(v, clientX, clientY) {
+  if (!v.nose) return false;
+  const r = v.pre.getBoundingClientRect();
+  const x = ((clientX - r.left) / r.width) * v.cols * CELL_W;
+  const y = ((clientY - r.top) / r.height) * v.rows * CELL_H;
+  return Math.hypot(x - v.nose.x, y - v.nose.y) < NOSE.radius * v.nose.scale;
+}
 window.addEventListener('pointermove', (e) => {
   if (!e.isPrimary) return;
-  const here = views.some((v) => {
-    if (!v.nose) return false;
-    const r = v.pre.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * v.cols * CELL_W;
-    const y = ((e.clientY - r.top) / r.height) * v.rows * CELL_H;
-    return Math.hypot(x - v.nose.x, y - v.nose.y) < NOSE.radius * v.nose.scale;
-  });
-  sim.onNose(here);
+  sim.onNose(views.some((v) => onNoseOf(v, e.clientX, e.clientY)));
 });
 
 /*
@@ -3226,6 +3270,8 @@ for (const v of views) {
       if (wakeTaps.length >= WAKE.taps) { wakeTaps = []; sim.wake(); } else sim.stir();
       return;
     }
+    // Right on the nose: a boop, not a purr or a poke.
+    if (on('boop') && onNoseOf(v, e.clientX, e.clientY) && sim.boop()) return;
     if (on('poke')) {
       pokes = pokes.filter((t) => now - t < POKE.windowMs);
       pokes.push(now);
@@ -3242,7 +3288,7 @@ for (const v of views) {
       }
       if (pokes.length >= POKE.irked) { sim.react('irked', 1.8); return; }
     }
-    if (on('tap') || on('poke')) sim.react('happy', 2.2);
+    if (on('tap') || on('poke') || on('boop')) sim.react('happy', 2.2);
   });
 }
 LAB.poke.readout = () => {
