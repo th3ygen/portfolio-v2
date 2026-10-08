@@ -736,7 +736,7 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0, shiftX: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0, shiftX: 0, pawL: 0, pawR: 0, rem: 0, remOffset: 0, loaf: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -774,6 +774,9 @@ class Sim {
     // Shifting its weight: where it sits (design units off centre), the last
     // move — from, to, when — and when the next comes.
     this.weight = { from: 0, to: 0, at: -10, next: rand(...WEIGHT.gap), gap: WEIGHT.gap };
+    // Dreaming, asleep: a spell now and then (until), the next one (next), and
+    // the next twitch within it. `on`, a lab switch.
+    this.dream = { on: true, until: -1, next: rand(...DREAM.gap), nextTwitch: 0, gap: DREAM.gap };
     // Last frame's mood, to see the dizziness end.
     this.lastMood = 'idle';
 
@@ -877,6 +880,17 @@ class Sim {
     w.next = this.t + rand(...w.gap) * (this.mood() === 'sleep' ? 2 : 1);
   }
 
+  /** Start a dream now, if asleep. */
+  dreamNow() {
+    if (this.mood() !== 'sleep') return;
+    const d = this.dream;
+    d.until = this.t + rand(...DREAM.dur);
+    d.next = d.until + rand(...d.gap);
+    d.nextTwitch = this.t + 0.2;
+    // Now and then it says something, muffled, somewhere in the dream.
+    d.speakAt = Math.random() < DREAM.speak ? this.t + rand(0.4, d.until - this.t - 0.6) : -1;
+  }
+
   /** Woken from a doze: a startled blink, eyes wide, a '?'. */
   wake() {
     this.asleep = false;
@@ -912,6 +926,11 @@ class Sim {
     // the floor asleep. Awake again, it comes up a little quicker.
     const tailDown = mood === 'sleep' ? 1 : mood === 'drowsy' ? 0.55 : 0;
     p.tailDown = approach(p.tailDown, tailDown, tailDown > p.tailDown ? 0.45 : 1.5, dt);
+    // Settling down to sleep, the cat loafs: lower and rounder, paws tucked
+    // under, head sunk onto its chest — a little of the way while drowsy, all
+    // of it asleep. Slowly in; up a little quicker when it wakes.
+    const loaf = mood === 'sleep' ? 1 : mood === 'drowsy' ? 0.35 : 0;
+    p.loaf = approach(p.loaf, loaf, loaf > p.loaf ? 0.6 : 1.8, dt);
     p.wobble = p.dizzy * Math.sin(this.t * 7) * 0.22;
     p.jx = p.jitter * rand(-1.3, 1.3);
     p.jy = p.jitter * rand(-0.8, 0.8);
@@ -959,6 +978,33 @@ class Sim {
       if (st < SNIFF.burst) sniff = Math.abs(Math.sin((st / SNIFF.burst) * Math.PI * SNIFF.twitches));
     }
     p.sniff = approach(p.sniff, sniff, 30, dt);
+
+    // Dreaming: asleep, every so often, a few seconds of it — the lids
+    // fluttering, an ear flicking, a paw or the tail tip twitching, and
+    // sometimes a word, muffled. Then still again.
+    const d = this.dream;
+    const dreaming = d.on && mood === 'sleep' && this.t < d.until;
+    if (d.on && mood === 'sleep' && this.t > d.next) this.dreamNow();
+    if (mood !== 'sleep') d.until = -1;
+    if (dreaming && this.t > d.nextTwitch) {
+      d.nextTwitch = this.t + rand(...DREAM.twitchGap);
+      const which = Math.floor(Math.random() * 3);
+      const side = Math.random() < 0.5 ? -1 : 1;
+      if (which === 0) { if (side < 0) this.twitchL = 1; else this.twitchR = 1; }
+      else if (which === 1) { if (side < 0) p.pawL = 1; else p.pawR = 1; }
+      else { this.flickAt = this.t; this.flickSide = side * DREAM.flick; }
+    }
+    if (dreaming && d.speakAt > 0 && this.t > d.speakAt) {
+      d.speakAt = -1;
+      const husky = this.species === 'husky';
+      const text = husky ? (Math.random() < 0.5 ? 'wuf' : 'wf..') : Math.random() < 0.5 ? 'mrf' : 'mm..rp';
+      this.particles.push({ text, x: 62, y: husky ? 20 : 32, vx: 1.5, vy: -2, life: 1.6, life0: 1.6, cls: 's', typed: 6 });
+    }
+    p.pawL = approach(p.pawL, 0, 9, dt);
+    p.pawR = approach(p.pawR, 0, 9, dt);
+    // The lids: a fast, faint flicker while it dreams.
+    p.rem = approach(p.rem, dreaming ? 1 : 0, 6, dt);
+    p.remOffset = p.rem * Math.sin(this.t * 37) * DREAM.flutter;
 
     // The tail tip's twitch at a click: two quick beats toward the click,
     // dying away in half a second.
@@ -1367,8 +1413,10 @@ class Pen {
     const blocks = this.opts.face !== 'lines';
     // Shut (asleep, or mid-blink): a lid, curved down a touch at the ends.
     if (state === 'closed') {
-      if (blocks) this.lid([[x - rx * 0.8, y], [x - rx * 0.4, y + 0.9], [x + rx * 0.4, y + 0.9], [x + rx * 0.8, y]], cls);
-      else this.stroke([[x - rx * 0.8, y + 0.5], [x + rx * 0.8, y + 0.5]]);
+      // Dreaming, the shut lid flutters (p.remOffset).
+      const fy = y + (p.remOffset ?? 0);
+      if (blocks) this.lid([[x - rx * 0.8, fy], [x - rx * 0.4, fy + 0.9], [x + rx * 0.4, fy + 0.9], [x + rx * 0.8, fy]], cls);
+      else this.stroke([[x - rx * 0.8, fy + 0.5], [x + rx * 0.8, fy + 0.5]]);
       return;
     }
     // Happy: the lid arched up, '^'.
@@ -1489,29 +1537,32 @@ function drawCat(pen, p) {
   const down = [[64, 91], [79, 93], [89, 93.5], [96 + s * 2, 92.5], [100 + s * 3 + f * 2, 89 - Math.abs(s) - Math.abs(f) * 2]];
   pen.solid(strip(up.map(([x, y], i) => [lerp(x, down[i][0], d), lerp(y, down[i][1], d)]), 5.5), { shadow: 0.5 });
 
-  // ── Body, sitting: a faceted bell, breathing upward from the ground.
+  // ── Body, sitting: a faceted bell, breathing upward from the ground. As it
+  // loafs (p.loaf) the bell sinks into a low, wide dome.
   const by = (y) => 95 - (95 - y) * breathe;
-  pen.solid([
-    [29, 95],
-    [27, by(80)],
-    [33, by(67)],
-    [42, by(61)],
-    [58, by(61)],
-    [67, by(67)],
-    [73, by(80)],
-    [71, 95],
-  ], { shadow: 1.2 });
+  const L = p.loaf;
+  const sitting = [[29, 95], [27, 80], [33, 67], [42, 61], [58, 61], [67, 67], [73, 80], [71, 95]];
+  const loafed = [[24, 95], [23, 85], [31, 76], [42, 72.5], [58, 72.5], [69, 76], [77, 85], [76, 95]];
+  pen.solid(sitting.map(([x, y], i) => [lerp(x, loafed[i][0], L), by(lerp(y, loafed[i][1], L))]), { shadow: 1.2 });
 
-  // Chest: an unshaded lit wedge, no outline.
-  pen.solid([[44, by(66)], [56, by(66)], [50, by(82)]], { outline: false, band: LIT });
+  // Chest: an unshaded lit wedge, no outline — smaller in a loaf, the head
+  // resting over most of it.
+  pen.solid([[lerp(44, 45, L), by(lerp(66, 76, L))], [lerp(56, 55, L), by(lerp(66, 76, L))], [50, by(lerp(82, 85, L))]], { outline: false, band: LIT });
 
-  // Front paws.
-  pen.solid([[35, 90], [46, 90], [47, 95], [34, 95]], { shadow: 0.4 });
-  pen.solid([[54, 90], [65, 90], [66, 95], [53, 95]], { shadow: 0.4 });
+  // Front paws. A dreaming twitch (pawL, pawR) lifts one off the floor; in a
+  // loaf they are tucked under, out of sight.
+  if (L < 0.98) {
+    const top = lerp(90, 95, L);
+    const pl = p.pawL * 1.6 * (1 - L);
+    const pr = p.pawR * 1.6 * (1 - L);
+    pen.solid([[35, top - pl], [46, top - pl], [47, 95 - pl], [34, 95 - pl]], { shadow: 0.4 });
+    pen.solid([[54, top - pr], [65, top - pr], [66, 95 - pr], [53, 95 - pr]], { shadow: 0.4 });
+  }
 
   // ── Head: follows the gaze, tilts with it, drops when asleep.
   const hx = 50 + p.lookX * 3.2 + p.jx;
-  const hy = 45 + p.lookY * 2 + p.drop + p.jy - p.breath * 12;
+  // In a loaf, the head rests low, on the chest.
+  const hy = 45 + p.lookY * 2 + p.drop + p.jy - p.breath * 12 + p.loaf * 9;
   const tilt = p.lookX * 0.1 + p.wobble;
 
   pen.group(() => {
@@ -1640,9 +1691,11 @@ function drawHusky(pen, p) {
   // White chest, a deep shield down between the legs.
   pen.solid([[38, by(58)], [62, by(58)], [64, by(76)], [50, by(93)], [36, by(76)]], { shadow: 0.5, outline: false });
 
-  // Front legs, white.
-  pen.solid([[37, 79], [45, 79], [45, 95], [36, 95]], { shadow: 0.4 });
-  pen.solid([[55, 79], [63, 79], [64, 95], [55, 95]], { shadow: 0.4 });
+  // Front legs, white. A dreaming twitch (pawL, pawR) draws a paw up.
+  const pl = p.pawL * 1.8;
+  const pr = p.pawR * 1.8;
+  pen.solid([[37, 79], [45, 79], [45, 95 - pl], [36, 95 - pl]], { shadow: 0.4 });
+  pen.solid([[55, 79], [63, 79], [64, 95 - pr], [55, 95 - pr]], { shadow: 0.4 });
 
   // ── Head.
   const hx = 50 + p.lookX * 3 + p.jx;
@@ -2409,6 +2462,11 @@ const $ = (id) => document.getElementById(id);
 // and squashing `squash` as it lands, eyes on the ground it is moving to
 // (`lookX` out to that side, `lookY` down).
 const WEIGHT = { gap: [120, 240], dur: 1.6, spots: [-1.6, 0, 1.6], lift: 1.1, squash: 0.04, lookX: 0.7, lookY: 0.9 };
+// Dreams, asleep: every `gap` seconds a dream of `dur` seconds, a twitch
+// every `twitchGap` within it (an ear, a paw, the tail tip at `flick` of a
+// click's), a word with chance `speak`, and the lids fluttering `flutter`
+// design units.
+const DREAM = { gap: [8, 20], dur: [2.5, 4.5], twitchGap: [0.35, 0.9], flick: 0.5, speak: 0.6, flutter: 0.5 };
 const sim = new Sim();
 // Feeding the pet coffee. Each feed adds `dose` to the pet's caffeine (up to
 // `max`); it wears off at `wearOff` a second, and the pet is hyper while it is
@@ -2756,6 +2814,17 @@ cursor ${sim.gaze.x >= 0 ? 'right' : 'left'} ${Math.abs(sim.gaze.x).toFixed(2)} 
       return `sitting at ${sim.pose.shiftX >= 0 ? '+' : ''}${sim.pose.shiftX.toFixed(2)}   ${moving ? 'moving' : `next in ${Math.max(0, w.next - sim.t).toFixed(1)}s`}`;
     },
   },
+  dream: {
+    label: 'DREAM',
+    rest: 'sleep',
+    hint: 'The pet is asleep here, and dreams: every so often, for a few seconds, its shut lids flutter, an ear flicks, a paw or the tip of its tail twitches, and sometimes it says something, muffled (mrf, wuf). Then it is still again. Here a dream comes every 2 to 4 seconds instead of 8 to 20; the button starts one now.',
+    reset: () => { sim.dream.gap = [2, 4]; sim.dream.next = sim.t + 1; },
+    controls: () => [['DREAM NOW', () => sim.dreamNow()]],
+    readout: () => {
+      const d = sim.dream;
+      return sim.t < d.until ? `dreaming, ${(d.until - sim.t).toFixed(1)}s left` : `sound asleep, next dream in ${Math.max(0, d.next - sim.t).toFixed(1)}s`;
+    },
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -2790,6 +2859,8 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.nightAware = on('doze') || key === 'coffee';
     sim.earFollow = on('ears');
     if (key !== 'weight') sim.weight.gap = WEIGHT.gap;
+    sim.dream.on = on('dream');
+    if (key !== 'dream') sim.dream.gap = DREAM.gap;
     sim.caffeine = 0;
     sim.wasNight = false;
   });
