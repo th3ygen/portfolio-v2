@@ -736,7 +736,7 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0, sniff: 0, shiftX: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -771,6 +771,9 @@ class Sim {
     // Coffee nearby — the cursor over the COFFEE card, not carrying the mug:
     // since when, or null.
     this.smellSince = null;
+    // Shifting its weight: where it sits (design units off centre), the last
+    // move — from, to, when — and when the next comes.
+    this.weight = { from: 0, to: 0, at: -10, next: rand(...WEIGHT.gap), gap: WEIGHT.gap };
     // Last frame's mood, to see the dizziness end.
     this.lastMood = 'idle';
 
@@ -862,6 +865,16 @@ class Sim {
     if (this.mood() === 'sleep') return;
     this.flickAt = this.t;
     this.flickSide = side;
+  }
+
+  /** Shift its weight now: lift, slide to a new spot, settle. */
+  resettle() {
+    const w = this.weight;
+    const spots = WEIGHT.spots.filter((x) => x !== w.to);
+    w.from = this.pose.shiftX;
+    w.to = spots[Math.floor(Math.random() * spots.length)];
+    w.at = this.t;
+    w.next = this.t + rand(...w.gap) * (this.mood() === 'sleep' ? 2 : 1);
   }
 
   /** Woken from a doze: a startled blink, eyes wide, a '?'. */
@@ -1013,6 +1026,24 @@ class Sim {
       this.perform('shakeoff');
     }
     this.lastMood = mood;
+
+    // Shifting its weight, every few minutes, when nothing else is going on:
+    // up a touch, across to a new spot, and down with a little squash.
+    const wt = this.weight;
+    if (this.t > wt.next && !this.action && !(this.transient && this.t < this.transient.until)) this.resettle();
+    const wk = (this.t - wt.at) / WEIGHT.dur;
+    if (wk < 1) {
+      // It looks first: down at the ground on the side it is moving to, from
+      // just before it lifts until it is nearly there.
+      const look = env(wk, 0.12, 0.7);
+      const side = Math.sign(wt.to - wt.from) || 1;
+      p.lookX = lerp(p.lookX, side * WEIGHT.lookX, look);
+      p.lookY = lerp(p.lookY, WEIGHT.lookY, look);
+      const across = clamp((wk - 0.15) / 0.6, 0, 1);
+      p.shiftX = lerp(wt.from, wt.to, across * across * (3 - 2 * across));
+      if (wk < 0.6) p.bodyY -= WEIGHT.lift * Math.sin((Math.PI * wk) / 0.6);
+      else p.stretch *= 1 - WEIGHT.squash * Math.sin((Math.PI * (wk - 0.6)) / 0.4);
+    } else p.shiftX = wt.to;
 
     this.emit(mood);
     for (const q of this.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; }
@@ -1935,9 +1966,10 @@ class AsciiView {
       c.fillStyle = '#000';
       c.fillRect(0, 0, W, H);
       c.setTransform(u, 0, 0, u, ox, oy);
-      // The whole pet: puffed up from its feet, and lifted by a hop.
+      // The whole pet: puffed up from its feet, lifted by a hop, and moved
+      // over a little when it shifts its weight.
       const k = 1 + 0.07 * sim.pose.puff;
-      c.translate(50, 97 + sim.pose.bodyY);
+      c.translate(50 + sim.pose.shiftX, 97 + sim.pose.bodyY);
       c.scale(k, k * sim.pose.stretch);
       c.translate(-50, -97);
       // Hard edges: anti-aliased shape edges would smear the bands.
@@ -2372,6 +2404,11 @@ function stampSpiral(sp, grid, cls, cols, rows, t) {
  * ──────────────────────────────────────────────────────────────────────────── */
 
 const $ = (id) => document.getElementById(id);
+// Read by the Sim as it is made, so before it. Shifting its weight: every `gap` seconds (twice that asleep), a `dur`
+// second move to one of `spots` (design units off centre), lifting `lift`
+// and squashing `squash` as it lands, eyes on the ground it is moving to
+// (`lookX` out to that side, `lookY` down).
+const WEIGHT = { gap: [120, 240], dur: 1.6, spots: [-1.6, 0, 1.6], lift: 1.1, squash: 0.04, lookX: 0.7, lookY: 0.9 };
 const sim = new Sim();
 // Feeding the pet coffee. Each feed adds `dose` to the pet's caffeine (up to
 // `max`); it wears off at `wearOff` a second, and the pet is hyper while it is
@@ -2708,6 +2745,17 @@ cursor ${sim.gaze.x >= 0 ? 'right' : 'left'} ${Math.abs(sim.gaze.x).toFixed(2)} 
       return since === null ? 'cursor not on the COFFEE card' : `coffee nearby for ${(sim.t - since).toFixed(1)}s   sniff ${sim.pose.sniff.toFixed(2)}   mood ${MOOD_LABEL[sim.mood()]}`;
     },
   },
+  weight: {
+    label: 'WEIGHT',
+    hint: 'Every few minutes the pet resettles where it sits: it lifts a touch, slides about a character to one side, and settles with a small squash — so it never sits frozen in one spot. Here it does it every 5 to 8 seconds instead of every 2 to 4 minutes (twice as long asleep); the button does it now.',
+    reset: () => { sim.weight.gap = [5, 8]; sim.weight.next = sim.t + 2; },
+    controls: () => [['SHIFT NOW', () => sim.resettle()]],
+    readout: () => {
+      const w = sim.weight;
+      const moving = sim.t - w.at < WEIGHT.dur;
+      return `sitting at ${sim.pose.shiftX >= 0 ? '+' : ''}${sim.pose.shiftX.toFixed(2)}   ${moving ? 'moving' : `next in ${Math.max(0, w.next - sim.t).toFixed(1)}s`}`;
+    },
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -2741,6 +2789,7 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.asleep = false;
     sim.nightAware = on('doze') || key === 'coffee';
     sim.earFollow = on('ears');
+    if (key !== 'weight') sim.weight.gap = WEIGHT.gap;
     sim.caffeine = 0;
     sim.wasNight = false;
   });
