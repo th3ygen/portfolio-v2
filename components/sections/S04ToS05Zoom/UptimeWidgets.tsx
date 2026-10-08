@@ -10,6 +10,9 @@ import {
   UPTIME_SINCE,
   UPTIME_YEARS,
 } from '@/content/uptime';
+import { GitHubHeatmap } from './GitHubHeatmap';
+import { Coffee, Comms, LocalTime, Pulse } from './LiveWidgets';
+import { useContributions, useNow } from './useLive';
 import styles from './UptimeWidgets.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -25,7 +28,13 @@ const SEGMENT = 10;
 const GAP = 1.4;
 
 /**
- * The UPTIME summary: four readouts around the word, two a side.
+ * The UPTIME summary: four readouts around the word, two a side, and on
+ * screens with the room a band above (LOC.TIME, SYS.PULSE, FUEL.COFFEE) and
+ * one below (GIT.ACTIVITY, COMMS.LINK). The page's one clock and one GitHub
+ * fetch live here and are handed down (see useLive).
+ *
+ * The bands' widgets are all chrome: they fade with the rest as the clock
+ * assembles, and nothing of theirs flies into it.
  *
  * Built for the handoff to the clock, so every widget is split in two:
  *
@@ -39,8 +48,16 @@ const GAP = 1.4;
  * s05 say in words, and a reader meets those in order.
  */
 export function UptimeWidgets() {
+  const now = useNow();
+  const github = useContributions();
   return (
     <div className={styles.widgets} aria-hidden="true">
+      <div className={styles.bandTop}>
+        <LocalTime now={now} />
+        <Pulse github={github} />
+        <Coffee now={now} />
+      </div>
+
       <div className={`${styles.side} ${styles.left}`}>
         <section className={styles.widget} data-w-widget>
           <div className={styles.frame} data-w-chrome />
@@ -155,6 +172,11 @@ export function UptimeWidgets() {
             CLIENTS {pad(CLIENT_COUNT)} · STACK {STACK_COUNT}
           </footer>
         </section>
+      </div>
+
+      <div className={styles.bandBottom}>
+        <GitHubHeatmap github={github} />
+        <Comms now={now} />
       </div>
     </div>
   );

@@ -58,7 +58,9 @@ describe('S04ToS05Zoom', () => {
 
   it('surrounds UPTIME with a summary whose data can become the clock', () => {
     const { container } = render(<S04ToS05Zoom startYear={2026} />);
-    expect(container.querySelectorAll('[data-w-widget]')).toHaveLength(4);
+    // Four flanking the word; LOC.TIME, SYS.PULSE and FUEL.COFFEE above;
+    // GIT.ACTIVITY and COMMS.LINK below.
+    expect(container.querySelectorAll('[data-w-widget]')).toHaveLength(9);
     // One gauge (the rim), a bar per year (the ring), a cell per project
     // (ticks), a dot per running post (the hub).
     expect(container.querySelectorAll('[data-w-gauge]')).toHaveLength(1);

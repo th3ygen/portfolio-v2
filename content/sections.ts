@@ -24,6 +24,7 @@ export const HEADER = {
   operator: 'OPERATOR: M.AIDIL SYAZWAN HAMDAN',
   build: 'BUILD 2026.08',
   coordinates: 'KL 3.1390°N 101.6869°E',
+  /** Rendered on the server and until the client clock ticks; then the live level (lib/uptime/live). */
   coffee: 'COFFEE: CRITICAL',
   /** Rendered on the server and until the client clock ticks. */
   clockPlaceholder: '--:--:-- MYT',

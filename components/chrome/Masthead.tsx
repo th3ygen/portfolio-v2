@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { HEADER } from '@/content/sections';
+import { coffee, myt } from '@/lib/uptime/live';
 import styles from './Masthead.module.css';
 
 const TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
@@ -19,9 +20,15 @@ const TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
  */
 export function Masthead() {
   const [clock, setClock] = useState<string>(HEADER.clockPlaceholder);
+  // The same level the UPTIME summary's FUEL.COFFEE shows, as a word.
+  const [fuel, setFuel] = useState<string>(HEADER.coffee);
 
   useEffect(() => {
-    const tick = () => setClock(`${TIME_FORMAT.format(new Date())} MYT`);
+    const tick = () => {
+      const now = new Date();
+      setClock(`${TIME_FORMAT.format(now)} MYT`);
+      setFuel(`COFFEE: ${coffee(myt(now)).status}`);
+    };
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
@@ -42,7 +49,7 @@ export function Masthead() {
       <span className={`${styles.slash} ${styles.optional}`} aria-hidden="true">/</span>
       <span className={styles.optional}>{HEADER.coordinates}</span>
       <span className={`${styles.slash} ${styles.optional}`} aria-hidden="true">/</span>
-      <span className={`${styles.coffee} ${styles.optional}`}>{HEADER.coffee}</span>
+      <span className={`${styles.coffee} ${styles.optional}`}>{fuel}</span>
     </header>
   );
 }

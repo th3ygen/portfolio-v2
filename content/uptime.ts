@@ -3,6 +3,8 @@ import { TRAJECTORY } from './trajectory';
 import { INDEX_ROWS } from './index-rows';
 import { CLIENTS } from './clients';
 import { MANIFEST_COUNT } from './manifest';
+import { OPERATOR_CARD, READOUT } from './operator';
+import { CHANNELS, UPLINK } from './uplink';
 
 /**
  * The s04 → s05 UPTIME summary: the readout that sits around UPTIME before
@@ -57,3 +59,18 @@ export const RUNNING: readonly { readonly org: string; readonly since: string; r
 
 export const CLIENT_COUNT = CLIENTS.length;
 export const STACK_COUNT = MANIFEST_COUNT;
+
+/**
+ * COMMS.LINK: how to reach the operator, restated from what s00, s01 and s06
+ * already say — the availability, the notice period, the response window and
+ * the channels — so it can't promise anything they don't.
+ */
+const availability = READOUT.find((row) => row.kind === 'status' && row.label === 'AVAILABILITY');
+export const COMMS = {
+  availability: availability && 'value' in availability ? availability.value : 'OPEN',
+  notice: OPERATOR_CARD.find((row) => row.label === 'NOTICE')?.value ?? '',
+  /** "~24H", out of "RESPONSE WINDOW: ~24H · GMT+8". */
+  reply: UPLINK.responseWindow.match(/~\s*\d+\s*H/)?.[0] ?? '',
+  /** The ways in: the s06 form first, then the direct lines (not BASE, which is a place). */
+  channels: ['UPLINK', ...CHANNELS.filter((c) => c.label !== 'BASE').map((c) => c.label)],
+} as const;

@@ -71,7 +71,9 @@
   background: linear-gradient(180deg, var(--color-textFaint), transparent);
 }
 
-/* Upright, the summary widgets take the bottom of the stage and say this already. */
-@media (max-aspect-ratio: 1/1) {
+/* Upright, the summary widgets take the bottom of the stage and say this
+   already; on a wide screen tall enough for the summary's bottom band
+   (UptimeWidgets' .bandBottom), the band takes it. */
+@media (max-aspect-ratio: 1/1), (min-height: 701px) {
   .meta { display: none; }
 }

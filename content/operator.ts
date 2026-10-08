@@ -203,12 +203,15 @@ export const TICKER: readonly string[] = [
   'NGINX', 'MAPBOX', 'BLE', 'RASPBERRY PI',
 ] as const;
 
+/** The GitHub account behind the UPTIME summary's heatmap (and the GITHUB link below). */
+export const GITHUB_USER = 'th3ygen';
+
 /**
  * Social and CV destinations. The prototype renders these as bare labels with
  * no hrefs; the real URLs come from the live site at aidilsyaz.vercel.app.
  */
 export const SOCIALS: readonly { readonly label: string; readonly href: string }[] = [
-  { label: 'GITHUB', href: 'https://github.com/th3ygen' },
+  { label: 'GITHUB', href: `https://github.com/${GITHUB_USER}` },
   { label: 'LINKEDIN', href: 'https://www.linkedin.com/in/aidilsyaz/' },
   { label: 'X', href: 'https://x.com/aideal_syaz' },
   { label: 'STACKOVERFLOW', href: 'https://stackoverflow.com/users/10222642/aidil' },
