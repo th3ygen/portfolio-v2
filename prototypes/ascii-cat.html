@@ -433,6 +433,30 @@ const approach = (v, target, rate, dt) => v + (target - v) * (1 - Math.exp(-rate
 const rand = (a, b) => a + Math.random() * (b - a);
 
 /** The time in Malaysia (GMT+8), whatever the viewer's own zone. */
+/**
+ * Through the day: piecewise-linear over `points` ([hour, value], from 0 to
+ * 24), at `hour`.
+ */
+function daily(points, hour) {
+  for (let i = 1; i < points.length; i++) {
+    const [h1, v1] = points[i];
+    const [h0, v0] = points[i - 1];
+    if (hour <= h1) return v0 + ((v1 - v0) * (hour - h0)) / (h1 - h0 || 1);
+  }
+  return points[points.length - 1][1];
+}
+
+/**
+ * Its day. `eye`: added to the calm eye — wide from 07:00, normal through
+ * the day, heavier from 21:00, heaviest after midnight. `yawn`: the chance
+ * a routine it picks for itself is a yawn — a tenth by day, about half at
+ * bedtime and after.
+ */
+const DAY = {
+  eye: [[0, -0.32], [5, -0.32], [7, 0.12], [10, 0.08], [12, 0], [20, 0], [22, -0.18], [24, -0.32]],
+  yawn: [[0, 0.55], [6, 0.4], [8, 0.1], [20, 0.1], [22, 0.5], [24, 0.55]],
+};
+
 function mytHour() {
   const now = new Date();
   return (now.getUTCHours() + 8 + now.getUTCMinutes() / 60) % 24;
@@ -777,6 +801,12 @@ class Sim {
     // Dreaming, asleep: a spell now and then (until), the next one (next), and
     // the next twitch within it. `on`, a lab switch.
     this.dream = { on: true, until: -1, next: rand(...DREAM.gap), nextTwitch: 0, gap: DREAM.gap };
+    // The hour it lives by, for the lab: null follows TIME (see hour()).
+    this.hourOverride = null;
+    // Whether it keeps the hours (eyes, yawns); a lab switch.
+    this.dayAware = true;
+    // The last few routines it picked on its own, newest last.
+    this.picked = [];
     // Last frame's mood, to see the dizziness end.
     this.lastMood = 'idle';
 
@@ -880,6 +910,16 @@ class Sim {
     w.next = this.t + rand(...w.gap) * (this.mood() === 'sleep' ? 2 : 1);
   }
 
+  /**
+   * The hour of its day, 0 to 24: Malaysia's, or the lab's, or a stand-in
+   * when TIME is forced (midday, or 23:00).
+   */
+  hour() {
+    if (this.hourOverride !== null) return this.hourOverride;
+    if (this.data.time === 'live') return mytHour();
+    return this.data.time === 'night' ? 23 : 12;
+  }
+
   /** Start a dream now, if asleep. */
   dreamNow() {
     if (this.mood() !== 'sleep') return;
@@ -916,8 +956,12 @@ class Sim {
     const mood = this.mood();
     const target = MOODS[mood];
     const p = this.pose;
+    // Calm, its eyes keep the hours: wide in the morning, heavy late at night.
+    // Not with coffee in it — wired is wired, whatever the time.
+    const hours = this.dayAware && this.caffeine <= 0;
+    const eye = mood === 'idle' && hours ? clamp(target.eye + daily(DAY.eye, this.hour()), 0.6, 1.15) : target.eye;
 
-    for (const key of Object.keys(target)) p[key] = approach(p[key], target[key], key === 'jitter' ? 12 : 5, dt);
+    for (const key of Object.keys(target)) p[key] = approach(p[key], key === 'eye' ? eye : target[key], key === 'jitter' ? 12 : 5, dt);
 
     // Breathing and tail are continuous oscillators; their speed follows the mood.
     p.breath = Math.sin(this.t * p.breathRate * Math.PI) * p.breathAmp;
@@ -1053,13 +1097,18 @@ class Sim {
     p.stretch = 1;
     if (!this.action && this.routines.on && mood === 'idle' && !this.transient && this.t - this.cursorAt > 3 && this.t > this.nextRoutine) {
       const names = Object.keys(ROUTINES).filter((n) => !ROUTINES[n].manual && (!ROUTINES[n].husky || this.species === 'husky'));
-      this.perform(names[Math.floor(Math.random() * names.length)]);
+      // Late, it yawns more: the yawn's share rises toward bedtime.
+      const name = hours && Math.random() < daily(DAY.yawn, this.hour()) ? 'yawn' : names[Math.floor(Math.random() * names.length)];
+      this.perform(name);
+      this.picked = [...this.picked, name].slice(-10);
     }
     if (this.action) {
       const r = ROUTINES[this.action.name];
       const k = (this.t - this.action.t0) / r.dur;
-      // Anything else happening — a tap, a mood — cuts the routine short.
-      if (k >= 1 || (this.transient && this.t < this.transient.until)) {
+      // Anything else happening — a tap, a mood — cuts the routine short; so
+      // does dropping off to sleep mid-yawn. (Not the coffee: feeding wakes it.)
+      const dozed = mood === 'sleep' && this.action.name !== 'drink';
+      if (k >= 1 || dozed || (this.transient && this.t < this.transient.until)) {
         this.action = null;
         this.nextRoutine = this.t + rand(...this.routines.gap);
         if (k >= 1) r.end?.(this);
@@ -1072,6 +1121,9 @@ class Sim {
       this.perform('shakeoff');
     }
     this.lastMood = mood;
+    // Woken this frame, after the dream was updated (the morning, say): the
+    // dream ends now, not a frame late.
+    if (this.mood() !== 'sleep') this.dream.until = -1;
 
     // Shifting its weight, every few minutes, when nothing else is going on:
     // up a touch, across to a new spot, and down with a little squash.
@@ -1080,8 +1132,11 @@ class Sim {
     const wk = (this.t - wt.at) / WEIGHT.dur;
     if (wk < 1) {
       // It looks first: down at the ground on the side it is moving to, from
-      // just before it lifts until it is nearly there.
-      const look = env(wk, 0.12, 0.7);
+      // just before it lifts until it is nearly there. Not asleep (the head
+      // follows the gaze, and would swing off its chest), and not once
+      // something else has its attention — a poke, a stroke — mid-move.
+      const busy = mood === 'sleep' || (this.transient && this.t < this.transient.until);
+      const look = busy ? 0 : env(wk, 0.12, 0.7);
       const side = Math.sign(wt.to - wt.from) || 1;
       p.lookX = lerp(p.lookX, side * WEIGHT.lookX, look);
       p.lookY = lerp(p.lookY, WEIGHT.lookY, look);
@@ -2825,6 +2880,26 @@ cursor ${sim.gaze.x >= 0 ? 'right' : 'left'} ${Math.abs(sim.gaze.x).toFixed(2)} 
       return sim.t < d.until ? `dreaming, ${(d.until - sim.t).toFixed(1)}s left` : `sound asleep, next dream in ${Math.max(0, d.next - sim.t).toFixed(1)}s`;
     },
   },
+  hours: {
+    label: 'HOURS',
+    hint: 'The pet keeps the hours: wide-eyed in the morning, normal through the day, heavy-lidded from about 21:00 and more so after midnight — and when it picks something to do on its own, it yawns more the later it gets. Pick a time below (LIVE is Malaysia time now). It stays awake here so you can see its eyes; routines come every 3 to 5 seconds.',
+    controls: () => [
+      ['07:30', () => { sim.hourOverride = 7.5; }],
+      ['12:00', () => { sim.hourOverride = 12; }],
+      ['21:30', () => { sim.hourOverride = 21.5; }],
+      ['23:30', () => { sim.hourOverride = 23.5; }],
+      ['02:00', () => { sim.hourOverride = 2; }],
+      ['LIVE', () => { sim.hourOverride = null; }],
+    ],
+    readout: () => {
+      const h = sim.hour();
+      const hhmm = `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+      const e = daily(DAY.eye, h);
+      const yawns = sim.picked.filter((n) => n === 'yawn').length;
+      return `hour ${hhmm}${sim.hourOverride === null ? ' (live)' : ''}   eyes ${e >= 0 ? '+' : ''}${e.toFixed(2)}   yawn chance ${Math.round(daily(DAY.yawn, h) * 100)}%
+last routines: ${sim.picked.join(', ') || '—'}   (${yawns} of ${sim.picked.length} yawns)`;
+    },
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -2847,8 +2922,11 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.transient = null;
     entry.reset?.();
     showLabControls();
-    // Routines are on in ALL and IDLE; IDLE runs them much more often.
-    sim.routines = { on: on('idle'), gap: key === 'idle' ? [3, 5] : [8, 14] };
+    // Routines are on in ALL, IDLE and HOURS; the last two run them much more often.
+    sim.routines = { on: on('idle') || key === 'hours', gap: key === 'idle' || key === 'hours' ? [3, 5] : [8, 14] };
+    sim.hourOverride = null;
+    sim.picked = [];
+    sim.dayAware = on('hours');
     sim.action = null;
     sim.nextRoutine = sim.t + rand(...sim.routines.gap);
     // Dozing is on in ALL and DOZE; DOZE nods off much sooner. The click on
