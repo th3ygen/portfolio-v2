@@ -736,7 +736,7 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -763,6 +763,8 @@ class Sim {
     this.wasNight = false;
     this.nextWander = 0;
     this.wander = { x: 0, y: 0 };
+    // One ear turns toward the cursor (see step); a lab switch.
+    this.earFollow = true;
     // Last frame's mood, to see the dizziness end.
     this.lastMood = 'idle';
 
@@ -909,6 +911,15 @@ class Sim {
     this.twitchR = approach(this.twitchR, 0, 6, dt);
     p.earL = this.twitchL * Math.sin(this.t * 55);
     p.earR = this.twitchR * Math.sin(this.t * 55);
+
+    // An ear on the cursor: the one on its side swivels toward it, and keeps
+    // pointing at where it last was even once the eyes wander off — it is
+    // still listening. Off to the side enough to matter; eased, a little
+    // behind the eyes; let go a while after the cursor stops, and asleep.
+    const listening = this.earFollow && mood !== 'sleep' && this.t - this.cursorAt < EAR.holdFor;
+    const reach = listening ? clamp((Math.abs(this.gaze.x) - EAR.from) / (EAR.full - EAR.from), 0, 1) : 0;
+    p.turnL = approach(p.turnL, this.gaze.x < 0 ? reach : 0, EAR.rate, dt);
+    p.turnR = approach(p.turnR, this.gaze.x > 0 ? reach : 0, EAR.rate, dt);
 
     // Gaze: the cursor when it is about, otherwise an idle wander.
     let gx = this.gaze.x;
@@ -1441,14 +1452,17 @@ function drawCat(pen, p) {
 
   pen.group(() => {
     // Ears, behind the head: pinned at their base, flattened back when grumpy.
-    const ear = (side, twitch) => {
+    // Turned toward a sound (`turn`, 0 to 1), an ear swings outward and, seen
+    // edge-on, narrows — the inside showing less.
+    const ear = (side, twitch, turn) => {
+      const w = 1 - turn * 0.4;
       pen.group(() => {
-        pen.solid([[-7, 5], [side * 1.5, -14 + p.earsBack * 5], [7, 5]], { shadow: 0.5 });
-        pen.solid([[-3.5, 3], [side * 1, -8 + p.earsBack * 4], [3.5, 3]], { outline: false, band: SHADE });
-      }, { x: side * 11, y: -11, rot: side * (0.2 + p.earsBack * 0.55) + twitch * 0.35 });
+        pen.solid([[-7 * w, 5], [side * (1.5 + turn * 2), -14 + p.earsBack * 5 + turn * 1.5], [7 * w, 5]], { shadow: 0.5 });
+        pen.solid([[-3.5 * w * w, 3], [side * (1 + turn * 2), -8 + p.earsBack * 4 + turn], [3.5 * w * w, 3]], { outline: false, band: SHADE });
+      }, { x: side * 11, y: -11, rot: side * (0.2 + p.earsBack * 0.55 + turn * 0.35) + twitch * 0.35 });
     };
-    ear(-1, p.earL);
-    ear(1, p.earR);
+    ear(-1, p.earL, p.turnL);
+    ear(1, p.earR, p.turnR);
 
     // The head: a wide faceted skull, cheeks flaring at the sides.
     pen.solid([
@@ -1569,14 +1583,16 @@ function drawHusky(pen, p) {
   pen.group(() => {
     // Ears: big upright triangles, pale inside with a dark rim, a narrow
     // crown between them.
-    const ear = (side, twitch) => {
+    // Turned toward a sound, an ear swings outward and narrows (see the cat's).
+    const ear = (side, twitch, turn) => {
+      const w = 1 - turn * 0.4;
       pen.group(() => {
-        pen.solid([[-8, 6], [side * 1.5, -21 + p.earsBack * 9], [8, 6]], { shadow: 0.5, coat: 'mark' });
-        pen.solid([[-5.5, 4], [side * 1, -16 + p.earsBack * 7], [5.5, 4]], { outline: false, band: LIT });
-      }, { x: side * 11, y: -14, rot: side * (0.12 + p.earsBack * 0.6) + twitch * 0.3 });
+        pen.solid([[-8 * w, 6], [side * (1.5 + turn * 2.5), -21 + p.earsBack * 9 + turn * 2], [8 * w, 6]], { shadow: 0.5, coat: 'mark' });
+        pen.solid([[-5.5 * w * w, 4], [side * (1 + turn * 2.5), -16 + p.earsBack * 7 + turn * 1.5], [5.5 * w * w, 4]], { outline: false, band: LIT });
+      }, { x: side * 11, y: -14, rot: side * (0.12 + p.earsBack * 0.6 + turn * 0.3) + twitch * 0.3 });
     };
-    ear(-1, p.earL);
-    ear(1, p.earR);
+    ear(-1, p.earL, p.turnL);
+    ear(1, p.earR, p.turnR);
 
     // The ruff: the fur of the cheeks and neck, in a V — widest at the
     // cheeks, running straight in to a point under the chin. Its tufts are few
@@ -2324,6 +2340,10 @@ const sim = new Sim();
 // changes it. It stays up until the caffeine is all gone, 30 seconds. Fed
 // again at any point, the caffeine goes back to one dose: the time starts
 // over rather than stacking.
+// An ear on the cursor: turns from `from` off-centre (in view half-widths,
+// as the gaze has it), fully by `full`; eased at `rate`; let go `holdFor`
+// seconds after the cursor stops.
+const EAR = { from: 0.25, full: 0.75, rate: 4, holdFor: 10 };
 const FEED = { dose: 45, wearOff: 1.5, hyperAbove: 30, minimum: 10 };
 
 /** Settings shared by both views. */
@@ -2616,6 +2636,16 @@ const LAB = {
       .filter((n) => !ROUTINES[n].manual && (!ROUTINES[n].husky || sim.species === 'husky'))
       .map((n) => [n.toUpperCase(), () => { sim.action = null; sim.transient = null; sim.perform(n); }]),
   },
+  ears: {
+    label: 'EARS',
+    hint: 'Move the cursor off to one side of the pet: the ear on that side swivels toward it — out, and narrower, as an ear turned edge-on. Keep the cursor still and the eyes wander off, but the ear stays on where it was: still listening. It lets go after 10 seconds still, and asleep it does not listen at all.',
+    readout: () => {
+      const p = sim.pose;
+      const bar = (v) => '#'.repeat(Math.round(v * 10)).padEnd(10, '.');
+      return `left ear  [${bar(p.turnL)}] ${p.turnL.toFixed(2)}     right ear [${bar(p.turnR)}] ${p.turnR.toFixed(2)}
+cursor ${sim.gaze.x >= 0 ? 'right' : 'left'} ${Math.abs(sim.gaze.x).toFixed(2)}   (turns from ${EAR.from}, fully by ${EAR.full})   still ${(sim.t - sim.cursorAt).toFixed(1)}s`;
+    },
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -2648,6 +2678,7 @@ for (const [key, entry] of Object.entries(LAB)) {
     sim.cursorAt = sim.t;
     sim.asleep = false;
     sim.nightAware = on('doze') || key === 'coffee';
+    sim.earFollow = on('ears');
     sim.caffeine = 0;
     sim.wasNight = false;
   });
