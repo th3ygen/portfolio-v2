@@ -736,7 +736,7 @@ class Sim {
 
     // bodyY and puff move the whole pet: a hop (design units, up is negative)
     // and fur standing on end (0..1, scaled up from the feet).
-    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0 };
+    this.pose = { ...MOODS.idle, lookX: 0, lookY: 0, blink: 1, earL: 0, earR: 0, breath: 0, tail: 0, wobble: 0, jx: 0, jy: 0, bodyY: 0, puff: 0, stretch: 1, mouth: 0, tongue: 0, tailDown: 0, turnL: 0, turnR: 0, flick: 0 };
     this.startledAt = -10;
     // The routine playing, if any, and when the next may start.
     this.action = null;
@@ -765,6 +765,9 @@ class Sim {
     this.wander = { x: 0, y: 0 };
     // One ear turns toward the cursor (see step); a lab switch.
     this.earFollow = true;
+    // A click elsewhere on the page: when, and toward which side (-1, 1).
+    this.flickAt = -10;
+    this.flickSide = 1;
     // Last frame's mood, to see the dizziness end.
     this.lastMood = 'idle';
 
@@ -847,6 +850,17 @@ class Sim {
     this.cursorAt = this.t;
   }
 
+  /**
+   * A click somewhere else on the page, on the `side` of the pet it landed
+   * (-1 left, 1 right). It noticed — the tip of its tail twitches that way —
+   * but it doesn't care. Asleep, it doesn't notice.
+   */
+  clickedNearby(side) {
+    if (this.mood() === 'sleep') return;
+    this.flickAt = this.t;
+    this.flickSide = side;
+  }
+
   /** Woken from a doze: a startled blink, eyes wide, a '?'. */
   wake() {
     this.asleep = false;
@@ -920,6 +934,11 @@ class Sim {
     const reach = listening ? clamp((Math.abs(this.gaze.x) - EAR.from) / (EAR.full - EAR.from), 0, 1) : 0;
     p.turnL = approach(p.turnL, this.gaze.x < 0 ? reach : 0, EAR.rate, dt);
     p.turnR = approach(p.turnR, this.gaze.x > 0 ? reach : 0, EAR.rate, dt);
+
+    // The tail tip's twitch at a click: two quick beats toward the click,
+    // dying away in half a second.
+    const ft = this.t - this.flickAt;
+    p.flick = ft < FLICK.dur ? this.flickSide * Math.sin(ft * Math.PI * 2 * FLICK.beats / FLICK.dur) * Math.exp(-ft * FLICK.decay) : 0;
 
     // Gaze: the cursor when it is about, otherwise an idle wander.
     let gx = this.gaze.x;
@@ -1421,8 +1440,10 @@ function drawCat(pen, p) {
   // up a little and barely moving.
   const s = p.tail;
   const d = p.tailDown;
-  const up = [[64, 91], [80, 91], [88, 82], [88 + s * 6, 68], [82 + s * 16, 57 - Math.abs(s) * 3]];
-  const down = [[64, 91], [79, 93], [89, 93.5], [96 + s * 2, 92.5], [100 + s * 3, 89 - Math.abs(s)]];
+  // A click's flick moves only the tip (see FLICK): the last joint most.
+  const f = p.flick;
+  const up = [[64, 91], [80, 91], [88, 82], [88 + s * 6 + f * 2, 68], [82 + s * 16 + f * 7, 57 - Math.abs(s) * 3 + Math.abs(f) * 1.5]];
+  const down = [[64, 91], [79, 93], [89, 93.5], [96 + s * 2, 92.5], [100 + s * 3 + f * 2, 89 - Math.abs(s) - Math.abs(f) * 2]];
   pen.solid(strip(up.map(([x, y], i) => [lerp(x, down[i][0], d), lerp(y, down[i][1], d)]), 5.5), { shadow: 0.5 });
 
   // ── Body, sitting: a faceted bell, breathing upward from the ground.
@@ -1545,15 +1566,17 @@ function drawHusky(pen, p) {
 
   // ── Tail: curled up behind the body on one side, wagging from its base.
   pen.group(() => {
+    // A click's flick swings the end of the curl (see FLICK).
+    const f = p.flick * 3;
     pen.solid(strip([
       [0, 0],
       [10, -3],
       [15, -12],
-      [12, -22],
-      [5, -24],
-      [3, -18],
+      [12 + f * 0.4, -22],
+      [5 + f, -24 - Math.abs(f) * 0.3],
+      [3 + f, -18],
     ], 7), { shadow: 0.5, coat: 'mark' });
-    pen.solid([[3, -18], [5, -24], [8, -23], [7, -17]], { outline: false, band: LIT });
+    pen.solid([[3 + f, -18], [5 + f, -24 - Math.abs(f) * 0.3], [8 + f, -23], [7 + f, -17]], { outline: false, band: LIT });
   }, { x: 66, y: 88, rot: p.tail * 0.35 });
 
   // ── Body: dark saddle, broad in the shoulder.
@@ -2344,6 +2367,9 @@ const sim = new Sim();
 // as the gaze has it), fully by `full`; eased at `rate`; let go `holdFor`
 // seconds after the cursor stops.
 const EAR = { from: 0.25, full: 0.75, rate: 4, holdFor: 10 };
+// A click elsewhere: the tail tip twitches `beats` times over `dur` seconds,
+// fading at `decay`.
+const FLICK = { dur: 0.5, beats: 2, decay: 5 };
 const FEED = { dose: 45, wearOff: 1.5, hyperAbove: 30, minimum: 10 };
 
 /** Settings shared by both views. */
@@ -2646,6 +2672,14 @@ const LAB = {
 cursor ${sim.gaze.x >= 0 ? 'right' : 'left'} ${Math.abs(sim.gaze.x).toFixed(2)}   (turns from ${EAR.from}, fully by ${EAR.full})   still ${(sim.t - sim.cursorAt).toFixed(1)}s`;
     },
   },
+  flick: {
+    label: 'CLICKS',
+    hint: 'Click anywhere on the page away from the pet: the tip of its tail twitches twice, toward the side you clicked, and settles — it noticed, but it does not care. Clicking the pet itself still makes it purr; asleep, it ignores clicks.',
+    readout: () => {
+      const ago = sim.t - sim.flickAt;
+      return ago < 30 ? `last click ${ago.toFixed(1)}s ago, on the ${sim.flickSide < 0 ? 'left' : 'right'}   flick ${sim.pose.flick.toFixed(2)}` : 'no click yet';
+    },
+  },
   stroke: {
     label: 'STROKE',
     hint: 'Stroke the head: move the cursor slowly left and right over it, without pressing. After a few strokes its eyes close and it leans in; keep going and it stays that way. Stop, and it looks up at you.',
@@ -2827,6 +2861,17 @@ function drawBadges() {
     });
   }
 }
+
+/*
+ * A click anywhere but on a pet: the tail tip twitches toward it. Which side
+ * is measured from the enlarged pet's centre.
+ */
+window.addEventListener('pointerdown', (e) => {
+  if (!e.isPrimary || !on('flick')) return;
+  if (views.some((v) => v.pre.contains(e.target))) return;
+  const box = $('big').getBoundingClientRect();
+  sim.clickedNearby(e.clientX < box.left + box.width / 2 ? -1 : 1);
+});
 
 // Gaze follows the cursor, measured from the enlarged view's centre. Pointer
 // events, not mouse ones: carrying the mug cancels the pointerdown's default,
